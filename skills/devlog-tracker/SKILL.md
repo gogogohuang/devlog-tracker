@@ -60,11 +60,13 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
   算不出來）都明確接住、失敗就直接放行。這些腳本的職責是「檢查」，不該因為自己的臭蟲
   就意外把使用者的 session 卡死。
 
-沒有做的一件事：agentflow 的 Stop hook 還會依「這一輪是不是還在進行中」放寬檢查強度——
-只有結構性問題才擋，其餘失敗只當警告。這個設計在他們的架構下有意義，是因為他們用
-Ask/Reply 配對代表一個可能橫跨多次 Claude 動作才會結束的完整輪次；我們的架構是
-Claude Code 原生的「一個使用者訊息 = 一輪」，Stop 本來就只在這一輪真的要結束時才觸發，
-沒有「輪次進行中」這個中間狀態要放寬，所以這個設計沒有直接對應的地方可以搬過來。
+更新（Span Mode 之後）：agentflow 的 Stop hook 會依「這一輪是不是還在進行中」
+放寬檢查強度，這裡原本認為 Claude Code 原生的「一個使用者訊息 = 一輪」架構沒有
+對應的地方可以搬這個設計過來。後來為了支援 `/loop`／`Workflow` 這類會被自動
+排程反覆喚醒的長任務，加了上面的 Span Mode，算是這個設計的一個窄化版本——只在
+Claude 主動宣告「接下來會有一串自動續接」時才放寬，且用 tick 計數做安全閥，
+不是像 agentflow 那樣泛用地判斷「這輪是否還在進行中」。一般互動式對話仍然是
+完整的「一個訊息 = 一輪」強制模式，沒有變。
 
 ## 自動接續（由 hook 負責，不需要使用者喊指令）
 
@@ -134,6 +136,68 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 | 決策 | 做了會影響後續方向的選擇 | 沒有做任何選擇，純粹回應 |
 | Status | `IN_PROGRESS` / `BLOCKED`（還有事沒完） | `DONE` 且沒有任何懸而未決 |
 | 內容重複性 | 帶來新資訊 | 只是重複或確認前一輪已經記過的事 |
+
+## Span Mode：橫跨多次自動續接的長任務
+
+`/loop` 動態模式、`Workflow`、或任何會讓 Claude 被自己排程（`ScheduleWakeup`、
+背景 agent 完成通知）反覆喚醒、而不是被使用者手動打字觸發的長任務，如果每次
+自動喚醒都被當成一輪、強制要求完整寫入 devlog.md，會逼出很多沒有意義的紀錄，
+或是卡住整個自動化流程。Span Mode 是這種情境下的例外機制。
+
+### 什麼時候該開一個 span
+
+只有在**確定接下來會進入一連串自動續接**時才開（例如剛要開始跑 `/loop` 動態
+模式、或剛派出一個 `Workflow`），不是每輪隨便判斷。一般的互動式對話不需要，
+也不應該開 span。
+
+### 怎麼開一個 span
+
+寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，額外用 Write／Edit
+工具建立 `.devlog/.span-open`：
+
+```json
+{
+  "round": 12,
+  "opened_at": "2026-09-08T21:40:00+08:00",
+  "ticks_since_checkin": 0,
+  "max_silent_ticks": 5
+}
+```
+
+- `round`：剛寫的那個 Round 的編號
+- `opened_at`：現在的 ISO 8601 時間戳
+- `ticks_since_checkin`：固定從 0 開始
+- `max_silent_ticks`：這個 span 容許連續幾次自動 tick 都不寫 devlog.md，自己
+  依任務性質挑一個合理值（沒有標準答案，抓 5 這類量級即可）
+
+### span 開著的時候會自動發生什麼事
+
+不用手動維護——`round-start.sh` 每次自動續接觸發時會自己把 `ticks_since_checkin`
++1，`enforce-devlog.sh` 只要這個數字還沒到 `max_silent_ticks` 就直接放行，
+devlog.md 完全不用動。一旦累積到門檻，Stop hook 會退回正常模式，**這一輪就
+會被要求寫東西才能結束**——看到這種擋下來的訊息，代表這個 span 的「安靜額度」
+用完了，寫點輕量的進度（不用完整 Round，一行都可以）就能讓它繼續運作。
+
+### 怎麼關掉一個 span
+
+整個 Ask 真的做完時：**開一個新的 Round**（不要回頭改寫當初開 span 那個
+Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」，Response 總結
+整段自動化期間做了什麼，Status 正常寫 `DONE`／`IN_PROGRESS`／`BLOCKED`；然後
+刪掉 `.devlog/.span-open`。
+
+### 已知限制：分辨不出「這是自動續接還是真人插話」
+
+Claude Code 目前沒有任何 hook 欄位能分辨一個 tick 是自動排程觸發的，還是使用
+者真的手動打了新訊息——這兩種在 span 開著時會被一視同仁地當成一個 tick。如果
+span 開著時你發現進來的其實是一個跟自動任務無關的新請求，應該自己先關掉 span
+（刪除 `.span-open`、補寫收尾的 Round）再處理新請求，不要讓它悄悄被吞進正在
+開著的 span 裡。
+
+### 崩潰時的風險
+
+span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` 個 tick 的
+活動——不是整段 span，風險有明確上限。這是跟「回合進行到一半被砍斷」（見上面
+「需要誠實說明的邊界」）同一類、但用 tick 數量而不是單一回合為界的風險。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
 
