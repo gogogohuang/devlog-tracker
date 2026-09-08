@@ -114,6 +114,24 @@ if [ -f "$CHECKPOINT_FILE" ]; then
     CURRENT_MARKER_COUNT="$(grep -c '^## Checkpoint' "$DEVLOG_FILE" 2>/dev/null || echo 0)"
     case "$CURRENT_MARKER_COUNT" in ''|*[!0-9]*) CURRENT_MARKER_COUNT=0 ;; esac
 
+    # 下修同步：如果現在看到的數量比上次記的還少（compact 把 checkpoint 搬走了，
+    # 或有人手動改了 devlog.md），代表 CP_SEEN 是過期的高估值，往下的 -gt 比對
+    # 會永遠卡住（真的新寫的 checkpoint 也追不上這個虛高的門檻）。這裡必須立刻
+    # 把 checkpoint_marker_count 寫回檔案修正——這支腳本每次 Stop hook 都是全新
+    # process，只改 shell 變數不寫檔的話，下一次呼叫又會從檔案讀回舊的高估值，
+    # 等於什麼都沒修到。只動 checkpoint_marker_count 這個欄位，不動
+    # rounds_since_checkpoint——單純「數量變少」不代表寫了 checkpoint，不該歸零
+    # 沉默輪數計數器。同時更新本次呼叫用的 CP_SEEN 變數，讓下面這次 invocation
+    # 的 -gt / elif 判斷也立刻用修正後的值。
+    if [ "$CURRENT_MARKER_COUNT" -lt "$CP_SEEN" ]; then
+      awk -v seen="$CURRENT_MARKER_COUNT" '{
+        gsub(/"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]+/, "\"checkpoint_marker_count\": " seen);
+        print
+      }' "$CHECKPOINT_FILE" > "$CHECKPOINT_FILE.tmp" 2>/dev/null \
+        && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
+      CP_SEEN="$CURRENT_MARKER_COUNT"
+    fi
+
     if [ "$CURRENT_MARKER_COUNT" -gt "$CP_SEEN" ]; then
       awk -v seen="$CURRENT_MARKER_COUNT" '{
         gsub(/"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]+/, "\"rounds_since_checkpoint\": 0");

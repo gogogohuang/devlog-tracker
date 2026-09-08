@@ -193,6 +193,60 @@ echo "## Round 5 — 2026-09-08T00:35:00+08:00" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "malformed .checkpoint-state, round written -> allowed (checkpoint check skipped)" 0 $?
 
+# --- Checkpoint Mode Scenario 6: stored count higher than live count ------
+# (simulating post-archival/manual-edit decrease). Proves the resync guard
+# actually persists the corrected (lower) checkpoint_marker_count to disk
+# the moment the decrease is observed -- not just in the shell variable for
+# one invocation -- since this script is a fresh process every Stop hook
+# call and can only ever see what's on disk. Also proves a bare decrease
+# must not touch rounds_since_checkpoint, and that the very next genuine
+# checkpoint write correctly resets both counters off the now-correct base.
+cat > "$DEVLOG_DIR/.checkpoint-state" <<'CPEOF'
+{"rounds_since_checkpoint": 3, "max_silent_rounds": 20, "checkpoint_marker_count": 1}
+CPEOF
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 1 — 2026-09-09T00:00:00+08:00
+DEVEOF
+# devlog.md now has 0 "## Checkpoint" headings, but checkpoint_marker_count
+# says 1 (stale, from before an archival/manual edit removed it): live (0) <
+# stored (1) -- the decrease case.
+
+# Round A: round-start.sh bumps rounds_since_checkpoint 3 -> 4, then Claude
+# writes an ORDINARY round block (no new "## Checkpoint" heading) -- this
+# satisfies the base hash check but leaves the live checkpoint-heading count
+# at 0, still below the stale stored value of 1. This is the moment
+# enforce-devlog.sh must observe the decrease and persist it immediately,
+# without waiting for any future checkpoint write.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "## Round 2 — 2026-09-09T00:05:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "decrease observed on an ordinary (non-checkpoint) write -> allowed (below round threshold)" 0 $?
+CP_ROUNDS_MID="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+CP_MARKER_MID="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP_ROUNDS_MID" = "4" ] && [ "$CP_MARKER_MID" = "0" ]; then
+  echo "PASS: downward-count observation persisted checkpoint_marker_count=0 to disk IMMEDIATELY (before any new checkpoint heading existed), while leaving rounds_since_checkpoint at round-start.sh's plain increment (not reset)"
+else
+  echo "FAIL: expected rounds_since_checkpoint=4 (untouched by resync) and checkpoint_marker_count=0 (persisted to disk by the resync itself), got rounds=$CP_ROUNDS_MID marker=$CP_MARKER_MID"
+  FAIL=1
+fi
+
+# Round B: a genuine checkpoint write now brings the live count to 1, which
+# is above the just-corrected stored value of 0 -- the normal -gt path must
+# fire and reset/persist both counters together, proving a real checkpoint
+# write is never blocked or wedged after a resync.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "## Checkpoint（Round 2 摘要）" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "genuine checkpoint write above the corrected stored value -> allowed" 0 $?
+CP_ROUNDS_FINAL="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+CP_MARKER_FINAL="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP_ROUNDS_FINAL" = "0" ] && [ "$CP_MARKER_FINAL" = "1" ]; then
+  echo "PASS: genuine checkpoint write past the corrected stored value reset rounds_since_checkpoint to 0 and persisted checkpoint_marker_count to 1 -- resync was not a permanent wedge"
+else
+  echo "FAIL: expected rounds_since_checkpoint=0 and checkpoint_marker_count=1 after the follow-up genuine write, got rounds=$CP_ROUNDS_FINAL marker=$CP_MARKER_FINAL"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

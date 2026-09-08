@@ -268,7 +268,7 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 
 ### `/devlog-tracker:pause` 之後
 
-暫停強制記錄時 `.checkpoint-state`不會被刪除，計數保留；之後重新
+暫停強制記錄時 `.checkpoint-state` 不會被刪除，計數保留；之後重新
 `/devlog-tracker:start` 會接著原本的計數繼續，不會歸零重算。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
