@@ -96,4 +96,36 @@ if [ "$SPAN_VALID" -eq 1 ]; then
     && mv "$SPAN_FILE.tmp" "$SPAN_FILE" 2>/dev/null || true
 fi
 
+# --- checkpoint 檢查（Checkpoint Mode）----------------------------------
+# 這輪確實寫了東西（上面的雜湊比對通過）之後，才檢查 checkpoint 狀態。
+# 用「## Checkpoint 標題數量有沒有變多」當作可驗證的訊號，而不是「有沒有
+# 寫東西」——因為每輪本來就一定會寫東西（上面的雜湊檢查已經保證），用寫入
+# 當訊號會讓計數器每輪都被歸零，永遠到不了門檻。
+CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
+if [ -f "$CHECKPOINT_FILE" ]; then
+  CP_ROUNDS="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  CP_MAX="$(grep -o '"max_silent_rounds"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  CP_SEEN="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  case "$CP_ROUNDS" in ''|*[!0-9]*) CP_ROUNDS='' ;; esac
+  case "$CP_MAX" in ''|*[!0-9]*) CP_MAX='' ;; esac
+  case "$CP_SEEN" in ''|*[!0-9]*) CP_SEEN='' ;; esac
+
+  if [ -n "$CP_ROUNDS" ] && [ -n "$CP_MAX" ] && [ -n "$CP_SEEN" ]; then
+    CURRENT_MARKER_COUNT="$(grep -c '^## Checkpoint' "$DEVLOG_FILE" 2>/dev/null || echo 0)"
+    case "$CURRENT_MARKER_COUNT" in ''|*[!0-9]*) CURRENT_MARKER_COUNT=0 ;; esac
+
+    if [ "$CURRENT_MARKER_COUNT" -gt "$CP_SEEN" ]; then
+      awk -v seen="$CURRENT_MARKER_COUNT" '{
+        gsub(/"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]+/, "\"rounds_since_checkpoint\": 0");
+        gsub(/"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]+/, "\"checkpoint_marker_count\": " seen);
+        print
+      }' "$CHECKPOINT_FILE" > "$CHECKPOINT_FILE.tmp" 2>/dev/null \
+        && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
+    elif [ "$CP_ROUNDS" -ge "$CP_MAX" ]; then
+      echo "已經 ${CP_ROUNDS} 輪沒有寫 checkpoint 摘要了（門檻 ${CP_MAX}）。請在 .devlog/devlog.md 追加一段「## Checkpoint（Round X-Y 摘要）」，總結這段期間做了什麼，寫完再結束這一輪。" >&2
+      exit 2
+    fi
+  fi
+fi
+
 exit 0

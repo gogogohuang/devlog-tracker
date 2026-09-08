@@ -118,6 +118,81 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "malformed .span-open -> falls through to normal check, blocked (no write)" 2 $?
 
+# --- Checkpoint Mode Scenario 1: below threshold, no checkpoint yet -------
+# round-start.sh should bump rounds_since_checkpoint from 0 to 1; a normal
+# round write still satisfies the base hash check, so this must pass and
+# leave the counter at 1 (untouched, since no new "## Checkpoint" appeared).
+rm -f "$DEVLOG_DIR/.span-open"
+cat > "$DEVLOG_DIR/.checkpoint-state" <<'CPEOF'
+{"rounds_since_checkpoint": 0, "max_silent_rounds": 2, "checkpoint_marker_count": 0}
+CPEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "## Round 3 — 2026-09-08T00:20:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "checkpoint below threshold, round written -> allowed" 0 $?
+CP_ROUNDS_AFTER="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP_ROUNDS_AFTER" = "1" ]; then
+  echo "PASS: round-start.sh incremented rounds_since_checkpoint to 1"
+else
+  echo "FAIL: rounds_since_checkpoint should be 1, got '$CP_ROUNDS_AFTER'"
+  FAIL=1
+fi
+
+# --- Checkpoint Mode Scenario 2: threshold reached, no checkpoint written -
+# max_silent_rounds is 2; this is the second round-start.sh increment
+# (1 -> 2), so rounds_since_checkpoint hits the threshold. Even though the
+# round writes normal content (satisfying the base hash check), no
+# "## Checkpoint" heading exists yet -> must be blocked.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "## Round 4 — 2026-09-08T00:25:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "checkpoint threshold reached, no checkpoint block -> blocked" 2 $?
+
+# --- Checkpoint Mode Scenario 3: checkpoint block written -> resolves it --
+# Simulates Claude responding to the block by appending a checkpoint
+# heading. The retry must pass and reset both counters.
+echo "## Checkpoint（Round 3-4 摘要）" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "checkpoint block written -> allowed" 0 $?
+CP_ROUNDS_RESET="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+CP_MARKER_AFTER="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP_ROUNDS_RESET" = "0" ] && [ "$CP_MARKER_AFTER" = "1" ]; then
+  echo "PASS: checkpoint write reset rounds_since_checkpoint to 0 and checkpoint_marker_count to 1"
+else
+  echo "FAIL: expected rounds_since_checkpoint=0 and checkpoint_marker_count=1, got rounds=$CP_ROUNDS_RESET marker=$CP_MARKER_AFTER"
+  FAIL=1
+fi
+
+# --- Checkpoint Mode Scenario 4: an open, under-budget span pauses the ----
+# checkpoint counter, so it doesn't get double-jeopardy'd during an
+# automated run that Span Mode is deliberately keeping quiet.
+cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
+{
+  "round": 4,
+  "opened_at": "2026-09-08T00:30:00+08:00",
+  "ticks_since_checkin": 0,
+  "max_silent_ticks": 5
+}
+SPANEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+CP_ROUNDS_DURING_SPAN="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP_ROUNDS_DURING_SPAN" = "0" ]; then
+  echo "PASS: rounds_since_checkpoint not incremented while span silently passes this tick"
+else
+  echo "FAIL: rounds_since_checkpoint should stay 0 during span pass-through, got '$CP_ROUNDS_DURING_SPAN'"
+  FAIL=1
+fi
+rm -f "$DEVLOG_DIR/.span-open"
+
+# --- Checkpoint Mode Scenario 5: malformed .checkpoint-state -> fail-open -
+echo "not valid json at all" > "$DEVLOG_DIR/.checkpoint-state"
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "malformed .checkpoint-state, no write this round -> blocked by normal check only" 2 $?
+echo "## Round 5 — 2026-09-08T00:35:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "malformed .checkpoint-state, round written -> allowed (checkpoint check skipped)" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
