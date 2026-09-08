@@ -59,20 +59,21 @@ devlog-tracker/
 │   ├── plugin.json        # plugin manifest
 │   └── marketplace.json   # 讓這個 repo 本身就是一個 marketplace
 ├── docs/design/
-│   └── span-mode.md       # Span Mode 設計文件
+│   ├── span-mode.md        # Span Mode 設計文件
+│   └── checkpoint-mode.md  # Checkpoint Mode 設計文件
 ├── skills/devlog-tracker/SKILL.md
 ├── hooks/
 │   ├── hooks.json                       # SessionStart / UserPromptSubmit / Stop
 │   └── scripts/
 │       ├── session-start-devlog.sh      # 自動接續（含 Span Mode 恢復提醒）
-│       ├── round-start.sh               # 記錄每輪開始時 devlog.md 的內容雜湊
-│       ├── enforce-devlog.sh            # 強制每輪結束前要寫 devlog（含 Span Mode 檢查）
+│       ├── round-start.sh               # 記錄每輪開始時的雜湊，遞增 Span/Checkpoint 計數
+│       ├── enforce-devlog.sh            # 強制每輪結束前要寫 devlog（含 Span Mode、Checkpoint Mode 檢查）
 │       ├── test-enforce-devlog.sh       # 上面兩支腳本的自我檢查
 │       └── test-session-start-devlog.sh # session-start-devlog.sh 的自我檢查
 └── commands/
-    ├── start.md            # 開啟強制記錄
+    ├── start.md            # 開啟強制記錄（建立 .enabled、.checkpoint-state）
     ├── pause.md            # 暫停強制記錄
-    └── compact.md          # 壓縮歸檔
+    └── compact.md          # 壓縮歸檔（保留 Checkpoint 區塊，不搬進 archive）
 ```
 
 ## License
