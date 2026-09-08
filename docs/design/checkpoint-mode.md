@@ -1,0 +1,140 @@
+# Checkpoint Mode (with Round Segments)
+
+Two related additions to devlog-tracker's recording format, both aimed at
+the same complaint: a long-running interaction (a single sprawling round,
+or a session that's accumulated many rounds) leaves `devlog.md` hard to
+reconstruct from — either because one round's `Response` is a single
+end-of-round summary hiding everything that happened along the way, or
+because skimming dozens of Round entries to find "what actually got done
+in the last hour" is slow.
+
+- **Round Segments** answer the first problem: within one round, write
+  incremental sub-sections as work progresses instead of a single
+  end-of-round summary.
+- **Checkpoint Mode** answers the second: periodically insert a summary
+  block covering the last stretch of rounds, with a hook-enforced safety
+  net so it doesn't get skipped indefinitely on a long session.
+
+## Round Segments
+
+**Mechanism: none — pure authoring convention.** The existing Stop-hook
+content-hash check already only cares whether `devlog.md` changed since
+the round started; it doesn't care how many edits happened or when. So
+writing progressively during a round already satisfies enforcement today.
+What's missing is purely the documented convention for *how* to do it.
+
+**Format** (added to `skills/devlog-tracker/SKILL.md`): for a round that
+involves multiple distinct phases (exploration, a decision, an
+implementation step, verification), write each as its own timestamped
+sub-section under the round as that phase completes, instead of holding
+everything until the final `Response`:
+
+```markdown
+## Round 15
+User Input: 幫我重構 XXX 模組
+Status: IN_PROGRESS
+
+### 段落 1 - 09:12
+讀完現有程式碼，發現三個地方耦合...
+
+### 段落 2 - 09:20
+決定拆成 A/B 兩個檔案，理由...
+
+### 段落 3 - 09:35
+完成拆分，跑測試全過
+
+Response: (最終總結)
+Status: DONE
+```
+
+**When to write a segment** is Claude's judgment call — "a meaningful
+stage result," the same bar `Status: IN_PROGRESS` already uses — not a
+rule triggered by elapsed time or tool-call count. A short round with no
+real phases still gets a single `Response` as today; segments are for
+rounds long enough that a single end-of-round summary would hide real
+intermediate decisions.
+
+**Side effect:** because segments are written as the round proceeds
+rather than all at once at the end, a crash mid-round now loses at most
+the in-progress segment, not the whole round's work — a smaller version
+of the existing "round killed mid-flight" risk `SKILL.md` already
+documents.
+
+## Checkpoint Mode
+
+### `.devlog/.checkpoint-state`
+
+A JSON file, created by `/devlog-tracker:start` alongside `.enabled`,
+maintained by the hooks (not by Claude, unlike `.span-open`):
+
+```json
+{ "rounds_since_checkpoint": 0, "max_silent_rounds": 20 }
+```
+
+| Field | Meaning |
+|---|---|
+| `rounds_since_checkpoint` | Starts at 0. Incremented by `round-start.sh` on every `UserPromptSubmit` that isn't being silently skipped by an open Span Mode span (see Interaction with Span Mode below). Reset to 0 by `enforce-devlog.sh` whenever a forced checkpoint write succeeds. |
+| `max_silent_rounds` | Default `20`. Claude may edit this file directly to change the threshold for a given project/session, the same way it chooses `max_silent_ticks` when opening a span — no dedicated slash command. |
+
+### Hook behavior
+
+- **`round-start.sh`** (`UserPromptSubmit`): existing behavior unchanged,
+  plus: if `.enabled` exists, `.checkpoint-state` exists and is
+  well-formed, and this tick is not one that an open, under-budget Span
+  Mode span would cause `enforce-devlog.sh` to silently pass through,
+  increment `rounds_since_checkpoint` by 1.
+- **`enforce-devlog.sh`** (`Stop`): after the existing hash-comparison
+  logic passes (the round's own content was written — this always runs
+  first, unchanged), a new check runs: if `.checkpoint-state` is
+  well-formed and `rounds_since_checkpoint >= max_silent_rounds`, block
+  (`exit 2`) with a message asking Claude to also append a
+  `## Checkpoint（Round X-Y 摘要）` block summarizing the rounds since the
+  last checkpoint. Any subsequent write resolves it (same trust model as
+  the rest of this plugin's format enforcement — the hook checks that
+  *something* was written, not that it matches the expected shape) and
+  resets `rounds_since_checkpoint` to 0.
+- A malformed or missing `.checkpoint-state` is treated as "no checkpoint
+  tracking" at every read site — fail-open, matching every other hook
+  script in this plugin.
+
+### Interaction with Span Mode
+
+While a span is open and under its `max_silent_ticks` budget, Span Mode's
+whole point is that the Stop hook does *not* demand a write every tick.
+Checkpoint enforcement piling a second, independent demand on top of that
+would defeat it. So: `rounds_since_checkpoint` is only incremented on
+ticks that are *not* being silently passed through by an open span — i.e.
+the same ticks where the normal hash-comparison logic actually runs.
+Once the span closes (or expires past `max_silent_ticks` and falls
+through to normal enforcement), checkpoint counting resumes as usual.
+
+### Lifecycle
+
+Checkpoint tracking is always on once `/devlog-tracker:start` has been
+run (no separate opt-in, unlike Span Mode which is judgment-triggered per
+task) — it's meant to backstop any long interactive session, not just
+automated runs. `/devlog-tracker:pause` should also stop checkpoint
+enforcement (mirroring how it stops round enforcement); `.checkpoint-state`
+is left in place so counting resumes where it left off on
+`/devlog-tracker:start` again, rather than resetting.
+
+### Known Limitations
+
+- **Trust-based content check.** Like the rest of this plugin's
+  enforcement, the hook can't verify the forced write is actually a
+  well-formed `## Checkpoint` block — it only knows *some* write happened
+  after being blocked. This matches the existing trust level for normal
+  Round entries.
+- **No verification the checkpoint covers the right range.** Nothing
+  checks that a checkpoint's stated `Round X-Y` range is accurate; that's
+  on Claude to get right when writing it, same as any other devlog content.
+
+## Files
+
+| File | Role |
+|---|---|
+| `hooks/scripts/round-start.sh` | Increments `rounds_since_checkpoint` (skipping ticks silently passed by an open span) |
+| `hooks/scripts/enforce-devlog.sh` | Checks the checkpoint threshold after normal round enforcement passes, resets on write |
+| `commands/start.md` | Creates `.checkpoint-state` alongside `.enabled` |
+| `skills/devlog-tracker/SKILL.md` | Authoring instructions for Round Segments and Checkpoint blocks |
+| `hooks/scripts/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |
