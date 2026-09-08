@@ -1,6 +1,6 @@
 {
   "name": "devlog-tracker",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "在專案中維護 .devlog/devlog.md 逐輪對話紀錄；用 /devlog-tracker:start 明確開啟強制記錄，Stop hook 保證每輪都寫入，/devlog-tracker:pause 暫停、/devlog-tracker:compact 壓縮歸檔；/clear 或開新 session 時自動讀檔補齊進度。",
   "author": {
     "name": "gogogohuang"
