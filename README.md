@@ -21,7 +21,7 @@
 作為 Claude Code plugin 安裝（會自動更新）：
 
 ```
-/plugin marketplace add <your-github-handle>/devlog-tracker
+/plugin marketplace add gogogohuang/devlog-tracker
 /plugin install devlog-tracker@devlog-tracker
 ```
 
