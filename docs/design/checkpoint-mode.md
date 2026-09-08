@@ -65,16 +65,19 @@ documents.
 ### `.devlog/.checkpoint-state`
 
 A JSON file, created by `/devlog-tracker:start` alongside `.enabled`,
-maintained by the hooks (not by Claude, unlike `.span-open`):
+fully owned and maintained by the hooks (unlike `.span-open`, which
+Claude writes directly — there's no equivalent slash command or manual
+step here):
 
 ```json
-{ "rounds_since_checkpoint": 0, "max_silent_rounds": 20 }
+{ "rounds_since_checkpoint": 0, "max_silent_rounds": 20, "checkpoint_marker_count": 0 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `rounds_since_checkpoint` | Starts at 0. Incremented by `round-start.sh` on every `UserPromptSubmit` that isn't being silently skipped by an open Span Mode span (see Interaction with Span Mode below). Reset to 0 by `enforce-devlog.sh` whenever a forced checkpoint write succeeds. |
+| `rounds_since_checkpoint` | Starts at 0. Incremented by `round-start.sh` on every `UserPromptSubmit` that isn't being silently skipped by an open Span Mode span (see Interaction with Span Mode below). Reset to 0 by `enforce-devlog.sh` whenever it detects a new `## Checkpoint` block was actually added (see below) — not just "some write happened," since every ordinary round already causes a write and would otherwise reset the counter every single round, defeating the threshold entirely. |
 | `max_silent_rounds` | Default `20`. Claude may edit this file directly to change the threshold for a given project/session, the same way it chooses `max_silent_ticks` when opening a span — no dedicated slash command. |
+| `checkpoint_marker_count` | Starts at 0. The last count of `^## Checkpoint` headings `enforce-devlog.sh` observed in `devlog.md`. Compared against the live count each time the hook runs to detect whether a *new* checkpoint block was just added, independent of ordinary round writes. |
 
 ### Hook behavior
 
@@ -85,14 +88,18 @@ maintained by the hooks (not by Claude, unlike `.span-open`):
   increment `rounds_since_checkpoint` by 1.
 - **`enforce-devlog.sh`** (`Stop`): after the existing hash-comparison
   logic passes (the round's own content was written — this always runs
-  first, unchanged), a new check runs: if `.checkpoint-state` is
-  well-formed and `rounds_since_checkpoint >= max_silent_rounds`, block
-  (`exit 2`) with a message asking Claude to also append a
-  `## Checkpoint（Round X-Y 摘要）` block summarizing the rounds since the
-  last checkpoint. Any subsequent write resolves it (same trust model as
-  the rest of this plugin's format enforcement — the hook checks that
-  *something* was written, not that it matches the expected shape) and
-  resets `rounds_since_checkpoint` to 0.
+  first, unchanged), a new check runs: count `^## Checkpoint` headings in
+  `devlog.md` and compare against the stored `checkpoint_marker_count`.
+  - If the live count is **higher** — Claude added a new checkpoint block
+    this round (whether proactively or after being blocked) — reset
+    `rounds_since_checkpoint` to 0 and update `checkpoint_marker_count` to
+    the new count.
+  - Otherwise, if `rounds_since_checkpoint >= max_silent_rounds`, block
+    (`exit 2`) with a message asking Claude to append a
+    `## Checkpoint（Round X-Y 摘要）` block summarizing the rounds since
+    the last checkpoint. Claude adds it and tries to end the turn again;
+    this time the marker-count comparison above catches the new heading
+    and resets the counter, so the retry passes.
 - A malformed or missing `.checkpoint-state` is treated as "no checkpoint
   tracking" at every read site — fail-open, matching every other hook
   script in this plugin.
@@ -120,21 +127,25 @@ is left in place so counting resumes where it left off on
 
 ### Known Limitations
 
-- **Trust-based content check.** Like the rest of this plugin's
-  enforcement, the hook can't verify the forced write is actually a
-  well-formed `## Checkpoint` block — it only knows *some* write happened
-  after being blocked. This matches the existing trust level for normal
-  Round entries.
-- **No verification the checkpoint covers the right range.** Nothing
-  checks that a checkpoint's stated `Round X-Y` range is accurate; that's
-  on Claude to get right when writing it, same as any other devlog content.
+- **Heading text is the only verified signal.** The hook confirms a new
+  line starting with `## Checkpoint` was added — it doesn't check the
+  block has a `Round X-Y` range, a real summary, or accurate content.
+  Getting the substance right is on Claude, same trust level as every
+  other devlog entry this plugin enforces the presence of but not the
+  quality of.
+- **A checkpoint written for unrelated reasons still counts.** If Claude
+  writes a line starting with `## Checkpoint` for any other reason (e.g.
+  quoting this design doc into devlog.md), the counter resets exactly as
+  if a genuine summary had been written. Considered acceptable: no
+  plausible reason for that heading text to appear other than an actual
+  checkpoint.
 
 ## Files
 
 | File | Role |
 |---|---|
 | `hooks/scripts/round-start.sh` | Increments `rounds_since_checkpoint` (skipping ticks silently passed by an open span) |
-| `hooks/scripts/enforce-devlog.sh` | Checks the checkpoint threshold after normal round enforcement passes, resets on write |
+| `hooks/scripts/enforce-devlog.sh` | Detects a new `## Checkpoint` heading (resets the counter) and enforces the threshold after normal round enforcement passes |
 | `commands/start.md` | Creates `.checkpoint-state` alongside `.enabled` |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Round Segments and Checkpoint blocks |
 | `hooks/scripts/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |
