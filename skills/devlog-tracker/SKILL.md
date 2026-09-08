@@ -137,6 +137,37 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 | Status | `IN_PROGRESS` / `BLOCKED`（還有事沒完） | `DONE` 且沒有任何懸而未決 |
 | 內容重複性 | 帶來新資訊 | 只是重複或確認前一輪已經記過的事 |
 
+## Round Segments：單輪內的階段性記錄
+
+一輪如果包含好幾個明顯階段（先探索、再做決策、再實作、再驗證），不要全部
+憋到最後才寫一次 `Response`——那樣中途 crash 會整輪的過程全部遺失，事後也
+看不出中間走過的路。改成邊做邊在這輪底下追加階段性子區塊：
+
+`````markdown
+## Round 15
+User Input: 幫我重構 XXX 模組
+Status: IN_PROGRESS
+
+### 段落 1 - 09:12
+讀完現有程式碼，發現三個地方耦合...
+
+### 段落 2 - 09:20
+決定拆成 A/B 兩個檔案，理由...
+
+### 段落 3 - 09:35
+完成拆分，跑測試全過
+
+Response: (最終總結)
+Status: DONE
+`````
+
+**什麼時候該寫一個段落**：跟判斷 `Status: IN_PROGRESS` 用的同一套標準——「有意義的
+階段性結果」，不是照時間或工具呼叫次數機械觸發。短的、沒什麼階段可言的一輪，
+照舊只寫一個 `Response` 就好，不用硬湊段落。
+
+機制上不需要任何 hook 改動——現有的雜湊比對本來就只看 `devlog.md` 這輪結束時有
+沒有變，不管中途寫了幾次。這純粹是格式規範，讓「邊做邊寫」變成預設習慣。
+
 ## Span Mode：橫跨多次自動續接的長任務
 
 `/loop` 動態模式、`Workflow`、或任何會讓 Claude 被自己排程（`ScheduleWakeup`、
@@ -198,6 +229,47 @@ span 開著時你發現進來的其實是一個跟自動任務無關的新請求
 span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` 個 tick 的
 活動——不是整段 span，風險有明確上限。這是跟「回合進行到一半被砍斷」（見上面
 「需要誠實說明的邊界」）同一類、但用 tick 數量而不是單一回合為界的風險。
+
+## Checkpoint Mode：定期摘要
+
+跟 Span Mode 處理的是不同問題：Span Mode 管的是「一輪內部/自動續接期間要不要
+強制寫」，Checkpoint Mode 管的是「累積夠多輪之後，要不要在 devlog.md 裡插入一段
+橫跨多輪的摘要」，讓翻閱 devlog.md 的人不用逐輪爬完才知道整體進度。
+
+### 怎麼運作（不用手動開關）
+
+`/devlog-tracker:start` 會自動建立 `.devlog/.checkpoint-state`，之後全程自動：
+
+- 每個互動輪次，`round-start.sh` 把裡面的 `rounds_since_checkpoint` +1
+  （Span Mode 的 span 開著、這個 tick 會被安靜放行時不算）
+- `enforce-devlog.sh` 每輪檢查一次：如果 `devlog.md` 裡 `## Checkpoint` 開頭的
+  標題數量比上次看到的多，代表這輪寫了新的 checkpoint，自動把計數器歸零；
+  否則如果 `rounds_since_checkpoint` 已經到 `max_silent_rounds`（預設 20），
+  就擋下這一輪，要求補寫一段摘要
+
+### 被要求補寫的時候該怎麼寫
+
+在 `devlog.md` 尾端追加：
+
+```markdown
+## Checkpoint（Round <X>-<Y> 摘要）
+這段期間完成了...、修了...、決定採用...
+```
+
+`X`-`Y` 是這段還沒被摘要過的 Round 範圍，內容抓重點就好，不用逐輪複述——
+細節本來就還留在下面的 Round 區塊裡，checkpoint 只是給翻閱時的路標。寫完
+之後這一輪就會正常結束，不用再做任何事。
+
+### 調整門檻
+
+`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，可以直接編輯
+`.devlog/.checkpoint-state` 改掉這個數字，跟 Span Mode 調整 `max_silent_ticks`
+是同一套邏輯。
+
+### `/devlog-tracker:pause` 之後
+
+暫停強制記錄時 `.checkpoint-state`不會被刪除，計數保留；之後重新
+`/devlog-tracker:start` 會接著原本的計數繼續，不會歸零重算。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
 
