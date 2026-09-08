@@ -14,6 +14,7 @@
   `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。
 - **`/devlog-tracker:compact`**：手動把已完成的舊輪次搬到 `devlog.archive.md`，避免主檔案無限膨脹。
 - **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Response` / `Status`（`DONE` / `IN_PROGRESS` / `BLOCKED`）三段式，讀檔案就能還原對話重點，不用翻對話紀錄。
+- **Span Mode（進階功能）**：`/loop` 動態模式、`Workflow` 這類會被自動排程反覆喚醒的長任務，不用每個自動 tick 都寫一次 devlog——用 tick 計數安全閥（`max_silent_ticks`）保底，崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
 
 ## 安裝
 
@@ -52,17 +53,21 @@
 
 ```
 devlog-tracker/
+├── .gitignore
 ├── .claude-plugin/
 │   ├── plugin.json        # plugin manifest
 │   └── marketplace.json   # 讓這個 repo 本身就是一個 marketplace
+├── docs/design/
+│   └── span-mode.md       # Span Mode 設計文件
 ├── skills/devlog-tracker/SKILL.md
 ├── hooks/
 │   ├── hooks.json                       # SessionStart / UserPromptSubmit / Stop
 │   └── scripts/
-│       ├── session-start-devlog.sh      # 自動接續
+│       ├── session-start-devlog.sh      # 自動接續（含 Span Mode 恢復提醒）
 │       ├── round-start.sh               # 記錄每輪開始時 devlog.md 的內容雜湊
-│       ├── enforce-devlog.sh            # 強制每輪結束前要寫 devlog
-│       └── test-enforce-devlog.sh       # 上面兩支腳本的自我檢查
+│       ├── enforce-devlog.sh            # 強制每輪結束前要寫 devlog（含 Span Mode 檢查）
+│       ├── test-enforce-devlog.sh       # 上面兩支腳本的自我檢查
+│       └── test-session-start-devlog.sh # session-start-devlog.sh 的自我檢查
 └── commands/
     ├── start.md            # 開啟強制記錄
     ├── pause.md            # 暫停強制記錄
