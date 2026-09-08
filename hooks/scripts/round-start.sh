@@ -10,6 +10,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+SPAN_FILE="$DEVLOG_DIR/.span-open"
 
 # 沒下過 /devlog-tracker:start（也就是沒有這個開關檔），代表這個專案沒啟動強制記錄，
 # 直接放行，不留下任何 .devlog 檔案。
@@ -19,6 +20,21 @@ if [ -f "$DEVLOG_FILE" ]; then
   cksum < "$DEVLOG_FILE" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
 else
   echo "MISSING" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+fi
+
+# Span Mode：.span-open 存在就把 ticks_since_checkin 遞增，供 Stop hook
+# （enforce-devlog.sh）判斷這一輪要不要放寬檢查。讀不到或不是數字就跳過，
+# 不動這個檔案——fail-open，讓 Stop hook 那邊的 malformed 判斷去處理。
+if [ -f "$SPAN_FILE" ]; then
+  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  case "$SPAN_TICKS" in
+    ''|*[!0-9]*) : ;;
+    *)
+      NEW_TICKS=$((SPAN_TICKS + 1))
+      awk -v new="$NEW_TICKS" '{ gsub(/"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]+/, "\"ticks_since_checkin\": " new); print }' "$SPAN_FILE" > "$SPAN_FILE.tmp" 2>/dev/null \
+        && mv "$SPAN_FILE.tmp" "$SPAN_FILE" 2>/dev/null || true
+      ;;
+  esac
 fi
 
 exit 0

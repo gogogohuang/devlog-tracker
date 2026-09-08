@@ -46,6 +46,28 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 # 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
 [ -f "$ENABLED_FLAG" ] || exit 0
 
+# --- span 檢查（Span Mode：橫跨多次自動續接的長任務）---------------------
+# Claude 主動宣告的 .devlog/.span-open 存在時（見 SKILL.md），這個 tick 不
+# 強制要求 devlog.md 有變動，只要求 ticks_since_checkin（由 round-start.sh
+# 每個 tick 遞增）沒有累積超過 max_silent_ticks。超過門檻就退回下面正常的
+# 雜湊比對，逼這輪真的寫點東西；寫成功後把計數器歸零。span 檔案壞掉、缺欄位
+# 或不是數字，一律當作沒有 span，直接往下走正常流程——fail-open。
+SPAN_FILE="$DEVLOG_DIR/.span-open"
+SPAN_VALID=0
+if [ -f "$SPAN_FILE" ]; then
+  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SPAN_MAX="$(grep -o '"max_silent_ticks"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  case "$SPAN_TICKS" in ''|*[!0-9]*) SPAN_TICKS='' ;; esac
+  case "$SPAN_MAX" in ''|*[!0-9]*) SPAN_MAX='' ;; esac
+  if [ -n "$SPAN_TICKS" ] && [ -n "$SPAN_MAX" ]; then
+    SPAN_VALID=1
+  fi
+fi
+
+if [ "$SPAN_VALID" -eq 1 ] && [ "$SPAN_TICKS" -lt "$SPAN_MAX" ]; then
+  exit 0
+fi
+
 # 還沒有 turn marker，代表 UserPromptSubmit hook 這次沒跑到（例如剛裝上、
 # 或是某種特殊情況），直接放行避免卡住——fail-open。
 [ -f "$TURN_MARKER" ] || exit 0
@@ -65,6 +87,13 @@ fi
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
   echo "這一輪還沒有寫進 .devlog/devlog.md。請依 skills/devlog-tracker/SKILL.md 的格式，在檔案尾端補上這一輪的 \`## Round <N>\`（User Input / Response / Status），寫完再結束這一輪。" >&2
   exit 2
+fi
+
+# 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
+# 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。
+if [ "$SPAN_VALID" -eq 1 ]; then
+  awk '{ gsub(/"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]+/, "\"ticks_since_checkin\": 0"); print }' "$SPAN_FILE" > "$SPAN_FILE.tmp" 2>/dev/null \
+    && mv "$SPAN_FILE.tmp" "$SPAN_FILE" 2>/dev/null || true
 fi
 
 exit 0
