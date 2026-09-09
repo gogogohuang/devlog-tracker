@@ -66,11 +66,14 @@ sequenceDiagram
 
 之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下 `/devlog-tracker:continue`。暫停、歸檔、具名搬走見上方指令表（完整 namespace，plugin 名稱是 `devlog-tracker`）。
 
+測試：`bash hooks/scripts/run-tests.sh`
+
 ## 目錄結構
 
 ```
 devlog-tracker/
 ├── .gitignore
+├── .github/workflows/hooks.yml          # 每次 push / PR 執行 hook 自我檢查
 ├── .claude-plugin/
 │   ├── plugin.json        # plugin manifest
 │   └── marketplace.json   # 讓這個 repo 本身就是一個 marketplace
@@ -94,6 +97,7 @@ devlog-tracker/
 │       ├── on-tool-failure.sh           # PostToolUseFailure：工具失敗時標中斷
 │       ├── segment-watch.sh             # 同一輪太久沒寫 devlog 就擋住下一個工具
 │       ├── enforce-devlog.sh            # 強制每輪結束前要寫 Summary/Handoff（含 Span Mode、Checkpoint Mode 檢查）
+│       ├── run-tests.sh                  # 執行所有 test-*.sh
 │       ├── test-close-open-round.sh     # close-open-round 自我檢查
 │       ├── test-round-start.sh          # round-start skeleton / heal 自我檢查
 │       ├── test-on-interrupt.sh         # StopFailure / SessionEnd / PostToolUseFailure 自我檢查
