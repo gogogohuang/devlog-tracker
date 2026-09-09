@@ -26,6 +26,27 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=devlog-lock.sh
 . "$SCRIPT_DIR/devlog-lock.sh"
 
+# Extracts the last "## Round N ..." block from $1 (fence-aware: a line
+# starting with ``` — optionally indented — toggles in/out of a code
+# fence, and headings inside a fence don't end the block). Used twice
+# below: once for the interrupt-heal check, once for the Summary/Handoff
+# title check.
+last_round_block() {
+  awk '
+    /^[ \t]*```/ { fence = !fence }
+    !fence && /^## Round / { start = NR }
+    { lines[NR] = $0; infence[NR] = fence }
+    END {
+      if (start == 0) exit 0
+      end = NR
+      for (i = start + 1; i <= NR; i++) {
+        if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+      }
+      for (i = start; i <= end; i++) print lines[i]
+    }
+  ' "$1"
+}
+
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
 # 足以涵蓋 Claude Code 實際送出的 stop_hook_active 欄位形狀），兩種環境都要生效。
@@ -41,19 +62,7 @@ if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   # INTERRUPTED + user_interrupt — exit 0 so Esc is not converted
   # into "please write Summary". Recovered-complete or a stale flag
   # leaves Status alone; fall through to hash / headings / checkpoint.
-  _LAST_ROUND="$(awk '
-    /^[ \t]*```/ { fence = !fence }
-    !fence && /^## Round / { start = NR }
-    { lines[NR] = $0; infence[NR] = fence }
-    END {
-      if (start == 0) exit 0
-      end = NR
-      for (i = start + 1; i <= NR; i++) {
-        if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
-      }
-      for (i = start; i <= end; i++) print lines[i]
-    }
-  ' "$DEVLOG_FILE" 2>/dev/null || true)"
+  _LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
   case "$_LAST_ROUND" in
     *$'\nINTERRUPTED\nuser_interrupt'*) exit 0 ;;
   esac
@@ -137,19 +146,7 @@ fi
 # 以 ### Summary、### Handoff 開頭的行。只驗標題存在，不驗內容。
 # 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
 # 變成新的卡死理由。
-LAST_ROUND="$(awk '
-  /^[ \t]*```/ { fence = !fence }
-  !fence && /^## Round / { start = NR }
-  { lines[NR] = $0; infence[NR] = fence }
-  END {
-    if (start == 0) exit 0
-    end = NR
-    for (i = start + 1; i <= NR; i++) {
-      if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
-    }
-    for (i = start; i <= end; i++) print lines[i]
-  }
-' "$DEVLOG_FILE" 2>/dev/null || true)"
+LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
 if [ -n "$LAST_ROUND" ]; then
   HAS_SUMMARY=0
   HAS_HANDOFF=0
