@@ -109,4 +109,4 @@ description: 若這段 devlog 值得單獨留名，把它從 devlog.md 搬走成
 
 回報：具名檔路徑、搬走幾輪（哪些編號）、主檔目前剩幾輪。不要讀寫 `devlog.archive.md`。
 
-然後在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
+若 `.round-open` 存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。若沒有開著的 Round：不要改寫歷史 Round 的收尾。
