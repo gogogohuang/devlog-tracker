@@ -91,18 +91,21 @@ fi
 
 # --- 標題檢查（Summary + Handoff）-----------------------------------------
 # 雜湊已經證明這輪有寫入。接著取出最後一個 Round 區塊：從最後一個
-# 「## Round 」行起到下一條「## 」標題之前（或 EOF）。這個區塊必須同時有
+# 「## Round 」行起到下一條「## 」標題之前（或 EOF）。圍欄（```）內的
+# 行不參與起迄判定，避免 User Input / Handoff 引用 `## Round` 或 `## 安裝`
+# 範例時把有效的最後一個 Round 誤切成缺標題。這個區塊必須同時有
 # 以 ### Summary、### Handoff 開頭的行。只驗標題存在，不驗內容。
 # 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
 # 變成新的卡死理由。
 LAST_ROUND="$(awk '
-  /^## Round / { start = NR }
-  { lines[NR] = $0 }
+  /^[ \t]*```/ { fence = !fence }
+  !fence && /^## Round / { start = NR }
+  { lines[NR] = $0; infence[NR] = fence }
   END {
     if (start == 0) exit 0
     end = NR
     for (i = start + 1; i <= NR; i++) {
-      if (lines[i] ~ /^## /) { end = i - 1; break }
+      if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
     }
     for (i = start; i <= end; i++) print lines[i]
   }

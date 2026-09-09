@@ -442,6 +442,65 @@ else
 fi
 rm -f "$DEVLOG_DIR/.span-open"
 
+# --- Heading Scenario 10: fenced ## Round / ## 安裝 must not bound the Round
+# A valid last Round has both required headings, but User Input quotes a
+# markdown example containing `## Round 15` and `## 安裝`. Those fenced lines
+# must not become the last-Round start or the next-heading end.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 8 — 2026-09-09T10:35:00+08:00
+
+### User Input
+格式要怎麼寫？
+
+```markdown
+## Round 15
+## 安裝
+```
+
+### Summary
+說明 Round 格式。
+
+### Handoff
+#### 現況
+已回覆格式問題。
+
+### Status
+DONE
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "last Round complete, fenced ## Round 15 and ## 安裝 in body -> allowed" 0 $?
+
+# --- Heading Scenario 11: older ### Response Round must not block last Round
+# History may still use ### Response. Only the last Round is checked.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 1 — 2026-09-08T09:00:00+08:00
+
+### User Input
+legacy request
+
+### Response
+old blob without Summary or Handoff
+
+### Status
+DONE
+
+## Round 2 — 2026-09-09T10:40:00+08:00
+
+### Summary
+new shape
+
+### Handoff
+#### 現況
+complete last Round
+
+### Status
+DONE
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "older Round still uses ### Response, complete last Round -> allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
