@@ -16,6 +16,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/redact-prompt.sh"
 # shellcheck source=devlog-lock.sh
 . "$HOOKS_DIR/devlog-lock.sh"
+# shellcheck source=devlog-md.sh
+. "$HOOKS_DIR/devlog-md.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -24,6 +26,7 @@ SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
+AWAITING_FILE="$DEVLOG_DIR/.awaiting-reply"
 
 [ -f "$ENABLED_FLAG" ] || exit 0
 devlog_lock_acquire
@@ -34,6 +37,21 @@ SESSION_ID="$(json_str_field "$INPUT" session_id)"
 
 if [ -f "$ROUND_OPEN" ]; then
   bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" || true
+fi
+
+FOLD_ROUND=""
+if [ -f "$AWAITING_FILE" ]; then
+  AWAIT_ROUND="$(json_int_get "$AWAITING_FILE" round)"
+  rm -f "$AWAITING_FILE" 2>/dev/null || true
+  case "$AWAIT_ROUND" in
+    ''|*[!0-9]*) AWAIT_ROUND='' ;;
+  esac
+  if [ -n "$AWAIT_ROUND" ] && [ -f "$DEVLOG_FILE" ]; then
+    CURRENT_LAST="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $2 }')"
+    if [ "$CURRENT_LAST" = "$AWAIT_ROUND" ]; then
+      FOLD_ROUND="$AWAIT_ROUND"
+    fi
+  fi
 fi
 
 SPAN_SKIP=0
@@ -49,7 +67,48 @@ fi
 
 PROMPT="$(json_str_field "$INPUT" prompt)"
 
-if [ "$SPAN_SKIP" -eq 0 ]; then
+if [ "$SPAN_SKIP" -eq 1 ]; then
+  FOLD_ROUND=""
+fi
+
+if [ -n "$FOLD_ROUND" ]; then
+  if [ -z "$PROMPT" ]; then
+    PROMPT="（無 prompt）"
+  fi
+  TRUNC_NOTE=""
+  if [ "${#PROMPT}" -gt 4000 ]; then
+    PROMPT="${PROMPT:0:4000}"
+    TRUNC_NOTE="（後略，已截斷至 4000 字）"
+  fi
+  PROMPT="$(printf '%s' "$PROMPT" | sed 's/```/⟨fence⟩/g')"
+  PROMPT="$(printf '%s' "$PROMPT" | redact_prompt)"
+
+  TS="$(date +%H:%M 2>/dev/null || echo unknown)"
+  FULL_TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
+  START_LINE="$(devlog_list_round_starts "$DEVLOG_FILE" | awk -v r="$FOLD_ROUND" '$2==r{print $1}')"
+  END_LINE="$(devlog_block_end "$DEVLOG_FILE" "$START_LINE")"
+  SEG_N=$(( $(devlog_count_segments "$DEVLOG_FILE" "$START_LINE" "$END_LINE") + 1 ))
+
+  SEG_TMP="$DEVLOG_DIR/.segment-insert.tmp"
+  {
+    printf '### 段落 %s - %s（回覆上一輪的問題）\n' "$SEG_N" "$TS"
+    printf '```text\n'
+    printf '%s\n' "$PROMPT"
+    printf '```\n'
+    if [ -n "$TRUNC_NOTE" ]; then
+      printf '%s\n' "$TRUNC_NOTE"
+    fi
+    printf '\n'
+  } > "$SEG_TMP" 2>/dev/null || true
+
+  if [ -f "$SEG_TMP" ]; then
+    devlog_insert_before_summary "$DEVLOG_FILE" "$START_LINE" "$END_LINE" "$SEG_TMP" > "$DEVLOG_FILE.tmp" 2>/dev/null \
+      && mv "$DEVLOG_FILE.tmp" "$DEVLOG_FILE" 2>/dev/null || true
+    rm -f "$SEG_TMP" 2>/dev/null || true
+  fi
+
+  printf '{"round": %s, "opened_at": "%s"}\n' "$FOLD_ROUND" "$FULL_TS" > "$ROUND_OPEN" 2>/dev/null || true
+elif [ "$SPAN_SKIP" -eq 0 ]; then
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
   fi
@@ -115,7 +174,7 @@ if [ -f "$SPAN_FILE" ]; then
   fi
 fi
 
-if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -f "$CHECKPOINT_FILE" ]; then
+if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -z "$FOLD_ROUND" ] && [ -f "$CHECKPOINT_FILE" ]; then
   CP_ROUNDS="$(json_int_get "$CHECKPOINT_FILE" rounds_since_checkpoint)"
   case "$CP_ROUNDS" in
     ''|*[!0-9]*) : ;;
