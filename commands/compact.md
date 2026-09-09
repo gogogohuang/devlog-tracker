@@ -17,4 +17,4 @@ description: 把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.a
 5. 從 `.devlog/devlog.md` 移除步驟 4 搬走的區塊，其餘保持原樣（不要順便改寫使用者或先前 Claude 寫的內容）。
 6. 完成後回報一句摘要：搬移了幾輪到 archive、devlog.md 目前剩幾輪、archive 檔案目前累積幾輪。
 
-不要在使用者沒有要求的情況下自動觸發這個流程；這是使用者主動執行 `/devlog-tracker:compact` 時才做的事。
+不要在使用者沒有要求的情況下自動觸發這個流程；這是使用者主動執行 `/devlog-tracker:compact` 時才做的事。不要讀取或寫入 `.devlog/devlog.<name>.md` 具名檔（那是 `/devlog-tracker:keep` 的產物）。

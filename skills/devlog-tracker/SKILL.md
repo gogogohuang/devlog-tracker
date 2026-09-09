@@ -1,6 +1,6 @@
 ---
 name: devlog-tracker
-description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / clear / compact / fork 時自動讀檔補齊進度；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
+description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / clear / compact / fork 時自動讀檔補齊進度；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔、/devlog-tracker:keep 可把有主題的一段搬走成 devlog.<name>.md；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「keep」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
 ---
 
 # Devlog Tracker（簡化版）
@@ -17,6 +17,7 @@ devlog.md 是 single source of truth。使用者在裡面許願、Claude 也在�
 
 - 主檔：`.devlog/devlog.md`
 - 歸檔：`.devlog/devlog.archive.md`
+- 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
 
@@ -331,6 +332,10 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 - 其餘 `DONE` 的舊輪次：完整搬到 `.devlog/devlog.archive.md`（append，不覆寫既有歸檔）
 - 只搬移，不刪除、不改寫內容
 
+## 具名保存：`/devlog-tracker:keep`
+
+把一段（或全部歷史）從 `devlog.md` **搬走**成 `.devlog/devlog.<name>.md`，讓有主題的紀錄可以單獨留名。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
+
 ## 跟原版 agentflow 的差異
 
 | | agentflow 原版 | 這個簡化版 |
@@ -340,4 +345,4 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 | 記錄機制 | 依 SDD 步驟完成度寫入 | 開關開著時 Stop hook 強制每輪都要更新，跟 plan 完成度無關 |
 | worker | 內建 subagent 或 external runner 外包 | 沒有，全部由當前 session 直接處理 |
 | 審查機制 | 對抗式審查、3ways 多模型辯論 | 沒有 |
-| 歸檔觸發 | 依大小自動判斷 | 使用者主動下 `/devlog-tracker:compact` |
+| 歸檔觸發 | 依大小自動判斷 | 使用者主動下 `/devlog-tracker:compact`；有主題要留名時用 `/devlog-tracker:keep` |
