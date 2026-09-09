@@ -377,6 +377,8 @@ framework.
 - **Span + unrelated human message** still not detected.
 - **Pause mid-round** leaves an `IN_PROGRESS` skeleton without
   Summary; that is intentional, not `INTERRUPTED`.
+- **Cursor cloud agents** do not run `sessionStart`, so they do not
+  receive the automatic devlog excerpt.
 
 ## Out of scope
 
@@ -384,7 +386,6 @@ framework.
 - Quality checks on Summary/Handoff bodies (still presence-only).
 - Parsing `transcript_path` on SessionEnd.
 - Distinguishing automated vs human UserPromptSubmit.
-- Cursor hook ports (this plugin remains Claude Code `hooks.json`).
 - Plugin version bump.
 
 ## Files

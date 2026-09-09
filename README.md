@@ -59,6 +59,16 @@ sequenceDiagram
 /plugin install devlog-tracker@devlog-tracker
 ```
 
+### Cursor（選用）
+
+Claude Code 仍是主要安裝方式。若要在 Cursor workspace 使用，先設定
+`DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `cursor/hooks.json` 的
+`hooks` 合併進專案 `.cursor/hooks.json`。也可以把整個 `cursor/hooks/` 與
+`hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
+
+Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的
+hook 仍依 Cursor 支援的事件執行。
+
 ## 使用
 
 在專案裡下一次：
@@ -80,6 +90,9 @@ devlog-tracker/
 ├── .claude-plugin/
 │   ├── plugin.json        # plugin manifest
 │   └── marketplace.json   # 讓這個 repo 本身就是一個 marketplace
+├── cursor/
+│   ├── hooks.json         # Cursor hooks 設定範本
+│   └── hooks/             # Cursor 事件轉接至共用 bash scripts
 ├── docs/design/
 │   ├── span-mode.md           # Span Mode 設計文件
 │   ├── checkpoint-mode.md     # Checkpoint Mode 設計文件
