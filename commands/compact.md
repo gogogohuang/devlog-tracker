@@ -9,7 +9,7 @@ description: 把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.a
 3. 保留規則（以下皆保留在 devlog.md，不搬動）：
    - 檔案開頭的專案摘要（如果有）
    - 最近 5 輪（不論 Status 是什麼）
-   - 所有 Status 為 `IN_PROGRESS` 或 `BLOCKED` 的輪次，不論多舊
+   - 所有 Status 為 `IN_PROGRESS`、`BLOCKED` 或 `INTERRUPTED` 的輪次，不論多舊
    - 所有 `## Checkpoint` 區塊，永遠留在 devlog.md、不搬到 archive——它們是
      checkpoint 機制存在的目的：翻閱時的摘要路標，搬走就失去了作用
 4. 其餘 Status 為 `DONE` 的舊輪次：依原本完整的 `## Round <N> — <時間戳>` 標題與內容，

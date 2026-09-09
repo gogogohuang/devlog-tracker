@@ -8,8 +8,10 @@ Round before the turn can end.
   of this round, including whether work is stuck.
 - **`### Handoff`** is for the next Claude: structured facts needed to
   continue without reading the conversation transcript.
-- **`### Status`** stays a three-value enum. The "what to do next" sentence
-  that used to live under Status moves into Handoff's `下一步`.
+- **`### Status`** is `DONE | IN_PROGRESS | BLOCKED | INTERRUPTED`. The "what
+  to do next" sentence that used to live under Status moves into Handoff's
+  `下一步`. `INTERRUPTED` is hook-only (unexpected interrupt), not a Claude
+  close choice; interrupt stubs do not require Summary/Handoff quality checks.
 
 This is independent of Checkpoint Mode. A Checkpoint is still a *cross-round*
 human landmark; Summary is the *per-round* human skim. Neither replaces the
@@ -66,7 +68,7 @@ when Status is IN_PROGRESS or BLOCKED. Omit when Status is DONE and there
 is nothing further to do.>
 
 ### Status
-DONE | IN_PROGRESS | BLOCKED
+DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 ```
 
 Top-level headings stay English (`User Input`, `Summary`, `Handoff`,
@@ -91,6 +93,10 @@ Round numbering, timestamps, and User Input rules are unchanged.
    - `IN_PROGRESS`: work remains and can proceed.
    - `BLOCKED`: work cannot proceed without external input.
    - `DONE`: this round's request is finished.
+   - `INTERRUPTED`: hook-only stamp for unexpected interrupt (Esc, non-usage
+     API error, SessionEnd, dangling `.round-open`). Claude must not choose
+     this when closing normally. Interrupt stubs are not subject to
+     Summary/Handoff quality checks.
    The former "接下來要做什麼" sentence no longer belongs under Status.
 5. **Trivial rounds still get a full Round block.** One-sentence Summary;
    Handoff keeps only `現況` (one sentence); Status is usually `DONE`.

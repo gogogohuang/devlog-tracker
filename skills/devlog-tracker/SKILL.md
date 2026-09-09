@@ -33,22 +33,25 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 開關啟動之後，才會進入下面這套強制流程：
 
 1. 使用者送出新訊息時，`UserPromptSubmit` hook（`hooks/scripts/round-start.sh`）
-   先檢查開關檔存在，才記下這一輪開始時 `.devlog/devlog.md` 的內容雜湊到 `.devlog/.turn-start`
-2. Claude 想結束這輪回應時，`Stop` hook（`hooks/scripts/enforce-devlog.sh`）
-   一樣先檢查開關檔，開著的話才去比對 `.devlog/devlog.md` 現在的內容雜湊跟這一輪開始時是否不同
-3. 沒有的話，hook 用 exit code 2 擋下來，把「請補上這輪的 Round 區塊」的訊息回給 Claude，
-   Claude 必須先照下面的格式寫完，才能真正結束這輪
+   若開關開著，就在 `.devlog/devlog.md` 尾端追加這一輪的 skeleton（`### User Input`
+   + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。`.turn-start` 雜湊是
+   **寫完 skeleton 之後**才拍的，所以 Stop 仍能判斷 Claude 有沒有再補收尾。
+2. Claude 編輯**同一個** Round：不要再 append 一個新的 `## Round`。不要改 User Input
+   （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Handoff`，
+   把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。
+3. `Stop` hook（`hooks/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
+   缺少 `### Summary` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
+   `.round-open`。
 
 好處：就算工作做到一半被中斷（下一輪還沒開始就被使用者關掉、或換 session），
 只要**上一輪有正常結束過**，devlog.md 就一定留有當時的 Status（多半是 `IN_PROGRESS`
 或 `BLOCKED`）可以接續——這跟「plan 是否完成」完全無關，純粹綁在「這一輪有沒有結束」
 這個事件上。
 
-需要誠實說明的邊界：這個機制保證的是「**每個正常結束的回合**」都會被記錄，如果是回合
-「進行到一半」就被強制砍掉 session（例如中途斷線、強制終止進程），那一次 Stop hook
-根本沒機會執行，那個瞬間的細節不會被補進 devlog——這種情況下能接續到的，是上一個有
-正常結束的回合留下的狀態，不會是砍斷當下那一瞬間。如果需要連這種情況都要能還原到
-最後一步操作，可以再加一個 `PostToolUse` hook，每次工具呼叫後都寫一行輕量的進度紀錄。
+需要誠實說明的邊界：User Input 在送出當下就已經在 `devlog.md`。正常結束時 Stop 仍保證有 Summary / Handoff。
+意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺時，Status 要等下次 SessionStart 或
+下一則訊息才補上）。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個
+工具呼叫時催促。
 
 ### 兩個穩健性設計（參考 agfnow/agentflow 的 stop-hook.js）
 
@@ -85,7 +88,7 @@ matcher 設為 `startup|resume|clear|compact`，也就是**開新 session、resu
 
 ## 每一輪的紀錄格式
 
-完成一輪工作後（或使用者要求先記錄時），在檔案尾端新增：
+hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，不要為同一則使用者訊息再新增一個 `## Round`：
 
 ```markdown
 ## Round <N> — <ISO 8601 時間戳，含時區>
@@ -111,7 +114,7 @@ matcher 設為 `startup|resume|clear|compact`，也就是**開新 session、resu
 IN_PROGRESS／BLOCKED 必寫；DONE 且沒有後續就整節省略>
 
 ### Status
-DONE | IN_PROGRESS | BLOCKED
+DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 ```
 
 Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。
@@ -127,9 +130,12 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   `現況` 幾乎每輪都該有。`下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫，且要具體到下一輪打開就能做，
   不要寫「繼續完成」。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
-- `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED` 其中一個，不要在下面再附「接下來要做什麼」
+- `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
   `DONE` = 這輪請求已結束。
+- `INTERRUPTED` 只由 hook 在意外中斷時寫上（Esc、非 usage 的 API 錯誤、SessionEnd、
+  下次 SessionStart / 下一則訊息發現 `.round-open` 還在）。Claude 正常收尾時不要自己選這個值。
+  usage 用光（`rate_limit` / `billing_error` / `account_on_hold`）不標中斷。
 - 每輪一個區塊，不要把多輪內容合併寫成一個 Round。
 - 不要另外開欄位列「這輪用了哪些 skill」——那是稽核用途，跟接續開發沒有直接關係。只有
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff

@@ -33,6 +33,9 @@ the last time `devlog.md`'s content hash changed.
   `date` mean exit 0.
 - **Do not author `devlog.md` from a hook.** Claude writes; the hook
   only checks.
+  Exception (see `docs/design/recording-moments.md`): `UserPromptSubmit` writes the
+  Round skeleton, and interrupt helpers patch Status to `INTERRUPTED`. Segment Watch
+  itself still only checks.
 - **Allow the write that satisfies the block.** If the upcoming tool
   is Write or Edit targeting this project's `.devlog/devlog.md`, pass
   even when the timer has expired — otherwise Claude cannot unblock
