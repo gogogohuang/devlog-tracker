@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionStart hook：在 startup / resume / clear / compact 時執行
+# SessionStart hook：在 startup / resume / clear / compact / fork 時執行
 # 讀取目前工作目錄下的 .devlog/devlog.md，只取最後 N 輪 + 開頭摘要（如果有），
 # 印到 stdout 讓 Claude Code 自動注入這次 session 的 context。
 # 找不到檔案就直接 exit 0，不輸出任何東西（不干擾一般沒有用 devlog 的專案）。

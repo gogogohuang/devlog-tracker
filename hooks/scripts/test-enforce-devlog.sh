@@ -113,8 +113,20 @@ cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
 }
 SPANEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+SPAN_HASH_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "span open, ticks at max, no write -> blocked (falls back to normal check)" 2 $?
+case "$SPAN_HASH_MISS_MSG" in
+  *"User Input / Summary / Handoff / Status"*) echo "PASS: expired-span hash-miss message names all Round sections" ;;
+  *) echo "FAIL: expired-span hash-miss message should name User Input / Summary / Handoff / Status, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
+esac
+case "$SPAN_HASH_MISS_MSG" in
+  *"不要再新增一個 ## Round"*) echo "FAIL: expired-span hash-miss message must not forbid a new Round"; FAIL=1 ;;
+  *) echo "PASS: expired-span hash-miss message does not forbid a new Round" ;;
+esac
+case "$SPAN_HASH_MISS_MSG" in
+  *"檔案尾端"*'## Round'*) echo "PASS: expired-span hash-miss message says append a Round at EOF" ;;
+  *) echo "FAIL: expired-span hash-miss message should say to append ## Round at 檔案尾端, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
+esac
 
 # --- Span Mode Scenario 3: ticks at max, devlog IS written this tick ------
 # -> allowed, and ticks_since_checkin resets to 0.
@@ -705,6 +717,24 @@ if [ -f "$DEVLOG_DIR/.round-open" ]; then
 else
   echo "FAIL: loop guard should leave .round-open for later heal"
   FAIL=1
+fi
+
+# --- Recording moments: paused project drops stale .interrupted ------------
+rm -f "$DEVLOG_DIR/.enabled" "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
+touch "$DEVLOG_DIR/.interrupted"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "disabled project with .interrupted -> exits 0" 0 $?
+if [ -f "$DEVLOG_DIR/.interrupted" ]; then
+  echo "FAIL: disabled project Stop should delete stale .interrupted"
+  FAIL=1
+else
+  echo "PASS: disabled project Stop deleted stale .interrupted"
+fi
+if [ -e "$DEVLOG_DIR/devlog.md" ]; then
+  echo "FAIL: disabled project Stop should not create devlog.md"
+  FAIL=1
+else
+  echo "PASS: disabled project Stop did not create or edit devlog.md"
 fi
 
 if [ "$FAIL" -eq 0 ]; then

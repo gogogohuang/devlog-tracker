@@ -106,6 +106,7 @@ partial
 IN_PROGRESS
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+rm -f "$DEVLOG_DIR/.turn-start"
 bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "kept existing summary" "partial" "$BODY"

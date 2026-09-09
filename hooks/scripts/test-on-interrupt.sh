@@ -129,7 +129,6 @@ fi
 
 # SessionEnd on a completed open Round must not stamp
 touch "$DEVLOG_DIR/.enabled"
-write_open
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 

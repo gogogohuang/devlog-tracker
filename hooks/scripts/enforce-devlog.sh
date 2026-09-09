@@ -29,9 +29,9 @@ INPUT="$(cat 2>/dev/null || true)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
-TURN_MARKER="$DEVLOG_DIR/.turn-start"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
+  rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
   # Helper is silent. If it stamped, the last Round now has
   # INTERRUPTED + user_interrupt — exit 0 so Esc is not converted
   # into "please write Summary". Recovered-complete or a stale flag
@@ -114,7 +114,11 @@ fi
 [ -n "$CURRENT_HASH" ] || exit 0
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
-  echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Handoff / Status。不要再新增一個 ## Round。" >&2
+  if [ "$SPAN_VALID" -eq 1 ]; then
+    echo "這一輪尚未寫入 devlog.md。請依 skills/devlog-tracker/SKILL.md 在檔案尾端追加一個新的 ## Round，包含 User Input / Summary / Handoff / Status。" >&2
+  else
+    echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Handoff / Status。不要再新增一個 ## Round。" >&2
+  fi
   exit 2
 fi
 

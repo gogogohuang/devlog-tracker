@@ -12,7 +12,7 @@
   `UserPromptSubmit` 在每一則使用者訊息送出時就先寫好 User Input skeleton；意外中斷
   （非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open`）會把同一塊標成
   `INTERRUPTED`（usage 用光不算中斷）。中途取消（例如 Esc）通常是在**下一則訊息**或
-  **下次 SessionStart（startup / resume / clear）**才補上；`PostToolUseFailure` 的
+  **下次 SessionStart（startup / resume / clear / fork）**才補上；`PostToolUseFailure` 的
   `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成一定會立刻蓋章。
 - **`/devlog-tracker:pause`**：暫停強制記錄，歷史紀錄不受影響，之後可再用 `/devlog-tracker:start` 重新啟動。
 - **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session、`/fork` 時自動讀取
