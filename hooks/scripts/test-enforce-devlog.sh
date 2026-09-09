@@ -302,6 +302,18 @@ case "$HASH_MISS_MSG" in
   *"User Input / Response / Status"*) echo "FAIL: hash-miss message still names Response"; FAIL=1 ;;
   *) echo "PASS: hash-miss message no longer names Response" ;;
 esac
+case "$HASH_MISS_MSG" in
+  *"編輯最後一個 Round"*) echo "PASS: hash-miss message says edit the last Round" ;;
+  *) echo "FAIL: hash-miss message should say 編輯最後一個 Round, got: $HASH_MISS_MSG"; FAIL=1 ;;
+esac
+case "$HASH_MISS_MSG" in
+  *"不要再新增一個 ## Round"*) echo "PASS: hash-miss message forbids a second Round" ;;
+  *) echo "FAIL: hash-miss message should say 不要再新增一個 ## Round, got: $HASH_MISS_MSG"; FAIL=1 ;;
+esac
+case "$HASH_MISS_MSG" in
+  *"在檔案尾端補上"*) echo "FAIL: hash-miss message still tells Claude to append a Round"; FAIL=1 ;;
+  *) echo "PASS: hash-miss message no longer says 在檔案尾端補上" ;;
+esac
 
 # --- Heading Scenario 2: Round written without ### Summary -> blocked -----
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -334,6 +346,10 @@ assert_exit "last Round missing ### Handoff -> blocked" 2 $?
 case "$HEADING_MISS_MSG" in
   *'### Summary'*'### Handoff'*) echo "PASS: heading-miss message names both required headings" ;;
   *) echo "FAIL: heading-miss message should mention ### Summary and ### Handoff, got: $HEADING_MISS_MSG"; FAIL=1 ;;
+esac
+case "$HEADING_MISS_MSG" in
+  *"不要再新增一個 ## Round"*) echo "PASS: heading-miss message forbids a second Round" ;;
+  *) echo "FAIL: heading-miss message should say 不要再新增一個 ## Round, got: $HEADING_MISS_MSG"; FAIL=1 ;;
 esac
 
 # --- Heading Scenario 4: both headings present, empty bodies -> allowed ---
