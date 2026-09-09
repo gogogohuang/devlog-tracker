@@ -18,6 +18,7 @@
 - **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session、`/fork` 時自動讀取
   `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。
 - **`/devlog-tracker:compact`**：手動把已完成的舊輪次搬到 `devlog.archive.md`，避免主檔案無限膨脹。
+- **`/devlog-tracker:keep`**：若這段紀錄值得單獨留名，確認後把一段（或全部歷史）從 `devlog.md` 搬走成 `.devlog/devlog.<name>.md`。Claude 會依內容建議範圍與檔名，也可自訂。不是 compact（compact 仍是把舊的 `DONE` 輪次 append 進 `devlog.archive.md`）。細節見 [`docs/design/keep.md`](docs/design/keep.md)。
 - **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Summary`（人讀結論）/ `Handoff`（下一輪接續：決策、檔案、現況、下一步）/ `Status`（只寫 `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`），讀檔案就能還原對話重點，不用翻對話紀錄。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
 - **Span Mode（進階功能）**：`/loop` 動態模式、`Workflow` 這類會被自動排程反覆喚醒的長任務，不用每個自動 tick 都寫一次 devlog——用 tick 計數安全閥（`max_silent_ticks`）保底，崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
 - **段落記錄 + Checkpoint Mode（進階功能）**：單輪內有多個階段性結果時，邊做邊寫成 `### 段落` 子區塊而不是憋到最後；同一輪若連續約 15 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具要求先補一段（門檻可調）。累積輪數夠多時，`Stop` hook 會提醒補上一段跨輪的 `## Checkpoint` 摘要（門檻預設 20 輪、可調）。已經啟用過強制記錄的專案要再跑一次 `/devlog-tracker:start` 才會建立 `.segment-state`。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)、[`docs/design/segment-watch.md`](docs/design/segment-watch.md) 和 SKILL.md。
@@ -53,6 +54,12 @@
 /devlog-tracker:compact
 ```
 
+這段開發紀錄值得單獨留名時：
+
+```
+/devlog-tracker:keep
+```
+
 （以上都是完整的 namespace 形式，plugin 名稱是 `devlog-tracker`。）
 
 ## 目錄結構
@@ -68,7 +75,8 @@ devlog-tracker/
 │   ├── checkpoint-mode.md     # Checkpoint Mode 設計文件
 │   ├── segment-watch.md       # 單輪沉默 15 分鐘保底
 │   ├── summary-handoff.md     # 每輪 Summary（人）+ Handoff（AI）設計文件
-│   └── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
+│   ├── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
+│   └── keep.md                # 具名搬走成 devlog.<name>.md
 ├── skills/devlog-tracker/SKILL.md
 ├── hooks/
 │   ├── hooks.json                       # SessionStart / UserPromptSubmit / PreToolUse / Stop / StopFailure / SessionEnd / PostToolUseFailure
@@ -90,7 +98,8 @@ devlog-tracker/
 └── commands/
     ├── start.md            # 開啟強制記錄（建立 .enabled、.checkpoint-state、.segment-state）
     ├── pause.md            # 暫停強制記錄
-    └── compact.md          # 壓縮歸檔（保留 Checkpoint 區塊，不搬進 archive）
+    ├── compact.md          # 壓縮歸檔（保留 Checkpoint 區塊，不搬進 archive）
+    └── keep.md             # 具名搬走（確認後寫 devlog.<name>.md，再從主檔刪）
 ```
 
 ## License
