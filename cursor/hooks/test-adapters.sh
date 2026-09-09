@@ -5,14 +5,32 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 FAIL=0
 assert_single_json() {
-  local desc="$1" json="$2"
-  if ! command -v python3 >/dev/null 2>&1; then
-    echo "FAIL: $desc (python3 required to parse hook stdout)"; FAIL=1; return
+  local desc="$1" json="$2" count
+  if command -v jq >/dev/null 2>&1; then
+    count="$(printf '%s' "$json" | jq -s 'length' 2>/dev/null || echo '')"
+  else
+    # No jq: count top-level {...} closures ourselves, quote/escape-aware so
+    # a brace inside a string value doesn't throw the depth count off.
+    count="$(printf '%s' "$json" | awk '
+      {
+        line = $0
+        for (i = 1; i <= length(line); i++) {
+          c = substr(line, i, 1)
+          if (esc) { esc = 0; continue }
+          if (c == "\\" && in_str) { esc = 1; continue }
+          if (c == "\"") { in_str = !in_str; continue }
+          if (in_str) continue
+          if (c == "{") depth++
+          else if (c == "}") { depth--; if (depth == 0) n_obj++ }
+        }
+      }
+      END { print n_obj + 0 }
+    ' 2>/dev/null || echo '')"
   fi
-  if printf '%s' "$json" | python3 -c 'import json,sys; json.loads(sys.stdin.read())' 2>/dev/null; then
+  if [ "$count" = "1" ]; then
     echo "PASS: $desc"
   else
-    echo "FAIL: $desc [$json]"; FAIL=1
+    echo "FAIL: $desc (expected 1 top-level JSON value, got [$count]) [$json]"; FAIL=1
   fi
 }
 mkdir -p "$TMP/project/.devlog"
