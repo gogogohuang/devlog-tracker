@@ -25,6 +25,23 @@ assert_exit() {
   fi
 }
 
+append_minimal_round() {
+  local n="$1" ts="$2"
+  cat >> "$DEVLOG_DIR/devlog.md" <<EOF
+## Round ${n} — ${ts}
+
+### Summary
+fixture
+
+### Handoff
+#### 現況
+fixture
+
+### Status
+DONE
+EOF
+}
+
 # --- Scenario 1: round starts, devlog never touched -> must block ---------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
@@ -34,7 +51,7 @@ assert_exit "no write during round -> blocked" 2 $?
 # This whole script runs in well under a second, so round-start.sh's marker
 # capture and this write below routinely land in the same wall-clock second
 # -- exactly the condition that used to race under the old mtime check.
-echo "## Round 1 — 2026-09-08T00:00:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 1 "2026-09-08T00:00:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "devlog written this round (same-second race) -> allowed" 0 $?
 
@@ -101,7 +118,7 @@ assert_exit "span open, ticks at max, no write -> blocked (falls back to normal 
 
 # --- Span Mode Scenario 3: ticks at max, devlog IS written this tick ------
 # -> allowed, and ticks_since_checkin resets to 0.
-echo "## Round 2 — 2026-09-08T00:10:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 2 "2026-09-08T00:10:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "span open, ticks at max, write happens -> allowed" 0 $?
 SPAN_TICKS_RESET="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
@@ -127,7 +144,7 @@ cat > "$DEVLOG_DIR/.checkpoint-state" <<'CPEOF'
 {"rounds_since_checkpoint": 0, "max_silent_rounds": 2, "checkpoint_marker_count": 0}
 CPEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-echo "## Round 3 — 2026-09-08T00:20:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 3 "2026-09-08T00:20:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "checkpoint below threshold, round written -> allowed" 0 $?
 CP_ROUNDS_AFTER="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
@@ -144,7 +161,7 @@ fi
 # round writes normal content (satisfying the base hash check), no
 # "## Checkpoint" heading exists yet -> must be blocked.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-echo "## Round 4 — 2026-09-08T00:25:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 4 "2026-09-08T00:25:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "checkpoint threshold reached, no checkpoint block -> blocked" 2 $?
 
@@ -189,7 +206,7 @@ echo "not valid json at all" > "$DEVLOG_DIR/.checkpoint-state"
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "malformed .checkpoint-state, no write this round -> blocked by normal check only" 2 $?
-echo "## Round 5 — 2026-09-08T00:35:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 5 "2026-09-08T00:35:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "malformed .checkpoint-state, round written -> allowed (checkpoint check skipped)" 0 $?
 
@@ -204,9 +221,8 @@ assert_exit "malformed .checkpoint-state, round written -> allowed (checkpoint c
 cat > "$DEVLOG_DIR/.checkpoint-state" <<'CPEOF'
 {"rounds_since_checkpoint": 3, "max_silent_rounds": 20, "checkpoint_marker_count": 1}
 CPEOF
-cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
-## Round 1 — 2026-09-09T00:00:00+08:00
-DEVEOF
+: > "$DEVLOG_DIR/devlog.md"
+append_minimal_round 1 "2026-09-09T00:00:00+08:00"
 # devlog.md now has 0 "## Checkpoint" headings, but checkpoint_marker_count
 # says 1 (stale, from before an archival/manual edit removed it): live (0) <
 # stored (1) -- the decrease case.
@@ -218,7 +234,7 @@ DEVEOF
 # enforce-devlog.sh must observe the decrease and persist it immediately,
 # without waiting for any future checkpoint write.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-echo "## Round 2 — 2026-09-09T00:05:00+08:00" >> "$DEVLOG_DIR/devlog.md"
+append_minimal_round 2 "2026-09-09T00:05:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "decrease observed on an ordinary (non-checkpoint) write -> allowed (below round threshold)" 0 $?
 CP_ROUNDS_MID="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
@@ -246,6 +262,185 @@ else
   echo "FAIL: expected rounds_since_checkpoint=0 and checkpoint_marker_count=1 after the follow-up genuine write, got rounds=$CP_ROUNDS_FINAL marker=$CP_MARKER_FINAL"
   FAIL=1
 fi
+
+# --- Heading check: reset span/checkpoint so only hash + headings matter --
+rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state"
+
+# --- Heading Scenario 1: hash miss message names Summary / Handoff --------
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 1 — 2026-09-09T10:00:00+08:00
+
+### Summary
+prior
+
+### Handoff
+#### 現況
+prior
+
+### Status
+DONE
+DEVEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+HASH_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "no write this round -> blocked (heading tests setup)" 2 $?
+case "$HASH_MISS_MSG" in
+  *"User Input / Summary / Handoff / Status"*) echo "PASS: hash-miss message names Summary / Handoff" ;;
+  *) echo "FAIL: hash-miss message should name User Input / Summary / Handoff / Status, got: $HASH_MISS_MSG"; FAIL=1 ;;
+esac
+case "$HASH_MISS_MSG" in
+  *"User Input / Response / Status"*) echo "FAIL: hash-miss message still names Response"; FAIL=1 ;;
+  *) echo "PASS: hash-miss message no longer names Response" ;;
+esac
+
+# --- Heading Scenario 2: Round written without ### Summary -> blocked -----
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 2 — 2026-09-09T10:05:00+08:00
+
+### Handoff
+#### 現況
+missing summary
+
+### Status
+DONE
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "last Round missing ### Summary -> blocked" 2 $?
+
+# --- Heading Scenario 3: Round written without ### Handoff -> blocked -----
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 3 — 2026-09-09T10:10:00+08:00
+
+### Summary
+missing handoff
+
+### Status
+DONE
+DEVEOF
+HEADING_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "last Round missing ### Handoff -> blocked" 2 $?
+case "$HEADING_MISS_MSG" in
+  *'### Summary'*'### Handoff'*) echo "PASS: heading-miss message names both required headings" ;;
+  *) echo "FAIL: heading-miss message should mention ### Summary and ### Handoff, got: $HEADING_MISS_MSG"; FAIL=1 ;;
+esac
+
+# --- Heading Scenario 4: both headings present, empty bodies -> allowed ---
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 4 — 2026-09-09T10:15:00+08:00
+
+### Summary
+### Handoff
+### Status
+DONE
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "both headings present with empty bodies -> allowed" 0 $?
+
+# --- Heading Scenario 5: hash changed, no ## Round heading -> fail-open ---
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "write with no ## Round heading -> fail-open (allowed)" 0 $?
+
+# --- Heading Scenario 6: Checkpoint text must not satisfy headings --------
+# Last Round lacks both headings; a following Checkpoint quotes them.
+# Extraction stops at the next ^##  line, so this must still block.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 5 — 2026-09-09T10:20:00+08:00
+old response blob
+
+## Checkpoint（Round 5 摘要）
+### Summary
+quoted
+### Handoff
+quoted
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "headings only inside Checkpoint, last Round missing them -> blocked" 2 $?
+
+# --- Heading Scenario 7: Checkpoint-only append on a complete last Round --
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 6 — 2026-09-09T10:25:00+08:00
+
+### Summary
+complete
+
+### Handoff
+#### 現況
+complete
+
+### Status
+DONE
+DEVEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "## Checkpoint（Round 6 摘要）" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "Checkpoint-only append after a complete last Round -> allowed" 0 $?
+
+# --- Heading Scenario 8: span one-liner on a complete last Round ----------
+# ticks at max so we do not silent-pass; a one-line append must still pass
+# heading check because it lands inside the last Round, which already has
+# both headings.
+cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 6 — 2026-09-09T10:25:00+08:00
+
+### Summary
+complete
+
+### Handoff
+#### 現況
+complete
+
+### Status
+DONE
+DEVEOF
+cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
+{
+  "round": 6,
+  "opened_at": "2026-09-09T10:25:00+08:00",
+  "ticks_since_checkin": 5,
+  "max_silent_ticks": 5
+}
+SPANEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+echo "span check-in: still looping" >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "span budget expired, one-line append on complete last Round -> allowed" 0 $?
+SPAN_TICKS_ONELINE="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
+if [ "$SPAN_TICKS_ONELINE" = "0" ]; then
+  echo "PASS: span ticks reset after one-line append that passed heading check"
+else
+  echo "FAIL: ticks_since_checkin should reset to 0 after passing write, got '$SPAN_TICKS_ONELINE'"
+  FAIL=1
+fi
+
+# --- Heading Scenario 9: heading miss must not reset span ticks -----------
+cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
+{
+  "round": 6,
+  "opened_at": "2026-09-09T10:25:00+08:00",
+  "ticks_since_checkin": 5,
+  "max_silent_ticks": 5
+}
+SPANEOF
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+## Round 7 — 2026-09-09T10:30:00+08:00
+incomplete new round
+DEVEOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "span at max, new Round missing headings -> blocked" 2 $?
+SPAN_TICKS_HELD="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
+if [ "$SPAN_TICKS_HELD" = "6" ]; then
+  echo "PASS: heading-check failure did not reset ticks_since_checkin (stayed at 6 after round-start increment)"
+else
+  echo "FAIL: ticks_since_checkin should stay 6 (5 + round-start increment, not reset), got '$SPAN_TICKS_HELD'"
+  FAIL=1
+fi
+rm -f "$DEVLOG_DIR/.span-open"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

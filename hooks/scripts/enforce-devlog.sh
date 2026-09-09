@@ -85,8 +85,37 @@ fi
 [ -n "$CURRENT_HASH" ] || exit 0
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
-  echo "這一輪還沒有寫進 .devlog/devlog.md。請依 skills/devlog-tracker/SKILL.md 的格式，在檔案尾端補上這一輪的 \`## Round <N>\`（User Input / Response / Status），寫完再結束這一輪。" >&2
+  echo "這一輪還沒有寫進 .devlog/devlog.md。請依 skills/devlog-tracker/SKILL.md 的格式，在檔案尾端補上這一輪的 \`## Round <N>\`（User Input / Summary / Handoff / Status），寫完再結束這一輪。" >&2
   exit 2
+fi
+
+# --- 標題檢查（Summary + Handoff）-----------------------------------------
+# 雜湊已經證明這輪有寫入。接著取出最後一個 Round 區塊：從最後一個
+# 「## Round 」行起到下一條「## 」標題之前（或 EOF）。這個區塊必須同時有
+# 以 ### Summary、### Handoff 開頭的行。只驗標題存在，不驗內容。
+# 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
+# 變成新的卡死理由。
+LAST_ROUND="$(awk '
+  /^## Round / { start = NR }
+  { lines[NR] = $0 }
+  END {
+    if (start == 0) exit 0
+    end = NR
+    for (i = start + 1; i <= NR; i++) {
+      if (lines[i] ~ /^## /) { end = i - 1; break }
+    }
+    for (i = start; i <= end; i++) print lines[i]
+  }
+' "$DEVLOG_FILE" 2>/dev/null || true)"
+if [ -n "$LAST_ROUND" ]; then
+  HAS_SUMMARY=0
+  HAS_HANDOFF=0
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Summary' && HAS_SUMMARY=1
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Handoff' && HAS_HANDOFF=1
+  if [ "$HAS_SUMMARY" -eq 0 ] || [ "$HAS_HANDOFF" -eq 0 ]; then
+    echo "最後一個 Round 缺少 \`### Summary\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這兩個標題（Summary 給人掃、Handoff 給下一輪接續），寫完再結束這一輪。" >&2
+    exit 2
+  fi
 fi
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
