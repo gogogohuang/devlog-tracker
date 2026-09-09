@@ -158,6 +158,14 @@ else
   echo "PASS: wrapper fence stayed closed"
 fi
 
+# --- 7aa: common provider tokens are masked in User Input -------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
+RAW_TOKEN="ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+printf '{"prompt":"token %s"}' "$RAW_TOKEN" | bash "$SCRIPT_DIR/round-start.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "prompt token masked" "（已遮罩）" "$BODY"
+assert_not_contains "raw prompt token absent" "$RAW_TOKEN" "$BODY"
+
 # --- 7b: truncation notice when prompt exceeds 4000 -------------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 LONG="$(awk 'BEGIN { s=""; for (i=0;i<4005;i++) s=s "a"; print s }')"
@@ -194,6 +202,18 @@ if [ "$SEEN" = "$POST" ]; then
   echo "PASS: segment last_seen_cksum matches post-skeleton hash"
 else
   echo "FAIL: last_seen_cksum=$SEEN expected $POST"
+  FAIL=1
+fi
+
+# --- 9b: segment state stores the submitting session id ---------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
+printf '%s\n' '{"last_change_epoch": 1, "last_seen_cksum": "old", "max_silent_seconds": 900}' > "$DEVLOG_DIR/.segment-state"
+printf '%s' '{"prompt":"hi","session_id":"s1"}' | bash "$SCRIPT_DIR/round-start.sh"
+SESSION_ID="$(grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+if [ "$SESSION_ID" = "s1" ]; then
+  echo "PASS: segment state stores session_id"
+else
+  echo "FAIL: expected session_id=s1, got [$SESSION_ID]"
   FAIL=1
 fi
 

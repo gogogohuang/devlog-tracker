@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      { "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-session-start.sh" }
+    ],
+    "beforeSubmitPrompt": [
+      { "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-submit-prompt.sh" }
+    ],
+    "preToolUse": [
+      { "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-pre-tool.sh" }
+    ],
+    "stop": [
+      {
+        "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-stop.sh",
+        "loop_limit": 1
+      }
+    ],
+    "sessionEnd": [
+      { "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-session-end.sh" }
+    ],
+    "postToolUseFailure": [
+      { "command": "bash ${DEVLOG_TRACKER_ROOT}/cursor/hooks/on-tool-failure.sh" }
+    ]
+  }
+}

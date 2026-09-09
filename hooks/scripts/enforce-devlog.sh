@@ -19,7 +19,12 @@
 
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_src="${BASH_SOURCE[0]}"
+SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$SCRIPT_DIR/json-field.sh"
+# shellcheck source=devlog-lock.sh
+. "$SCRIPT_DIR/devlog-lock.sh"
 
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
@@ -74,6 +79,8 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 # 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
 # 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
 [ -f "$ENABLED_FLAG" ] || exit 0
+devlog_lock_acquire
+trap 'devlog_lock_release' EXIT
 
 # --- span 檢查（Span Mode：橫跨多次自動續接的長任務）---------------------
 # Claude 主動宣告的 .devlog/.span-open 存在時（見 SKILL.md），這個 tick 不
@@ -84,8 +91,8 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 SPAN_VALID=0
 if [ -f "$SPAN_FILE" ]; then
-  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SPAN_MAX="$(grep -o '"max_silent_ticks"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SPAN_TICKS="$(json_int_get "$SPAN_FILE" ticks_since_checkin)"
+  SPAN_MAX="$(json_int_get "$SPAN_FILE" max_silent_ticks)"
   case "$SPAN_TICKS" in ''|*[!0-9]*) SPAN_TICKS='' ;; esac
   case "$SPAN_MAX" in ''|*[!0-9]*) SPAN_MAX='' ;; esac
   if [ -n "$SPAN_TICKS" ] && [ -n "$SPAN_MAX" ]; then
@@ -152,6 +159,63 @@ if [ -n "$LAST_ROUND" ]; then
     echo "最後一個 Round 缺少 \`### Summary\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這兩個標題（Summary 給人掃、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
     exit 2
   fi
+
+  section_body() {
+    local heading="$1"
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
+      $0 ~ h { grab=1; next }
+      grab && /^### / { exit }
+      grab && /^## / { exit }
+      grab { print }
+    '
+  }
+
+  nonempty_body() {
+    section_body "$1" | grep -q '[^[:space:]]'
+  }
+
+  SUM_BODY_OK=0
+  HAN_BODY_OK=0
+  nonempty_body '^### Summary' && SUM_BODY_OK=1
+  nonempty_body '^### Handoff' && HAN_BODY_OK=1
+  if [ "$SUM_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
+    echo "最後一個 Round 的 ### Summary 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    exit 2
+  fi
+
+  STATUS_VAL="$(printf '%s\n' "$LAST_ROUND" | awk '
+    /^### Status/ { grab=1; val=""; next }
+    grab && /^### / { grab=0 }
+    grab && /^## / { grab=0 }
+    grab && $0 ~ /[^[:space:]]/ && val == "" { val=$0 }
+    END { print val }
+  ')"
+  case "$STATUS_VAL" in
+    DONE|IN_PROGRESS|BLOCKED|INTERRUPTED) ;;
+    *)
+      echo "### Status 必須是 DONE、IN_PROGRESS、BLOCKED、INTERRUPTED 其中一個。" >&2
+      exit 2
+      ;;
+  esac
+
+  if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
+    HAS_NEXT=0
+    printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
+    NEXT_OK=0
+    if [ "$HAS_NEXT" -eq 1 ]; then
+      printf '%s\n' "$LAST_ROUND" | awk '
+        /^#### 下一步/ { grab=1; next }
+        grab && /^#### / { exit }
+        grab && /^### / { exit }
+        grab && /^## / { exit }
+        grab { print }
+      ' | grep -q '[^[:space:]]' && NEXT_OK=1
+    fi
+    if [ "$NEXT_OK" -eq 0 ]; then
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
+      exit 2
+    fi
+  fi
 fi
 
 rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
@@ -159,8 +223,7 @@ rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。
 if [ "$SPAN_VALID" -eq 1 ]; then
-  awk '{ gsub(/"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]+/, "\"ticks_since_checkin\": 0"); print }' "$SPAN_FILE" > "$SPAN_FILE.tmp" 2>/dev/null \
-    && mv "$SPAN_FILE.tmp" "$SPAN_FILE" 2>/dev/null || true
+  json_int_set "$SPAN_FILE" ticks_since_checkin 0
 fi
 
 # --- checkpoint 檢查（Checkpoint Mode）----------------------------------
@@ -170,9 +233,9 @@ fi
 # 當訊號會讓計數器每輪都被歸零，永遠到不了門檻。
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 if [ -f "$CHECKPOINT_FILE" ]; then
-  CP_ROUNDS="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  CP_MAX="$(grep -o '"max_silent_rounds"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  CP_SEEN="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  CP_ROUNDS="$(json_int_get "$CHECKPOINT_FILE" rounds_since_checkpoint)"
+  CP_MAX="$(json_int_get "$CHECKPOINT_FILE" max_silent_rounds)"
+  CP_SEEN="$(json_int_get "$CHECKPOINT_FILE" checkpoint_marker_count)"
   case "$CP_ROUNDS" in ''|*[!0-9]*) CP_ROUNDS='' ;; esac
   case "$CP_MAX" in ''|*[!0-9]*) CP_MAX='' ;; esac
   case "$CP_SEEN" in ''|*[!0-9]*) CP_SEEN='' ;; esac
@@ -191,21 +254,13 @@ if [ -f "$CHECKPOINT_FILE" ]; then
     # 沉默輪數計數器。同時更新本次呼叫用的 CP_SEEN 變數，讓下面這次 invocation
     # 的 -gt / elif 判斷也立刻用修正後的值。
     if [ "$CURRENT_MARKER_COUNT" -lt "$CP_SEEN" ]; then
-      awk -v seen="$CURRENT_MARKER_COUNT" '{
-        gsub(/"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]+/, "\"checkpoint_marker_count\": " seen);
-        print
-      }' "$CHECKPOINT_FILE" > "$CHECKPOINT_FILE.tmp" 2>/dev/null \
-        && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
+      json_int_set "$CHECKPOINT_FILE" checkpoint_marker_count "$CURRENT_MARKER_COUNT"
       CP_SEEN="$CURRENT_MARKER_COUNT"
     fi
 
     if [ "$CURRENT_MARKER_COUNT" -gt "$CP_SEEN" ]; then
-      awk -v seen="$CURRENT_MARKER_COUNT" '{
-        gsub(/"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]+/, "\"rounds_since_checkpoint\": 0");
-        gsub(/"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]+/, "\"checkpoint_marker_count\": " seen);
-        print
-      }' "$CHECKPOINT_FILE" > "$CHECKPOINT_FILE.tmp" 2>/dev/null \
-        && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
+      json_int_set "$CHECKPOINT_FILE" rounds_since_checkpoint 0
+      json_int_set "$CHECKPOINT_FILE" checkpoint_marker_count "$CURRENT_MARKER_COUNT"
     elif [ "$CP_ROUNDS" -ge "$CP_MAX" ]; then
       echo "已經 ${CP_ROUNDS} 輪沒有寫 checkpoint 摘要了（門檻 ${CP_MAX}）。請在 .devlog/devlog.md 追加一段「## Checkpoint（Round X-Y 摘要）」，總結這段期間做了什麼，寫完再結束這一輪。" >&2
       exit 2

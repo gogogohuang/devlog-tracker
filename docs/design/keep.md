@@ -146,9 +146,10 @@ A `## Checkpoint` block has a declared Round span in its heading
   move the block only if it sits between the first moved `## Round`
   heading and the end of the last moved Round; otherwise leave it.
 
-Do not edit `.checkpoint-state`. If Checkpoint headings leave
-`devlog.md`, `enforce-devlog.sh` already resyncs `checkpoint_marker_count`
-downward and does not treat that as "a new checkpoint was written".
+Full keep zeros `rounds_since_checkpoint` and does not change
+`max_silent_rounds`. If Checkpoint headings leave `devlog.md`,
+`enforce-devlog.sh` already resyncs `checkpoint_marker_count` downward
+and does not treat that as "a new checkpoint was written".
 
 ## Filenames
 
@@ -236,18 +237,18 @@ Keep does not create `.devlog/` in a project that has no `devlog.md`.
 | Trigger | user command, confirm first | user command, then move |
 
 Neither command touches the other's target files. SessionStart still
-reads only `devlog.md`. Kept files live under `.devlog/`, so they follow
-the same gitignore (or not) as the working log; this plugin does not
-add a separate tracking path.
+reads only `devlog.md`. `/devlog-tracker:continue` also reads only
+`devlog.md` unless that last Handoff's 下一步 names a keep file.
+Kept files live under `.devlog/`, so they follow the same gitignore
+(or not) as the working log; this plugin does not add a separate
+tracking path.
 
 Keep is never auto-run.
 
 ## Known limitations
 
-1. **Full keep and checkpoint counter** — Full keep does not zero
-   `rounds_since_checkpoint` in `.checkpoint-state`. Stop may soon demand
-   a Checkpoint on a nearly empty working file; that write self-heals the
-   counter.
+1. **Full keep and checkpoint counter** — Full keep zeros
+   `rounds_since_checkpoint` and does not change `max_silent_rounds`.
 2. **No `.enabled` / no open Round** — When `.enabled` is absent (never
    started or paused), there is no keep-turn skeleton and `.round-open`
    is missing. Keep must not fall back to treating the last historical
@@ -265,6 +266,7 @@ the last Round).
 | File | Role |
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
+| `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |
@@ -279,6 +281,6 @@ No hook or `hooks/hooks.json` changes.
 - Non-contiguous Round sets
 - A subdirectory for kept files
 - Auto-prompting keep at the end of a valuable episode
-- Reading or injecting kept files on SessionStart
+- Reading or injecting kept files on SessionStart（只有明確執行 `/devlog-tracker:resume` 才讀）
 - Pulling rounds back out of `devlog.archive.md`
 - A second slash command for full keep

@@ -273,6 +273,9 @@ fixture
 ### Handoff
 #### 現況
 fixture
+
+### Status
+DONE
 EOF
 echo "## Checkpoint（Round 2 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
@@ -375,7 +378,12 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 DONE
 DEVEOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "both headings present with empty bodies -> allowed" 0 $?
+assert_exit "both headings present with empty bodies -> blocked" 2 $?
+EMPTY_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+case "$EMPTY_MSG" in
+  *"是空的"*) echo "PASS: empty-body message" ;;
+  *) echo "FAIL: empty-body stderr, got: $EMPTY_MSG"; FAIL=1 ;;
+esac
 
 # --- Heading Scenario 5: hash changed, no ## Round heading -> fail-open ---
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -426,6 +434,9 @@ complete
 ### Handoff
 #### 現況
 complete
+
+### Status
+DONE
 DEVEOF
 echo "## Checkpoint（Round 6 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
@@ -736,6 +747,81 @@ if [ -e "$DEVLOG_DIR/devlog.md" ]; then
 else
   echo "PASS: disabled project Stop did not create or edit devlog.md"
 fi
+
+# --- Heading Scenario 12: legal DONE with bodies, no 下一步 -> allowed ----
+touch "$DEVLOG_DIR/.enabled"
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 90 — 2026-09-09T10:40:00+08:00
+
+### Summary
+一句話。
+
+### Handoff
+#### 現況
+做完了。
+
+### Status
+DONE
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with bodies and no 下一步 -> allowed" 0 $?
+
+# --- Heading Scenario 13: IN_PROGRESS without 下一步 -> blocked -----------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 91 — 2026-09-09T10:41:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 現況
+做到一半。
+
+### Status
+IN_PROGRESS
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "IN_PROGRESS without 下一步 -> blocked" 2 $?
+
+# --- Heading Scenario 14: IN_PROGRESS with 下一步 -> allowed --------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 92 — 2026-09-09T10:42:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 現況
+做到一半。
+#### 下一步
+打開 foo.ts 繼續。
+
+### Status
+IN_PROGRESS
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "IN_PROGRESS with 下一步 -> allowed" 0 $?
+
+# --- Heading Scenario 15: illegal Status -> blocked -----------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 93 — 2026-09-09T10:43:00+08:00
+
+### Summary
+x
+
+### Handoff
+#### 現況
+y
+
+### Status
+WIP
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "illegal Status -> blocked" 2 $?
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

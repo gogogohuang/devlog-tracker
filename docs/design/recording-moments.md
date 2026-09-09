@@ -341,7 +341,9 @@ framework.
   change.
 - `server_error` → `INTERRUPTED` + reason.
 - SessionEnd with marker → stamp; without marker → no-op.
-- SessionStart with marker → stamp then still print last rounds.
+- SessionStart with marker → stamp; `startup` / `resume` / `fork` (and
+  `compact`, which does not heal) still print the log excerpt; `clear`
+  stamps on disk then prints nothing.
 - Wrong `round` in marker vs last heading → delete marker, do not
   edit.
 
@@ -367,11 +369,16 @@ framework.
   excerpt only.
 - **Usage skip is exact three `error` strings.** Other billing-adjacent
   types that are not those names get recorded.
-- **Concurrent sessions** racing `devlog.md` / `.round-open` — pre-existing.
-- **Secrets in the prompt** are copied into the project file.
+- **Concurrent sessions** use a short `.devlog/.lock` around writes.
+  Sessions can still interleave after the 2-second fail-open timeout;
+  the lock covers the common overlapping-write window.
+- **Secrets in the prompt** — common provider-prefix tokens are masked;
+  other secrets still copy into the project file.
 - **Span + unrelated human message** still not detected.
 - **Pause mid-round** leaves an `IN_PROGRESS` skeleton without
   Summary; that is intentional, not `INTERRUPTED`.
+- **Cursor cloud agents** do not run `sessionStart`, so they do not
+  receive the automatic devlog excerpt.
 
 ## Out of scope
 
@@ -379,7 +386,6 @@ framework.
 - Quality checks on Summary/Handoff bodies (still presence-only).
 - Parsing `transcript_path` on SessionEnd.
 - Distinguishing automated vs human UserPromptSubmit.
-- Cursor hook ports (this plugin remains Claude Code `hooks.json`).
 - Plugin version bump.
 
 ## Files

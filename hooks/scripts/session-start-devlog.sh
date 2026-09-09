@@ -19,9 +19,11 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
-MAX_ROUNDS=8
 
-HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_src="${BASH_SOURCE[0]}"
+HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$HOOKS_DIR/json-field.sh"
 
 INPUT="$(cat 2>/dev/null || true)"
 SOURCE=""
@@ -46,12 +48,8 @@ if [ "$SOURCE" = "clear" ]; then
 fi
 
 if [ -f "$SPAN_FILE" ]; then
-  SPAN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SPAN_OPENED_AT_RAW="$(grep -o '"opened_at"[[:space:]]*:[[:space:]]*"[^"]*"' "$SPAN_FILE" 2>/dev/null || echo '')"
-  SPAN_OPENED_AT=""
-  if [ -n "$SPAN_OPENED_AT_RAW" ]; then
-    SPAN_OPENED_AT="$(printf '%s' "$SPAN_OPENED_AT_RAW" | sed -E 's/^.*:[[:space:]]*"//; s/"$//' 2>/dev/null || echo '')"
-  fi
+  SPAN_ROUND="$(json_int_get "$SPAN_FILE" round)"
+  SPAN_OPENED_AT="$(json_str_get "$SPAN_FILE" opened_at)"
   if [ -n "$SPAN_ROUND" ] && [ -n "$SPAN_OPENED_AT" ]; then
     echo "⚠️ 有一個開啟中的 span：Round ${SPAN_ROUND}，從 ${SPAN_OPENED_AT} 開始，"
     echo "還沒有正式結束。請先確認要繼續這個自動化任務，還是要明確關閉它"
@@ -62,21 +60,56 @@ fi
 
 [ -f "$DEVLOG_FILE" ] || exit 0
 
-echo "以下是本專案 .devlog/devlog.md 目前的內容，用來接續先前的工作進度（只顯示最近 ${MAX_ROUNDS} 輪，完整紀錄請自行讀取原檔）："
+echo "以下是本專案 .devlog/devlog.md 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
 echo ""
-
-awk -v max="$MAX_ROUNDS" '
-  BEGIN { n = 0 }
-  /^## Round / { n++; buf[n] = "" }
+awk '
+  /^[ \t]*```/ { fence = !fence }
   {
-    if (n > 0) { buf[n] = buf[n] $0 "\n" }
-    else       { preamble = preamble $0 "\n" }
+    lines[NR] = $0
+    infence[NR] = fence
   }
   END {
-    if (preamble != "") { printf "%s\n", preamble }
-    start = (n > max) ? (n - max + 1) : 1
-    for (i = start; i <= n; i++) { printf "%s", buf[i] }
+    n = NR
+    last_cp = 0
+    rc = 0
+    for (i = 1; i <= n; i++) {
+      if (infence[i]) continue
+      if (lines[i] ~ /^## Checkpoint/) last_cp = i
+      if (lines[i] ~ /^## Round /) { rc++; round_at[rc] = i }
+    }
+    if (last_cp > 0) {
+      cp_end = n
+      for (j = last_cp + 1; j <= n; j++) {
+        if (!infence[j] && lines[j] ~ /^## /) { cp_end = j - 1; break }
+      }
+      for (j = last_cp; j <= cp_end; j++) print lines[j]
+      print ""
+    }
+    start_i = (rc > 2) ? rc - 1 : 1
+    if (rc == 0) exit 0
+    for (r = start_i; r <= rc; r++) {
+      rs = round_at[r]
+      re = n
+      for (j = rs + 1; j <= n; j++) {
+        if (!infence[j] && lines[j] ~ /^## /) { re = j - 1; break }
+      }
+      print lines[rs]
+      print ""
+      has_summary = 0
+      for (j = rs; j <= re; j++) if (!infence[j] && lines[j] ~ /^### Summary/) has_summary = 1
+      keep = 0
+      for (j = rs + 1; j <= re; j++) {
+        if (infence[j]) {
+          if (keep) print lines[j]
+          continue
+        }
+        if (lines[j] ~ /^### Summary/ || lines[j] ~ /^### Handoff/ || lines[j] ~ /^### Status/) { keep = 1; print lines[j]; continue }
+        if (lines[j] ~ /^### User Input/) { keep = (has_summary ? 0 : 1); if (keep) print lines[j]; continue }
+        if (lines[j] ~ /^### /) { keep = 0; continue }
+        if (keep) print lines[j]
+      }
+      print ""
+    }
   }
 ' "$DEVLOG_FILE" 2>/dev/null || true
-
 exit 0

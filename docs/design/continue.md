@@ -6,8 +6,7 @@ the last Round's Handoff. It is the only resume path after `/clear`.
 `/clear` still wipes the conversation. SessionStart (`source=clear`)
 may stamp a dangling open Round `INTERRUPTED`, but it prints nothing
 to stdout, so Claude Code injects no additionalContext. A later
-`startup` / `resume` / `compact` / `fork` still injects the last 8
-rounds, as before.
+`startup` / `resume` / `compact` / `fork` still injects the SessionStart excerpt (last Checkpoint + last two Rounds' close), as `session-start-devlog.sh` does.
 
 This is a slash command (plus the skill matching 接續 / continue /
 繼續上一題). No new hooks.
@@ -24,7 +23,7 @@ step.
 
 ## SessionStart
 
-| `source` | Heal dangling `.round-open` | Inject last 8 rounds + span note |
+| `source` | Heal dangling `.round-open` | Inject excerpt + span note |
 |---|---|---|
 | `startup` / `resume` / `fork` | yes | yes |
 | `compact` | no | yes |

@@ -60,50 +60,22 @@ description: 若這段 devlog 值得單獨留名，把它從 devlog.md 搬走成
 
 目標 `.devlog/devlog.<name>.md` 已存在 → 不要覆寫。改建議 `devlog.<name>-2.md`（已存在就 `-3`，依此加），等使用者確認或另取名。
 
-## 5. 決定要搬走哪些區塊
+## 5. 跑搬移腳本
 
-**Full keep** = 確認後的範圍涵蓋每一個歷史 Round。否則是 episode keep。
+使用者確認範圍與檔名後，跑（不要自己搬檔）：
 
-**Round：** 把 `from`–`to` 裡每一個完整的 `## Round <N> — ...` 區塊（到下一個 `## ` 標題或檔案結尾、但不要吃進不該搬的區塊）列入搬走名單。判斷 `## ` 標題時，略過圍欄程式碼區塊（``` ... ```）內的行，與 hook 腳本解析方式一致。不要改寫 Round 本文。
-
-**專案摘要**（第一個 `## Round` 之前的文字）：
-
-- episode keep：留在 `devlog.md`
-- full keep：列入搬走名單，寫進具名檔時放在出處標頭之後、第一個 `## Round` 之前
-
-**`## Checkpoint`：**
-
-- 標題可解析出 `Round X-Y`（例如 `## Checkpoint（Round 10-20 摘要）`）：
-  - X–Y 完全落在 `from`–`to` 內 → 搬走
-  - 完全在外面 → 留在主檔
-  - 橫跨切點 → 留在主檔，也不複製到具名檔
-- 標題沒有可解析的 `Round X-Y`：只有當這塊位於「第一個被搬的 `## Round` 標題」與「最後一個被搬的 Round 結尾」之間時才搬走，否則留下。
-
-不要改 `.checkpoint-state`。
-
-## 6. 先寫具名檔，再改主檔
-
-具名檔路徑：`.devlog/devlog.<name>.md`。開頭固定為：
-
-```markdown
-# Kept log
-
-- source: `.devlog/devlog.md`
-- rounds: <from>-<to>
-- kept_at: <ISO 8601 時間戳，含時區>
+```bash
+CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/keep-move.sh" \
+  --from <from> --to <to> --name "<name>"
 ```
 
-`rounds` 是實際搬走的含端點範圍（不含開著的 Round）。`kept_at` 用現在時間。
+`<from>`、`<to>`、`<name>` 必須使用步驟 4 確認後的值。腳本是搬移、
+Checkpoint 歸屬、full keep 重編與 checkpoint counter reset 的唯一實作來源。
 
-接著依原順序、原文原樣接上步驟 5 的區塊。
+## 6. 處理腳本結果
 
-然後：
-
-1. 確認具名檔存在，且裡面有那些 `## Round` 標題。這一步失敗就停止，`devlog.md` 維持原樣。
-2. 才從 `devlog.md` 刪掉已搬走的區塊。其餘保持原樣（除了下面 full keep 的標題改寫）。禁止先刪後寫。若刪除失敗、具名檔已寫成：告訴使用者兩份都還在，不要盲目重試刪除。
-3. **Full keep：** 把留下的那一個開著 Round 的標題改成 `## Round 1`，時間戳與本文不動；若 `.devlog/.span-open` 存在就刪掉它；若 `.devlog/.round-open` 存在，將其 `"round"` 欄位改為 `1`（其他欄位不動），不要刪除 `.round-open`。
-4. **Episode keep：** 不要重編留下的 Round 編號（缺號可以）。若 `.span-open` 的 `round` 落在搬走範圍內，刪掉 `.span-open`；否則不要動它。不要動 `.round-open`。
-5. 不要動 `.enabled`。
+成功時依 stdout 回報具名檔與輪次統計。腳本 exit 1 時，原樣顯示 stderr，
+不要自行重試刪除，也不要手動補做搬移。
 
 ## 7. 回報並收尾這一輪
 

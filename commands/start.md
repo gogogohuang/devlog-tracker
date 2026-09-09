@@ -4,31 +4,15 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
 
 請執行以下步驟：
 
-1. 確認 `.devlog/` 資料夾存在，不存在就建立。
-2. 建立（若已存在就略過）`.devlog/.enabled` 這個檔案，內容隨意（例如寫入啟動時間），
-   這個檔案存在與否就是「這個專案要不要強制記錄」的開關。
-3. 建立（若已存在就略過）`.devlog/.checkpoint-state`，內容是：
-   ```json
-   {"rounds_since_checkpoint": 0, "max_silent_rounds": 20, "checkpoint_marker_count": 0}
+1. 跑這支腳本（環境變數 `CLAUDE_PLUGIN_ROOT` 若有值就用它；否則用這個 plugin 根目錄，也就是含 `.claude-plugin/plugin.json` 的那一層）：
+   ```bash
+   CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/start-devlog.sh"
    ```
-   這個檔案讓 Stop hook 能追蹤「多久沒寫 checkpoint 摘要」，`max_silent_rounds` 之後
-   可以直接編輯這個檔案調整門檻，見 `skills/devlog-tracker/SKILL.md` 的 Checkpoint 說明。
-4. 建立（若已存在就略過，尤其不要改掉已有的 `max_silent_seconds`）`.devlog/.segment-state`，內容是：
-   ```json
-   {"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 900}
-   ```
-   這個檔案讓 PreToolUse hook 能追蹤「這一輪多久沒改 `devlog.md`」。預設 900 秒
-   （15 分鐘）沒動就會擋住下一個工具、要求先補 `### 段落`；可以直接編輯
-   `max_silent_seconds` 調整門檻，見 `skills/devlog-tracker/SKILL.md` 的段落說明。
-   已經啟用過強制記錄的專案要再跑一次 `/devlog-tracker:start` 才會建立 `.segment-state`。
-5. 讀取 `.devlog/devlog.md`（若存在）：
+   不要自己用手建 `.enabled` / `.checkpoint-state` / `.segment-state`。
+2. 若 stdout 有 `GITIGNORE_DEVLOG=no`：告訴使用者 `.devlog/` 會含 prompt，建議把 `.devlog/` 加進專案 `.gitignore`。問要不要現在加。只有使用者明確說要，才在 `.gitignore` 末尾追加一行 `.devlog/`（檔案不存在就建立）。不要改其他行。
+3. 讀取 `.devlog/devlog.md`（若存在）：
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1
-6. 告訴使用者：從現在開始，每一則使用者訊息送出時就會先寫 User Input skeleton，結束前仍要補
-   Summary / Handoff（寫進 `.devlog/devlog.md`，含 Status）；同一輪若連續約 15 分鐘沒改這個檔，
-   下一個工具會被要求先補一段 `### 段落`；累積到一定輪數沒寫 checkpoint 摘要時也會被
-   提醒補上，可以用 `/devlog-tracker:pause` 隨時關掉這個強制機制。
+4. 告訴使用者：從現在開始，每一則使用者訊息送出時就會先寫 User Input skeleton，結束前仍要補 Summary / Handoff；同一輪約 15 分鐘沒改這個檔，下一個工具會被要求先補 `### 段落`；可以用 `/devlog-tracker:pause` 關掉。
 
-不要因為 `.devlog/.enabled` 已經存在就跳過步驟 5 的進度摘要——每次執行 `/devlog-tracker:start`
-都應該重新確認一次目前進度。`/clear` 之後若要接著做上一題，用 `/devlog-tracker:continue`，
-不要用 start 開工。
+不要因為 `.enabled` 已經存在就跳過步驟 3。`/clear` 之後若要接著做上一題，用 `/devlog-tracker:continue`，不要用 start 開工。

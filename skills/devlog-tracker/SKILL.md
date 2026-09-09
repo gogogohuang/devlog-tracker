@@ -1,6 +1,6 @@
 ---
 name: devlog-tracker
-description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / compact / fork 時自動讀檔補齊進度，/clear 不注入；要接續請 /devlog-tracker:continue；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔、/devlog-tracker:keep 可把有主題的一段搬走成 devlog.<name>.md；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「continue」「接續」「keep」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
+description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者下 /devlog-tracker:start 後 Stop hook 強制每輪寫入；SessionStart 在 startup / resume / compact / fork 注入進度，/clear 不注入；要接續用 /devlog-tracker:continue。當使用者提到「devlog-tracker」「.devlog/devlog.md」「/devlog-tracker:continue」或明確要寫／接續這份紀錄時使用。
 ---
 
 # Devlog Tracker（簡化版）
@@ -83,7 +83,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 自動注入時：
 
-1. 腳本讀取 `.devlog/devlog.md`，只取最近 8 輪（避免整份塞爆 context）
+1. 腳本讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
 2. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
 3. Claude 收到這段 context 後，開場就已經知道目前進度
 
@@ -163,8 +163,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff` 這兩行標題
-（只驗標題存在，不驗寫得好不好）。新開的 Round 兩個標題都要有，瑣碎輪也不例外。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」。
+新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）
 
@@ -252,8 +252,9 @@ DONE
 
 ### 怎麼開一個 span
 
-寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，額外用 Write／Edit
-工具建立 `.devlog/.span-open`：
+寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，使用
+`/devlog-tracker:span`（或跑 `span-open.sh`）建立 `.devlog/.span-open`。
+除非腳本不可用，否則不要手寫 JSON。檔案格式如下：
 
 ```json
 {
@@ -353,6 +354,11 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 ## 具名保存：`/devlog-tracker:keep`
 
 把一段（或全部歷史）從 `devlog.md` **搬走**成 `.devlog/devlog.<name>.md`，讓有主題的紀錄可以單獨留名。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
+
+## 接續具名保存：`/devlog-tracker:resume <name>`
+
+需要重啟具名主題時，用 resume 讀取 `.devlog/devlog.<name>.md` 的最後一輪與
+Handoff；新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
 
 ## 跟原版 agentflow 的差異
 

@@ -10,15 +10,32 @@ ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 
+_src="${BASH_SOURCE[0]}"
+SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$SCRIPT_DIR/json-field.sh"
+
 [ -f "$ENABLED_FLAG" ] || exit 0
 [ -f "$SEGMENT_FILE" ] || exit 0
 
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-SEG_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-SEG_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-SEG_SUM="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$SEGMENT_FILE" 2>/dev/null | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+STORED="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
+INCOMING=""
+if command -v jq >/dev/null 2>&1; then
+  INCOMING="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)"
+  [ "$INCOMING" = "null" ] && INCOMING=""
+else
+  INCOMING="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+fi
+if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
+  exit 0
+fi
+
+SEG_EPOCH="$(json_int_get "$SEGMENT_FILE" last_change_epoch)"
+SEG_MAX="$(json_int_get "$SEGMENT_FILE" max_silent_seconds)"
+SEG_SUM="$(json_str_get "$SEGMENT_FILE" last_seen_cksum)"
 SEG_SUM_KEY="$(grep -o '"last_seen_cksum"[[:space:]]*:' "$SEGMENT_FILE" 2>/dev/null || echo '')"
 
 case "$SEG_EPOCH" in ''|*[!0-9]*) exit 0 ;; esac
@@ -27,12 +44,8 @@ case "$SEG_MAX" in ''|*[!0-9]*) exit 0 ;; esac
 
 persist_seen() {
   local epoch="$1" sum="$2"
-  awk -v epoch="$epoch" -v sum="$sum" '{
-    gsub(/"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]+/, "\"last_change_epoch\": " epoch);
-    gsub(/"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"last_seen_cksum\": \"" sum "\"");
-    print
-  }' "$SEGMENT_FILE" > "$SEGMENT_FILE.tmp" 2>/dev/null \
-    && mv "$SEGMENT_FILE.tmp" "$SEGMENT_FILE" 2>/dev/null || true
+  json_int_set "$SEGMENT_FILE" last_change_epoch "$epoch"
+  json_str_set "$SEGMENT_FILE" last_seen_cksum "$sum"
 }
 
 NOW="$(date +%s 2>/dev/null || echo '')"
