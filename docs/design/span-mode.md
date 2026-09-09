@@ -108,8 +108,8 @@ line) resolves it and resumes normal silent operation.
 keeps the append-only convention the rest of devlog.md follows (`/compact`
 only ever moves content, nothing edits a past Round in place). The closing
 Round's User Input can note that it's an automated-continuation closeout
-(e.g. "（自動續接收尾，接續 Round 12）"); its Response summarizes the whole
-spanned period. `.span-open` is deleted once this closing Round is written.
+(e.g. "（自動續接收尾，接續 Round 12）"); its Summary (human) and Handoff
+(next Claude) summarize the whole spanned period. `.span-open` is deleted once this closing Round is written.
 
 ## Known Limitations
 

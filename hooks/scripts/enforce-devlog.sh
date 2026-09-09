@@ -19,10 +19,41 @@
 
 set -uo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
 # 足以涵蓋 Claude Code 實際送出的 stop_hook_active 欄位形狀），兩種環境都要生效。
 INPUT="$(cat 2>/dev/null || true)"
+
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+DEVLOG_DIR="$PROJECT_DIR/.devlog"
+DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+if [ -f "$DEVLOG_DIR/.interrupted" ]; then
+  bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
+  rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
+  # Helper is silent. If it stamped, the last Round now has
+  # INTERRUPTED + user_interrupt — exit 0 so Esc is not converted
+  # into "please write Summary". Recovered-complete or a stale flag
+  # leaves Status alone; fall through to hash / headings / checkpoint.
+  _LAST_ROUND="$(awk '
+    /^[ \t]*```/ { fence = !fence }
+    !fence && /^## Round / { start = NR }
+    { lines[NR] = $0; infence[NR] = fence }
+    END {
+      if (start == 0) exit 0
+      end = NR
+      for (i = start + 1; i <= NR; i++) {
+        if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+      }
+      for (i = start; i <= end; i++) print lines[i]
+    }
+  ' "$DEVLOG_FILE" 2>/dev/null || true)"
+  case "$_LAST_ROUND" in
+    *$'\nINTERRUPTED\nuser_interrupt'*) exit 0 ;;
+  esac
+fi
+
 if command -v jq >/dev/null 2>&1; then
   STOP_HOOK_ACTIVE="$(printf '%s' "$INPUT" | jq -r '.stop_hook_active // false' 2>/dev/null || echo false)"
 else
@@ -36,8 +67,6 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
 fi
 
 # --- 開關檢查 -----------------------------------------------------------
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 TURN_MARKER="$DEVLOG_DIR/.turn-start"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
@@ -85,9 +114,47 @@ fi
 [ -n "$CURRENT_HASH" ] || exit 0
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
-  echo "這一輪還沒有寫進 .devlog/devlog.md。請依 skills/devlog-tracker/SKILL.md 的格式，在檔案尾端補上這一輪的 \`## Round <N>\`（User Input / Response / Status），寫完再結束這一輪。" >&2
+  if [ "$SPAN_VALID" -eq 1 ]; then
+    echo "這一輪尚未寫入 devlog.md。請依 skills/devlog-tracker/SKILL.md 在檔案尾端追加一個新的 ## Round，包含 User Input / Summary / Handoff / Status。" >&2
+  else
+    echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Handoff / Status。不要再新增一個 ## Round。" >&2
+  fi
   exit 2
 fi
+
+# --- 標題檢查（Summary + Handoff）-----------------------------------------
+# 雜湊已經證明這輪有寫入。接著取出最後一個 Round 區塊：從最後一個
+# 「## Round 」行起到下一條「## 」標題之前（或 EOF）。圍欄（```）內的
+# 行不參與起迄判定，避免 User Input / Handoff 引用 `## Round` 或 `## 安裝`
+# 範例時把有效的最後一個 Round 誤切成缺標題。這個區塊必須同時有
+# 以 ### Summary、### Handoff 開頭的行。只驗標題存在，不驗內容。
+# 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
+# 變成新的卡死理由。
+LAST_ROUND="$(awk '
+  /^[ \t]*```/ { fence = !fence }
+  !fence && /^## Round / { start = NR }
+  { lines[NR] = $0; infence[NR] = fence }
+  END {
+    if (start == 0) exit 0
+    end = NR
+    for (i = start + 1; i <= NR; i++) {
+      if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+    }
+    for (i = start; i <= end; i++) print lines[i]
+  }
+' "$DEVLOG_FILE" 2>/dev/null || true)"
+if [ -n "$LAST_ROUND" ]; then
+  HAS_SUMMARY=0
+  HAS_HANDOFF=0
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Summary' && HAS_SUMMARY=1
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Handoff' && HAS_HANDOFF=1
+  if [ "$HAS_SUMMARY" -eq 0 ] || [ "$HAS_HANDOFF" -eq 0 ]; then
+    echo "最後一個 Round 缺少 \`### Summary\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這兩個標題（Summary 給人掃、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    exit 2
+  fi
+fi
+
+rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。

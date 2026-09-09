@@ -3,7 +3,7 @@
 Two related additions to devlog-tracker's recording format, both aimed at
 the same complaint: a long-running interaction (a single sprawling round,
 or a session that's accumulated many rounds) leaves `devlog.md` hard to
-reconstruct from — either because one round's `Response` is a single
+reconstruct from — either because one round's closing summary is a single
 end-of-round summary hiding everything that happened along the way, or
 because skimming dozens of Round entries to find "what actually got done
 in the last hour" is slow.
@@ -17,22 +17,24 @@ in the last hour" is slow.
 
 ## Round Segments
 
-**Mechanism: none — pure authoring convention.** The existing Stop-hook
-content-hash check already only cares whether `devlog.md` changed since
-the round started; it doesn't care how many edits happened or when. So
-writing progressively during a round already satisfies enforcement today.
-What's missing is purely the documented convention for *how* to do it.
+**Mechanism: authoring convention plus a silence valve.** When to write a
+segment is still Claude's judgment. The Stop-hook content-hash check only
+cares that `devlog.md` changed by end of turn. Mid-round, if the file's
+hash is unchanged for `max_silent_seconds` (default 900), `segment-watch.sh`
+blocks the next tool until something is appended — see
+[`segment-watch.md`](segment-watch.md).
 
 **Format** (added to `skills/devlog-tracker/SKILL.md`): for a round that
 involves multiple distinct phases (exploration, a decision, an
 implementation step, verification), write each as its own timestamped
 sub-section under the round as that phase completes, instead of holding
-everything until the final `Response`:
+everything until the final Summary / Handoff:
 
 ```markdown
-## Round 15
-User Input: 幫我重構 XXX 模組
-Status: IN_PROGRESS
+## Round 15 — 2026-09-09T09:00:00+08:00
+
+### User Input
+幫我重構 XXX 模組
 
 ### 段落 1 - 09:12
 讀完現有程式碼，發現三個地方耦合...
@@ -43,14 +45,25 @@ Status: IN_PROGRESS
 ### 段落 3 - 09:35
 完成拆分，跑測試全過
 
-Response: (最終總結)
-Status: DONE
+### Summary
+把 XXX 模組拆成 A/B 兩個檔案，測試全過。
+
+### Handoff
+#### 決策
+拆成 A/B，理由是三處耦合都集中在同一個檔。
+#### 檔案
+新增 a.ts、b.ts；刪除 xxx.ts。尚未 commit。
+#### 現況
+拆分完成，測試全過。
+
+### Status
+DONE
 ```
 
 **When to write a segment** is Claude's judgment call — "a meaningful
 stage result," the same bar `Status: IN_PROGRESS` already uses — not a
 rule triggered by elapsed time or tool-call count. A short round with no
-real phases still gets a single `Response` as today; segments are for
+real phases still gets Summary / Handoff as today, with no segment headings; segments are for
 rounds long enough that a single end-of-round summary would hide real
 intermediate decisions.
 

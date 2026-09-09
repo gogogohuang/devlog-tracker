@@ -13,12 +13,21 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
    ```
    這個檔案讓 Stop hook 能追蹤「多久沒寫 checkpoint 摘要」，`max_silent_rounds` 之後
    可以直接編輯這個檔案調整門檻，見 `skills/devlog-tracker/SKILL.md` 的 Checkpoint 說明。
-4. 讀取 `.devlog/devlog.md`（若存在）：
+4. 建立（若已存在就略過，尤其不要改掉已有的 `max_silent_seconds`）`.devlog/.segment-state`，內容是：
+   ```json
+   {"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 900}
+   ```
+   這個檔案讓 PreToolUse hook 能追蹤「這一輪多久沒改 `devlog.md`」。預設 900 秒
+   （15 分鐘）沒動就會擋住下一個工具、要求先補 `### 段落`；可以直接編輯
+   `max_silent_seconds` 調整門檻，見 `skills/devlog-tracker/SKILL.md` 的段落說明。
+   已經啟用過強制記錄的專案要再跑一次 `/devlog-tracker:start` 才會建立 `.segment-state`。
+5. 讀取 `.devlog/devlog.md`（若存在）：
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1
-5. 告訴使用者：從現在開始，每一輪結束前都會被要求先把這輪寫進 `.devlog/devlog.md`
-   （User Input / Response / Status），累積到一定輪數沒寫 checkpoint 摘要時也會被
+6. 告訴使用者：從現在開始，每一則使用者訊息送出時就會先寫 User Input skeleton，結束前仍要補
+   Summary / Handoff（寫進 `.devlog/devlog.md`，含 Status）；同一輪若連續約 15 分鐘沒改這個檔，
+   下一個工具會被要求先補一段 `### 段落`；累積到一定輪數沒寫 checkpoint 摘要時也會被
    提醒補上，可以用 `/devlog-tracker:pause` 隨時關掉這個強制機制。
 
-不要因為 `.devlog/.enabled` 已經存在就跳過步驟 4 的進度摘要——每次執行 `/devlog-tracker:start`
+不要因為 `.devlog/.enabled` 已經存在就跳過步驟 5 的進度摘要——每次執行 `/devlog-tracker:start`
 都應該重新確認一次目前進度，這通常代表使用者是在新 session 或 `/clear` 之後手動觸發的。
