@@ -196,5 +196,4 @@ not off `### Response`.
 - Rewriting or migrating historical Rounds that still use `### Response`.
 - Hook checks for subsection headings (`#### 決策` etc.), non-empty
   bodies, or Status/`下一步` consistency.
-- Changing SessionStart's "last 8 rounds" window or compact's retain
-  rules.
+- Changing compact's retain rules.

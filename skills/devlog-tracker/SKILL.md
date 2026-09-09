@@ -83,7 +83,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 自動注入時：
 
-1. 腳本讀取 `.devlog/devlog.md`，只取最近 8 輪（避免整份塞爆 context）
+1. 腳本讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
 2. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
 3. Claude 收到這段 context 後，開場就已經知道目前進度
 
