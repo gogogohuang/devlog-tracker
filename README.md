@@ -122,7 +122,7 @@ devlog-tracker/
 │       ├── devlog-md.sh                 # fence-aware Round 切塊
 │       ├── segment-watch.sh             # 同一輪太久沒寫就擋住下一個工具
 │       ├── enforce-devlog.sh            # Stop：Summary/Handoff 內容、Status、Span、Checkpoint
-│       ├── run-tests.sh                 # 執行 hooks/scripts/test-*.sh
+│       ├── run-tests.sh                 # 執行 hooks/scripts/test-*.sh + cursor/hooks/test-adapters.sh
 │       └── test-*.sh                    # 各腳本自我檢查
 └── commands/
     ├── start.md / pause.md / continue.md
