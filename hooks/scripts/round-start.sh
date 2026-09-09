@@ -12,6 +12,8 @@ _src="${BASH_SOURCE[0]}"
 HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$HOOKS_DIR/json-field.sh"
+# shellcheck source=redact-prompt.sh
+. "$HOOKS_DIR/redact-prompt.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -65,6 +67,7 @@ if [ "$SPAN_SKIP" -eq 0 ]; then
     TRUNC_NOTE="（後略，已截斷至 4000 字）"
   fi
   PROMPT="$(printf '%s' "$PROMPT" | sed 's/```/⟨fence⟩/g')"
+  PROMPT="$(printf '%s' "$PROMPT" | redact_prompt)"
 
   LAST_N=0
   if [ -f "$DEVLOG_FILE" ]; then

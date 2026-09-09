@@ -158,6 +158,14 @@ else
   echo "PASS: wrapper fence stayed closed"
 fi
 
+# --- 7aa: common provider tokens are masked in User Input -------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
+RAW_TOKEN="ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+printf '{"prompt":"token %s"}' "$RAW_TOKEN" | bash "$SCRIPT_DIR/round-start.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "prompt token masked" "（已遮罩）" "$BODY"
+assert_not_contains "raw prompt token absent" "$RAW_TOKEN" "$BODY"
+
 # --- 7b: truncation notice when prompt exceeds 4000 -------------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 LONG="$(awk 'BEGIN { s=""; for (i=0;i<4005;i++) s=s "a"; print s }')"

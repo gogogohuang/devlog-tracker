@@ -370,7 +370,8 @@ framework.
 - **Usage skip is exact three `error` strings.** Other billing-adjacent
   types that are not those names get recorded.
 - **Concurrent sessions** racing `devlog.md` / `.round-open` — pre-existing.
-- **Secrets in the prompt** are copied into the project file.
+- **Secrets in the prompt** — common provider-prefix tokens are masked;
+  other secrets still copy into the project file.
 - **Span + unrelated human message** still not detected.
 - **Pause mid-round** leaves an `IN_PROGRESS` skeleton without
   Summary; that is intentional, not `INTERRUPTED`.
