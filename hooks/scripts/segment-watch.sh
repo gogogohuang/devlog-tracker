@@ -21,6 +21,18 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
+STORED="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
+INCOMING=""
+if command -v jq >/dev/null 2>&1; then
+  INCOMING="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)"
+  [ "$INCOMING" = "null" ] && INCOMING=""
+else
+  INCOMING="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+fi
+if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
+  exit 0
+fi
+
 SEG_EPOCH="$(json_int_get "$SEGMENT_FILE" last_change_epoch)"
 SEG_MAX="$(json_int_get "$SEGMENT_FILE" max_silent_seconds)"
 SEG_SUM="$(json_str_get "$SEGMENT_FILE" last_seen_cksum)"

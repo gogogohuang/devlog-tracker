@@ -36,6 +36,8 @@ grep -q '"max_silent_rounds": 20' "$TMP_ROOT/.devlog/.checkpoint-state" \
   && echo "PASS: default checkpoint" || { echo "FAIL: checkpoint defaults"; FAIL=1; }
 grep -q '"max_silent_seconds": 900' "$TMP_ROOT/.devlog/.segment-state" \
   && echo "PASS: default segment" || { echo "FAIL: segment defaults"; FAIL=1; }
+grep -q '"session_id": ""' "$TMP_ROOT/.devlog/.segment-state" \
+  && echo "PASS: default segment session id" || { echo "FAIL: segment session id"; FAIL=1; }
 
 # preserve thresholds on second start
 printf '%s\n' '{"rounds_since_checkpoint": 7, "max_silent_rounds": 3, "checkpoint_marker_count": 1}' \

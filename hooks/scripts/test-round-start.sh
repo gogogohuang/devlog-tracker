@@ -197,6 +197,18 @@ else
   FAIL=1
 fi
 
+# --- 9b: segment state stores the submitting session id ---------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
+printf '%s\n' '{"last_change_epoch": 1, "last_seen_cksum": "old", "max_silent_seconds": 900}' > "$DEVLOG_DIR/.segment-state"
+printf '%s' '{"prompt":"hi","session_id":"s1"}' | bash "$SCRIPT_DIR/round-start.sh"
+SESSION_ID="$(grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+if [ "$SESSION_ID" = "s1" ]; then
+  echo "PASS: segment state stores session_id"
+else
+  echo "FAIL: expected session_id=s1, got [$SESSION_ID]"
+  FAIL=1
+fi
+
 # --- 10: dangling heal skips a completed last Round, still opens Round 2 ----
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open"
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'

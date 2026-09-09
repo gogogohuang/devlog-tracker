@@ -24,6 +24,13 @@ ROUND_OPEN="$DEVLOG_DIR/.round-open"
 [ -f "$ENABLED_FLAG" ] || exit 0
 
 INPUT="$(cat 2>/dev/null || true)"
+SESSION_ID=""
+if command -v jq >/dev/null 2>&1; then
+  SESSION_ID="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo '')"
+  [ "$SESSION_ID" = "null" ] && SESSION_ID=""
+else
+  SESSION_ID="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+fi
 
 if [ -f "$ROUND_OPEN" ]; then
   bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" || true
@@ -143,6 +150,14 @@ if [ -f "$SEGMENT_FILE" ]; then
         if [ -n "$SEG_CUR" ]; then
           json_int_set "$SEGMENT_FILE" last_change_epoch "$SEG_NOW"
           json_str_set "$SEGMENT_FILE" last_seen_cksum "$SEG_CUR"
+          if [ -n "$SESSION_ID" ]; then
+            json_str_set "$SEGMENT_FILE" session_id "$SESSION_ID"
+            SEG_SESSION="$(json_str_get "$SEGMENT_FILE" session_id)"
+            if [ "$SEG_SESSION" != "$SESSION_ID" ]; then
+              printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": %s, "session_id": "%s"}\n' \
+                "$SEG_NOW" "$SEG_CUR" "$SEG_MAX" "$SESSION_ID" > "$SEGMENT_FILE" 2>/dev/null || true
+            fi
+          fi
         fi
         ;;
     esac

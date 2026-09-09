@@ -36,7 +36,7 @@ assert_contains() {
 
 write_state() {
   local epoch="$1" sum="$2" max="$3"
-  printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": %s}\n' \
+  printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": %s, "session_id": "aaa"}\n' \
     "$epoch" "$sum" "$max" > "$DEVLOG_DIR/.segment-state"
 }
 
@@ -68,6 +68,17 @@ assert_contains "block message names ### 段落" "### 段落" "$ERR"
 assert_contains "block message names 門檻 900" "門檻 900 秒" "$ERR"
 assert_contains "block message starts 這一輪已經" "這一輪已經" "$ERR"
 assert_contains "block message ends 寫完再繼續呼叫工具" "寫完再繼續呼叫工具" "$ERR"
+
+# --- Scenario 3b: only the parent session uses this valve -------------------
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' '{"tool_name":"Bash","session_id":"aaa"}' | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + matching session_id -> blocked" 2 $?
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' '{"tool_name":"Bash","session_id":"bbb"}' | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + different session_id -> allowed" 0 $?
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' '{"tool_name":"Bash"}' | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + missing session_id -> blocked" 2 $?
 
 # --- Scenario 4: expired + Write relative devlog.md -> exit 0 ---------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
