@@ -66,6 +66,8 @@ ERR="$(printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/
 assert_exit "expired + Bash -> blocked" 2 $?
 assert_contains "block message names ### 段落" "### 段落" "$ERR"
 assert_contains "block message names 門檻 900" "門檻 900 秒" "$ERR"
+assert_contains "block message starts 這一輪已經" "這一輪已經" "$ERR"
+assert_contains "block message ends 寫完再繼續呼叫工具" "寫完再繼續呼叫工具" "$ERR"
 
 # --- Scenario 4: expired + Write relative devlog.md -> exit 0 ---------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
@@ -133,6 +135,15 @@ assert_exit "expired + Bash without jq -> blocked" 2 $?
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$WRITE_REL" | PATH="$PATH_NO_JQ" bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "expired + Write without jq -> allowed" 0 $?
+WRITE_SPACED='{ "tool_name" : "Write" , "tool_input": {"file_path":".devlog/devlog.md"} }'
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' "$WRITE_SPACED" | PATH="$PATH_NO_JQ" bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + spaced Write without jq -> allowed" 0 $?
+
+# --- Scenario 12b: expired + empty stdin -> fail-open exit 0 ----------------
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '' | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + empty stdin -> allowed" 0 $?
 
 # --- Scenario 13: round-start.sh resets clock and preserves max -------------
 write_state 1 "old-sum" 600

@@ -14,6 +14,7 @@ SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 [ -f "$SEGMENT_FILE" ] || exit 0
 
 INPUT="$(cat 2>/dev/null || true)"
+[ -n "$INPUT" ] || exit 0
 
 SEG_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
 SEG_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
@@ -55,12 +56,10 @@ if command -v jq >/dev/null 2>&1; then
   TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo '')"
   FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo '')"
 else
-  case "$INPUT" in
-    *'"tool_name":"Write"'*|*'"tool_name": "Write"'*) TOOL_NAME=Write ;;
-    *'"tool_name":"Edit"'*|*'"tool_name": "Edit"'*)   TOOL_NAME=Edit ;;
-  esac
+  TOOL_NAME="$(printf '%s' "$INPUT" | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
   FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
 fi
+[ -n "$TOOL_NAME" ] || exit 0
 
 if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
   case "$FILE_PATH" in

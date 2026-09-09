@@ -20,6 +20,7 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
    這個檔案讓 PreToolUse hook 能追蹤「這一輪多久沒改 `devlog.md`」。預設 900 秒
    （15 分鐘）沒動就會擋住下一個工具、要求先補 `### 段落`；可以直接編輯
    `max_silent_seconds` 調整門檻，見 `skills/devlog-tracker/SKILL.md` 的段落說明。
+   已經啟用過強制記錄的專案要再跑一次 `/devlog-tracker:start` 才會建立 `.segment-state`。
 5. 讀取 `.devlog/devlog.md`（若存在）：
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1

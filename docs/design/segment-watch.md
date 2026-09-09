@@ -132,6 +132,11 @@ to open or close a watch.
   If a tool's `file_path` is a different spelling of the same file
   that does not suffix-match `.devlog/devlog.md`, it is not
   allowlisted.
+- **Subagent tool calls share the parent round's valve.** PreToolUse
+  also runs for subagent tool calls that share the parent round's
+  `.segment-state`; a subagent has no UserPromptSubmit reset and may
+  be asked to write a `### 段落` it cannot contextualize. This is
+  accepted for now (same valve, no subagent exemption).
 
 ## Files
 
