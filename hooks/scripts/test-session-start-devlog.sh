@@ -38,6 +38,31 @@ assert_exit() {
   fi
 }
 
+write_round() {
+  local n="$1" status="$2"
+  cat >> "$DEVLOG_DIR/devlog.md" <<EOF
+## Round ${n} — 2026-09-09T12:00:00+08:00
+
+### User Input
+\`\`\`text
+prompt ${n} with lots of bulk
+\`\`\`
+
+### 段落 1 - 12:01
+secret intermediate ${n}
+
+### Summary
+summary ${n}
+
+### Handoff
+#### 現況
+handoff ${n}
+
+### Status
+${status}
+EOF
+}
+
 # --- Scenario 1: no devlog.md, no span -> silent exit 0 -------------------
 OUTPUT="$(bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
 EXIT_CODE=$?
@@ -276,6 +301,80 @@ if [ -f "$DEVLOG_DIR/.round-open" ]; then
 else
   echo "PASS: startup recovered-complete deleted .round-open"
 fi
+
+# --- Scenario 13: excerpt is last two rounds, not eight -------------------
+: > "$DEVLOG_DIR/devlog.md"
+rm -f "$DEVLOG_DIR/.span-open"
+n=1
+while [ "$n" -le 8 ]; do
+  write_round "$n" DONE
+  n=$((n + 1))
+done
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "excerpt names Round 8" "Round 8" "$OUTPUT"
+assert_contains "excerpt names Round 7" "Round 7" "$OUTPUT"
+assert_not_contains "excerpt drops Round 6" "Round 6" "$OUTPUT"
+assert_not_contains "excerpt drops 段落" "secret intermediate" "$OUTPUT"
+assert_not_contains "excerpt drops User Input when Summary exists" "prompt 8 with lots of bulk" "$OUTPUT"
+assert_contains "excerpt keeps Summary" "summary 8" "$OUTPUT"
+assert_contains "excerpt keeps Handoff" "handoff 8" "$OUTPUT"
+
+# --- Scenario 14: last Checkpoint is included even if older than last 2 ---
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+
+## Checkpoint（Round 1-6 摘要）
+old checkpoint body
+EOF
+write_round 9 DONE
+write_round 10 DONE
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "includes last checkpoint" "old checkpoint body" "$OUTPUT"
+assert_contains "still has Round 10" "Round 10" "$OUTPUT"
+assert_not_contains "still drops Round 8 body after more writes" "summary 8" "$OUTPUT"
+
+# --- Scenario 15: fenced ## Round inside User Input is not a real Round ---
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+## Round 99 — fake
+```
+
+### Summary
+real one
+
+### Handoff
+#### 現況
+real handoff
+
+### Status
+DONE
+EOF
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "fence-aware uses Round 1" "Round 1" "$OUTPUT"
+assert_not_contains "fence-aware ignores Round 99 heading as a round" "Round 99" "$OUTPUT"
+
+# --- Scenario 16: skeleton last Round includes User Input -----------------
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+
+## Round 2 — 2026-09-09T12:01:00+08:00
+
+### User Input
+```text
+unfinished prompt
+```
+
+### Status
+IN_PROGRESS
+EOF
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "skeleton User Input is shown" "unfinished prompt" "$OUTPUT"
+
+# --- Scenario 17: clear still silent with a long log ----------------------
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then echo "PASS: clear still silent after excerpt change"
+else echo "FAIL: clear injected: $OUTPUT"; FAIL=1; fi
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
