@@ -38,5 +38,16 @@ printf '%s\n' 'not json' > "$TMP"
 assert_eq "malformed int" "" "$(json_int_get "$TMP" round)"
 assert_eq "malformed str" "" "$(json_str_get "$TMP" opened_at)"
 
+INPUT='{"session_id": "abc-123", "prompt": "hello world"}'
+assert_eq "str field get" "abc-123" "$(json_str_field "$INPUT" session_id)"
+assert_eq "str field get other key" "hello world" "$(json_str_field "$INPUT" prompt)"
+assert_eq "str field missing key" "" "$(json_str_field "$INPUT" no_such)"
+
+INPUT='{"reason": null}'
+assert_eq "str field null" "" "$(json_str_field "$INPUT" reason)"
+
+INPUT='not json'
+assert_eq "str field malformed" "" "$(json_str_field "$INPUT" reason)"
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
