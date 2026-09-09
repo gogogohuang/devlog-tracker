@@ -33,9 +33,13 @@ out of the rolling working log. Compact never reads or writes
 Keep runs inside an ordinary interactive turn. `UserPromptSubmit` has
 already appended a skeleton Round for the keep command itself. The
 **open Round** is the `round` in `.devlog/.round-open` when that file
-exists; otherwise the last `## Round N` in `devlog.md`. It is **not**
-part of any keep range. If the file has no historical Rounds besides
-that skeleton, keep stops and does not create a named file.
+exists. If `.round-open` is missing (never started or paused), there is
+no open Round and no keep-turn skeleton — every `## Round` in the file
+is historical; do not treat the last Round as open for exclusion. When
+judging `## ` headings, ignore lines inside fenced code blocks (```),
+matching how the hook scripts parse. The open Round is **not** part of
+any keep range. If the file has no historical Rounds besides that
+skeleton, keep stops and does not create a named file.
 
 Judging "worth keeping", proposing a range, and proposing a slug are
 LLM work. They belong in `commands/keep.md`, the same way compact's
@@ -117,7 +121,8 @@ confirmed range covers every historical Round in `devlog.md`.
 | Project summary (text before the first `## Round`) | stays in `devlog.md` | moves into the named file, after the provenance header |
 | Round numbers in `devlog.md` | unchanged (gaps are allowed) | rewrite the leftover open Round heading to `## Round 1`, keep its timestamp and body |
 | `.span-open` | delete only if its `round` is inside the moved range | delete |
-| `.enabled` / `.round-open` | unchanged | unchanged |
+| `.enabled` | unchanged | unchanged |
+| `.round-open` | unchanged | set `"round"` to `1` (other fields unchanged; do not delete the file) |
 
 The next Round number is still "last `## Round N` in `devlog.md`, plus
 one". After a full keep that leftover heading is Round 1, so the
@@ -209,7 +214,8 @@ range (the open keep Round is not in it).
 1. Create the named file with the header plus moved blocks.
 2. Confirm that file exists and contains those Round headings.
 3. Delete the moved blocks from `devlog.md` (and apply the full-keep
-   leftover heading rewrite / `.span-open` delete when they apply).
+   leftover heading rewrite, `.round-open` `"round"` → `1`, and
+   `.span-open` delete when they apply).
 
 Delete-first is forbidden: a crash between delete and write would drop
 the episode. If step 1 fails, stop; `devlog.md` is unchanged. If step 3
@@ -235,6 +241,17 @@ the same gitignore (or not) as the working log; this plugin does not
 add a separate tracking path.
 
 Keep is never auto-run.
+
+## Known limitations
+
+1. **Full keep and checkpoint counter** — Full keep does not zero
+   `rounds_since_checkpoint` in `.checkpoint-state`. Stop may soon demand
+   a Checkpoint on a nearly empty working file; that write self-heals the
+   counter.
+2. **No `.enabled` / no open Round** — When `.enabled` is absent (never
+   started or paused), there is no keep-turn skeleton and `.round-open`
+   is missing. Keep must not fall back to treating the last historical
+   Round as open; all Rounds in the file are eligible for the range.
 
 ## Testing
 

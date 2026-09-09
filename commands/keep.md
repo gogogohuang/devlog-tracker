@@ -9,8 +9,8 @@ description: 若這段 devlog 值得單獨留名，把它從 devlog.md 搬走成
 ## 1. 讀檔、找出開著的 Round
 
 1. 讀取 `.devlog/devlog.md` 全文。若檔案不存在，告知「目前沒有東西可 keep」，不要建立 `.devlog/` 或任何新檔，結束。
-2. 開著的 Round：若 `.devlog/.round-open` 存在且有 `"round"` 數字，用那個編號；否則用 `devlog.md` 最後一個 `## Round <N>`。
-3. 歷史 Round = 檔案裡除了開著的 Round 以外的所有 `## Round`。若沒有任何歷史 Round，告知「目前沒有東西可 keep」，不要建立新檔，結束。
+2. 開著的 Round：若 `.devlog/.round-open` 存在且有 `"round"` 數字，用那個編號。若 `.round-open` 不存在（從未 start 或已 pause），表示沒有開著的 Round，檔案裡所有 `## Round` 都是歷史，不要把最後一個 Round 當成開著的 Round 來排除。
+3. 歷史 Round = 檔案裡除了開著的 Round 以外的所有 `## Round`（判斷 `## ` 標題時，略過圍欄程式碼區塊 ``` 內的行，與 hook 腳本解析方式一致）。若沒有任何歷史 Round，告知「目前沒有東西可 keep」，不要建立新檔，結束。
 
 ## 2. 建議範圍與價值
 
@@ -64,7 +64,7 @@ description: 若這段 devlog 值得單獨留名，把它從 devlog.md 搬走成
 
 **Full keep** = 確認後的範圍涵蓋每一個歷史 Round。否則是 episode keep。
 
-**Round：** 把 `from`–`to` 裡每一個完整的 `## Round <N> — ...` 區塊（到下一個 `## ` 標題或檔案結尾、但不要吃進不該搬的區塊）列入搬走名單。不要改寫 Round 本文。
+**Round：** 把 `from`–`to` 裡每一個完整的 `## Round <N> — ...` 區塊（到下一個 `## ` 標題或檔案結尾、但不要吃進不該搬的區塊）列入搬走名單。判斷 `## ` 標題時，略過圍欄程式碼區塊（``` ... ```）內的行，與 hook 腳本解析方式一致。不要改寫 Round 本文。
 
 **專案摘要**（第一個 `## Round` 之前的文字）：
 
@@ -101,9 +101,9 @@ description: 若這段 devlog 值得單獨留名，把它從 devlog.md 搬走成
 
 1. 確認具名檔存在，且裡面有那些 `## Round` 標題。這一步失敗就停止，`devlog.md` 維持原樣。
 2. 才從 `devlog.md` 刪掉已搬走的區塊。其餘保持原樣（除了下面 full keep 的標題改寫）。禁止先刪後寫。若刪除失敗、具名檔已寫成：告訴使用者兩份都還在，不要盲目重試刪除。
-3. **Full keep：** 把留下的那一個開著 Round 的標題改成 `## Round 1`，時間戳與本文不動；若 `.devlog/.span-open` 存在就刪掉它。
-4. **Episode keep：** 不要重編留下的 Round 編號（缺號可以）。若 `.span-open` 的 `round` 落在搬走範圍內，刪掉 `.span-open`；否則不要動它。
-5. 不要動 `.enabled`、不要動 `.round-open`。
+3. **Full keep：** 把留下的那一個開著 Round 的標題改成 `## Round 1`，時間戳與本文不動；若 `.devlog/.span-open` 存在就刪掉它；若 `.devlog/.round-open` 存在，將其 `"round"` 欄位改為 `1`（其他欄位不動），不要刪除 `.round-open`。
+4. **Episode keep：** 不要重編留下的 Round 編號（缺號可以）。若 `.span-open` 的 `round` 落在搬走範圍內，刪掉 `.span-open`；否則不要動它。不要動 `.round-open`。
+5. 不要動 `.enabled`。
 
 ## 7. 回報並收尾這一輪
 
