@@ -176,10 +176,11 @@ not off `### Response`.
 
 ## Known limitations
 
-- **Heading text is the only verified signal.** A `### Handoff` line with
-  an empty body, or a `### Summary` that is actually a file list, still
-  counts. Substance stays on Claude, as with every other enforced heading
-  in this plugin.
+- **Presence plus a light structure check.** Headings must exist, Summary
+  and Handoff bodies must contain a non-whitespace line, Status must be
+  one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`, and
+  `IN_PROGRESS` / `BLOCKED` require a non-empty `#### 下一步`. Prose
+  quality is still on Claude.
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
   Acceptable: no plausible reason for those headings to appear except a
@@ -194,6 +195,6 @@ not off `### Response`.
 ## Out of scope
 
 - Rewriting or migrating historical Rounds that still use `### Response`.
-- Hook checks for subsection headings (`#### 決策` etc.), non-empty
-  bodies, or Status/`下一步` consistency.
+- Hook checks for `#### 決策` / `#### 檔案` / `#### 現況`, or scoring
+  Summary prose.
 - Changing compact's retain rules.
