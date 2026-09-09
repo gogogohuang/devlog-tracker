@@ -55,3 +55,21 @@ json_str_set() {
     print
   }' "$file" > "$file.tmp" 2>/dev/null && mv "$file.tmp" "$file" 2>/dev/null || true
 }
+
+json_str_field() {
+  local json="$1" key="$2" raw=""
+  if command -v jq >/dev/null 2>&1; then
+    raw="$(printf '%s' "$json" | jq -r --arg k "$key" '.[$k] // empty' 2>/dev/null || echo '')"
+    [ "$raw" = "null" ] && raw=""
+    printf '%s' "$raw"
+    echo
+    return 0
+  fi
+  raw="$(printf '%s' "$json" | grep -o "\"${key}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" 2>/dev/null | head -1 || echo '')"
+  printf '%s' "$raw" | sed -E "s/^.*\"${key}\"[[:space:]]*:[[:space:]]*\"//; s/\"$//"
+  echo
+}
+
+slugify() {
+  printf '%s' "$1" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//'
+}

@@ -30,13 +30,7 @@ devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
 INPUT="$(cat 2>/dev/null || true)"
-SESSION_ID=""
-if command -v jq >/dev/null 2>&1; then
-  SESSION_ID="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || echo '')"
-  [ "$SESSION_ID" = "null" ] && SESSION_ID=""
-else
-  SESSION_ID="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
-fi
+SESSION_ID="$(json_str_field "$INPUT" session_id)"
 
 if [ -f "$ROUND_OPEN" ]; then
   bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" || true
@@ -53,13 +47,7 @@ if [ -f "$SPAN_FILE" ]; then
   fi
 fi
 
-PROMPT=""
-if command -v jq >/dev/null 2>&1; then
-  PROMPT="$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo '')"
-  if [ "$PROMPT" = "null" ]; then PROMPT=""; fi
-else
-  PROMPT="$(printf '%s' "$INPUT" | grep -o '"prompt"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
-fi
+PROMPT="$(json_str_field "$INPUT" prompt)"
 
 if [ "$SPAN_SKIP" -eq 0 ]; then
   if [ -z "$PROMPT" ]; then

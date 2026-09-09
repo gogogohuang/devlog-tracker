@@ -26,13 +26,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/json-field.sh"
 
 INPUT="$(cat 2>/dev/null || true)"
-SOURCE=""
-if command -v jq >/dev/null 2>&1; then
-  SOURCE="$(printf '%s' "$INPUT" | jq -r '.source // empty' 2>/dev/null || echo '')"
-  if [ "$SOURCE" = "null" ]; then SOURCE=""; fi
-else
-  SOURCE="$(printf '%s' "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
-fi
+SOURCE="$(json_str_field "$INPUT" source)"
 
 case "$SOURCE" in
   startup|resume|clear|fork)

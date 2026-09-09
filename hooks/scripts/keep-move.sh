@@ -24,7 +24,7 @@ case "$FROM:$TO" in *[!0-9:]*|:*) echo "範圍無效" >&2; exit 1 ;; esac
 case "$NAME" in devlog.md|*'/'*|*'\'*|*'..'*) echo "檔名無效" >&2; exit 1 ;; esac
 case "$NAME" in devlog.*) NAME="${NAME#devlog.}" ;; esac
 case "$NAME" in *.md) NAME="${NAME%.md}" ;; esac
-NAME="$(printf '%s' "$NAME" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"
+NAME="$(slugify "$NAME")"
 [ -n "$NAME" ] && [ "$NAME" != "archive" ] && [ "$NAME" != "devlog.md" ] \
   || { echo "檔名無效" >&2; exit 1; }
 [ "${#NAME}" -le 64 ] || { echo "檔名超過 64 字元" >&2; exit 1; }

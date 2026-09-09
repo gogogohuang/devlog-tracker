@@ -6,27 +6,6 @@ PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../hooks/scripts" && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
 export CLAUDE_PROJECT_DIR="$ROOT"
-ERR="$(printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/segment-watch.sh" 2>&1 >/dev/null)"
-RESULT=$?
-if [ "$RESULT" -eq 2 ]; then
-  if command -v jq >/dev/null 2>&1; then
-    jq -n --arg m "$ERR" '{permission:"deny",user_message:$m}'
-  else
-    esc="$(printf '%s' "$ERR" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-    printf '{"permission":"deny","user_message":"%s"}\n' "$esc"
-  fi
-else
-  printf '{}\n'
-fi
-exit 0
-#!/usr/bin/env bash
-set -uo pipefail
-_src="${BASH_SOURCE[0]}"
-SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
-PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../hooks/scripts" && pwd)"
-INPUT="$(cat 2>/dev/null || true)"
-ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
-export CLAUDE_PROJECT_DIR="$ROOT"
 ERR_FILE="$(mktemp "${TMPDIR:-/tmp}/cursor-pre-tool.XXXXXX")" || { echo '{}'; exit 0; }
 printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/segment-watch.sh" >/dev/null 2>"$ERR_FILE"
 RESULT=$?
@@ -42,3 +21,4 @@ if [ "$RESULT" -eq 2 ]; then
 else
   echo '{}'
 fi
+exit 0

@@ -1,6 +1,6 @@
 # devlog-tracker
 
-版本 `0.5.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
+版本 `0.5.1`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
 讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
 ## 特色
@@ -77,7 +77,7 @@ hook 仍依 Cursor 支援的事件執行。
 
 之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下 `/devlog-tracker:continue`。暫停、歸檔、具名搬走、狀態與 span 見上方指令表（完整 namespace，plugin 名稱是 `devlog-tracker`）。
 
-測試：`bash hooks/scripts/run-tests.sh`（Cursor adapter 另跑 `bash cursor/hooks/test-adapters.sh`）。
+測試：`bash hooks/scripts/run-tests.sh`（含 Cursor adapter）。
 
 ## 目錄結構
 
@@ -122,7 +122,7 @@ devlog-tracker/
 │       ├── devlog-md.sh                 # fence-aware Round 切塊
 │       ├── segment-watch.sh             # 同一輪太久沒寫就擋住下一個工具
 │       ├── enforce-devlog.sh            # Stop：Summary/Handoff 內容、Status、Span、Checkpoint
-│       ├── run-tests.sh                 # 執行 hooks/scripts/test-*.sh
+│       ├── run-tests.sh                 # 執行 hooks/scripts/test-*.sh + cursor/hooks/test-adapters.sh
 │       └── test-*.sh                    # 各腳本自我檢查
 └── commands/
     ├── start.md / pause.md / continue.md
