@@ -170,7 +170,80 @@ else
   echo "PASS: fork SessionStart deleted .round-open"
 fi
 
-# --- Scenario 9: startup does not interrupt a completed last Round ---------
+# --- Scenario 9: source=clear does not inject; still heals open round ------
+rm -f "$DEVLOG_DIR/.span-open"
+touch "$DEVLOG_DIR/.enabled"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+cleared
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then
+  echo "PASS: source=clear with open round -> silent stdout"
+else
+  echo "FAIL: source=clear must not inject context, got: $OUTPUT"
+  FAIL=1
+fi
+FILE="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "clear still stamps INTERRUPTED on disk" "INTERRUPTED" "$FILE"
+assert_contains "clear heal reason is on disk not stdout" "dangling:session_start" "$FILE"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: clear SessionStart should delete .round-open after heal"
+  FAIL=1
+else
+  echo "PASS: clear SessionStart deleted .round-open"
+fi
+
+# --- Scenario 10: source=clear with closed log and open span -> silent -----
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Summary
+finished
+
+### Handoff
+#### 現況
+finished
+
+### Status
+DONE
+EOF
+cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
+{
+  "round": 1,
+  "opened_at": "2026-09-08T21:40:00+08:00",
+  "ticks_since_checkin": 2,
+  "max_silent_ticks": 5
+}
+SPANEOF
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then
+  echo "PASS: source=clear with span -> silent stdout"
+else
+  echo "FAIL: source=clear must not inject span warning or rounds, got: $OUTPUT"
+  FAIL=1
+fi
+assert_not_contains "clear must not mention 開啟中的 span" "開啟中的 span" "$OUTPUT"
+rm -f "$DEVLOG_DIR/.span-open"
+
+# --- Scenario 11: source=resume still injects after the clear exception ----
+OUTPUT="$(echo '{"source":"resume"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "resume still injects Round 1" "Round 1" "$OUTPUT"
+
+# --- Scenario 12: startup does not interrupt a completed last Round ---------
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 

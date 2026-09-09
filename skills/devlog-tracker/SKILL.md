@@ -1,6 +1,6 @@
 ---
 name: devlog-tracker
-description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / clear / compact / fork 時自動讀檔補齊進度；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔、/devlog-tracker:keep 可把有主題的一段搬走成 devlog.<name>.md；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「keep」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
+description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / compact / fork 時自動讀檔補齊進度，/clear 不注入；要接續請 /devlog-tracker:continue；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔、/devlog-tracker:keep 可把有主題的一段搬走成 devlog.<name>.md；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「continue」「接續」「keep」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
 ---
 
 # Devlog Tracker（簡化版）
@@ -27,7 +27,9 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 所以這裡不猜也不解析 transcript，改用一個明確的開關檔案 `.devlog/.enabled`：
 
 - 使用者下 `/devlog-tracker:start`：建立這個開關檔（見 `commands/start.md`），代表「這個專案從現在起
-  要強制記錄」，同時讀一次現有 devlog 摘要目前進度
+  要強制記錄」，同時讀一次現有 devlog 摘要目前進度（對進度，不自動開工）
+- 使用者下 `/devlog-tracker:continue`：讀現有 devlog，依最後一輪 Handoff 的下一步接著做（見
+  `commands/continue.md`）。`/clear` 之後要接續，用這個，不要用 start
 - 使用者下 `/devlog-tracker:pause`：刪掉開關檔，暫停強制記錄，但完全不動歷史紀錄
 - 沒下過 `/devlog-tracker:start` 的專案：這個 plugin 裝著也不會有任何動作，不會留下 `.devlog/` 檔案
 
@@ -73,20 +75,36 @@ Claude 主動宣告「接下來會有一串自動續接」時才放寬，且用 
 不是像 agentflow 那樣泛用地判斷「這輪是否還在進行中」。一般互動式對話仍然是
 完整的「一個訊息 = 一輪」強制模式，沒有變。
 
-## 自動接續（由 hook 負責，不需要使用者喊指令）
+## 自動接續與 `/clear`
 
 這個 plugin 內建一個 SessionStart hook（`hooks/hooks.json` + `hooks/scripts/session-start-devlog.sh`），
-matcher 設為 `startup|resume|clear|compact|fork`，也就是**開新 session、resume、使用者按 `/clear`、`/compact` 壓縮對話之後，或 `/fork`／`--fork-session` 分支出去的 session**都會自動觸發：
+matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume、`/compact`、`/fork`**
+時會自動讀檔注入；**`/clear` 不會注入**——對話清空就是空的。
+
+自動注入時：
 
 1. 腳本讀取 `.devlog/devlog.md`，只取最近 8 輪（避免整份塞爆 context）
 2. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
-3. Claude 收到這段 context 後，開場就已經知道目前進度，**不用使用者再手動要求接續**
+3. Claude 收到這段 context 後，開場就已經知道目前進度
+
+`/clear` 時 hook 仍可能把殘留的開著 Round 標成 `INTERRUPTED`，但 stdout 什麼都不印。
+之後只有使用者下 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時，
+才讀 `.devlog/devlog.md` 並依 Handoff 下一步接著做（見 `commands/continue.md`）。
+一般新請求當成空白對話，不要先讀檔接舊工作。`/devlog-tracker:start` 只對進度，不開工。
 
 找不到 `.devlog/devlog.md` 時 hook 直接 exit 0，不輸出任何東西，不會干擾沒有用 devlog 的專案。
 
-如果 hook 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些環境問題沒跑），Claude 仍應主動：
-使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次 `.devlog/devlog.md` 最後幾輪再接手，
-把 hook 當作「保證會發生」的機制，把 Claude 自己主動讀檔當作 fallback。
+如果 hook 在 startup / resume / fork 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些
+環境問題沒跑），Claude 仍應主動：使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次
+`.devlog/devlog.md` 最後幾輪再接手。這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有
+說 continue，就不要讀檔。
+
+## 接續：`/devlog-tracker:continue`
+
+`/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
+「接續」「繼續上一題」）。讀 `devlog.md`，依最後一輪 Handoff 的下一步立刻開工。
+`DONE` 就說明上一題已結束、等新需求；`BLOCKED` 就說明缺什麼、不要發明輸入。
+步驟見 `commands/continue.md`。不要自動觸發。`/devlog-tracker:start` 只對進度，不開工。
 
 ## 每一輪的紀錄格式
 
@@ -341,7 +359,7 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 | | agentflow 原版 | 這個簡化版 |
 |---|---|---|
 | 涵蓋範圍 | devlog 協定 + 10 步驟 SDD pipeline | 只有 devlog 協定 |
-| 接續機制 | `godev` 關鍵字 + stop hook | `/devlog-tracker:start` 指令建立開關檔 + Stop/SessionStart hook |
+| 接續機制 | `godev` 關鍵字 + stop hook | `/devlog-tracker:start` 開開關；SessionStart 在 startup / resume / compact / fork 注入；`/clear` 後用 `/devlog-tracker:continue` |
 | 記錄機制 | 依 SDD 步驟完成度寫入 | 開關開著時 Stop hook 強制每輪都要更新，跟 plan 完成度無關 |
 | worker | 內建 subagent 或 external runner 外包 | 沒有，全部由當前 session 直接處理 |
 | 審查機制 | 對抗式審查、3ways 多模型辯論 | 沒有 |
