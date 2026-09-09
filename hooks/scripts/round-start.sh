@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook：每次使用者送出新訊息時執行，
-# 記下這一輪開始時 devlog.md 的內容雜湊，供 Stop hook 判斷這一輪有沒有寫過 devlog。
-# 用雜湊而不是時間戳，避免同一秒內的寫入跟下一輪開始互相誤判（見 enforce-devlog.sh 註解）。
+# UserPromptSubmit hook：每次使用者送出新訊息時執行。
+# 互動輪次：先（如有）把上一輪未收尾標成 INTERRUPTED，再追加本輪 User Input
+# skeleton，然後把 .turn-start 設成「寫完 skeleton 之後」的雜湊，供 Stop hook
+# 判斷 Claude 有沒有再寫 Summary/Handoff。
+# Span 開著且檔案格式有效時不開新 Round。
 # fail-open：這支腳本本身出任何問題都不該影響使用者送出訊息，一律 exit 0。
 
 set -uo pipefail
 
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -13,10 +16,78 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
+ROUND_OPEN="$DEVLOG_DIR/.round-open"
 
-# 沒下過 /devlog-tracker:start（也就是沒有這個開關檔），代表這個專案沒啟動強制記錄，
-# 直接放行，不留下任何 .devlog 檔案。
 [ -f "$ENABLED_FLAG" ] || exit 0
+
+INPUT="$(cat 2>/dev/null || true)"
+
+if [ -f "$ROUND_OPEN" ]; then
+  bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" || true
+fi
+
+SPAN_SKIP=0
+if [ -f "$SPAN_FILE" ]; then
+  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SPAN_MAX="$(grep -o '"max_silent_ticks"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  case "$SPAN_TICKS" in ''|*[!0-9]*) SPAN_TICKS='' ;; esac
+  case "$SPAN_MAX" in ''|*[!0-9]*) SPAN_MAX='' ;; esac
+  if [ -n "$SPAN_TICKS" ] && [ -n "$SPAN_MAX" ]; then
+    SPAN_SKIP=1
+  fi
+fi
+
+PROMPT=""
+if command -v jq >/dev/null 2>&1; then
+  PROMPT="$(printf '%s' "$INPUT" | jq -r '.prompt // empty' 2>/dev/null || echo '')"
+  if [ "$PROMPT" = "null" ]; then PROMPT=""; fi
+else
+  PROMPT="$(printf '%s' "$INPUT" | grep -o '"prompt"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+fi
+
+if [ "$SPAN_SKIP" -eq 0 ]; then
+  if [ -z "$PROMPT" ]; then
+    PROMPT="（無 prompt）"
+  fi
+  TRUNC_NOTE=""
+  if [ "${#PROMPT}" -gt 4000 ]; then
+    PROMPT="${PROMPT:0:4000}"
+    TRUNC_NOTE="（後略，已截斷至 4000 字）"
+  fi
+  PROMPT="$(printf '%s' "$PROMPT" | sed 's/```/⟨fence⟩/g')"
+
+  LAST_N=0
+  if [ -f "$DEVLOG_FILE" ]; then
+    LAST_N="$(awk '
+      /^[ \t]*```/ { fence = !fence }
+      !fence && /^## Round / {
+        split($0, parts, /[ \t]+/)
+        n = parts[3] + 0
+        if (n > last) last = n
+      }
+      END { print last + 0 }
+    ' "$DEVLOG_FILE" 2>/dev/null || echo 0)"
+    case "$LAST_N" in ''|*[!0-9]*) LAST_N=0 ;; esac
+  fi
+  NEXT_N=$((LAST_N + 1))
+  TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
+
+  {
+    printf '\n## Round %s — %s\n\n' "$NEXT_N" "$TS"
+    printf '### User Input\n'
+    printf '```text\n'
+    printf '%s\n' "$PROMPT"
+    printf '```\n'
+    if [ -n "$TRUNC_NOTE" ]; then
+      printf '%s\n' "$TRUNC_NOTE"
+    fi
+    printf '\n### Status\nIN_PROGRESS\n'
+  } >> "$DEVLOG_FILE" 2>/dev/null || true
+
+  if [ -f "$DEVLOG_FILE" ]; then
+    printf '{"round": %s, "opened_at": "%s"}\n' "$NEXT_N" "$TS" > "$ROUND_OPEN" 2>/dev/null || true
+  fi
+fi
 
 if [ -f "$DEVLOG_FILE" ]; then
   cksum < "$DEVLOG_FILE" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
@@ -24,12 +95,6 @@ else
   echo "MISSING" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
 fi
 
-# Span Mode：.span-open 存在就把 ticks_since_checkin 遞增，供 Stop hook
-# （enforce-devlog.sh）判斷這一輪要不要放寬檢查。讀不到或不是數字就跳過，
-# 不動這個檔案——fail-open，讓 Stop hook 那邊的 malformed 判斷去處理。
-# 同時記下「這個 tick 遞增後預期會不會被 Stop hook 的 Span Mode 早退放行」
-# （span 有效、且遞增後的 ticks 還沒到 max_silent_ticks），供下面 Checkpoint
-# Mode 判斷要不要把這個 tick 算進 rounds_since_checkpoint。
 SPAN_WILL_PASS_THROUGH=0
 if [ -f "$SPAN_FILE" ]; then
   SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
@@ -46,9 +111,6 @@ if [ -f "$SPAN_FILE" ]; then
   fi
 fi
 
-# Checkpoint Mode：.checkpoint-state 存在就把 rounds_since_checkpoint +1——除非
-# 這個 tick 預期會被上面判斷出來的 Span Mode 早退放行，這種情況下不計入，
-# 避免自動續接期間被兩套機制疊加要求。讀不到或不是數字就跳過，fail-open。
 if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -f "$CHECKPOINT_FILE" ]; then
   CP_ROUNDS="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
   case "$CP_ROUNDS" in
@@ -61,8 +123,6 @@ if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -f "$CHECKPOINT_FILE" ]; then
   esac
 fi
 
-# Segment Watch：.segment-state 存在且欄位齊就重設 last_change_epoch / last_seen_cksum，
-# 讓這一輪的 15 分鐘保底從現在起算。不動 max_silent_seconds。讀不到或不是數字就跳過。
 if [ -f "$SEGMENT_FILE" ]; then
   SEG_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
   SEG_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"

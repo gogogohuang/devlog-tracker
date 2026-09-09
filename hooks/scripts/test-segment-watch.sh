@@ -148,13 +148,14 @@ assert_exit "expired + empty stdin -> allowed" 0 $?
 # --- Scenario 13: round-start.sh resets clock and preserves max -------------
 write_state 1 "old-sum" 600
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+POST_SKEL="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
 RS_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.segment-state" | grep -o '[0-9]\+$')"
 RS_SUM="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 RS_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.segment-state" | grep -o '[0-9]\+$')"
-if [ "$RS_EPOCH" -ge "$NOW" ] && [ "$RS_SUM" = "$SEED_CKSUM" ] && [ "$RS_MAX" = "600" ]; then
-  echo "PASS: round-start.sh reset epoch/cksum and kept max_silent_seconds=600"
+if [ "$RS_EPOCH" -ge "$NOW" ] && [ "$RS_SUM" = "$POST_SKEL" ] && [ "$RS_MAX" = "600" ]; then
+  echo "PASS: round-start.sh reset epoch/cksum to post-skeleton hash and kept max_silent_seconds=600"
 else
-  echo "FAIL: round-start expected epoch>=$NOW cksum=$SEED_CKSUM max=600, got epoch=$RS_EPOCH cksum=$RS_SUM max=$RS_MAX"
+  echo "FAIL: round-start expected epoch>=$NOW cksum=$POST_SKEL max=600, got epoch=$RS_EPOCH cksum=$RS_SUM max=$RS_MAX"
   FAIL=1
 fi
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
