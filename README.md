@@ -1,8 +1,6 @@
 # devlog-tracker
 
-版本 `0.5.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。
-參考 [agfnow/agentflow](https://github.com/agfnow/agentflow) 的 devlog 基礎協定做的簡化版，
-只保留「逐輪對話紀錄」這一層。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
+版本 `0.5.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
 讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
 ## 特色
