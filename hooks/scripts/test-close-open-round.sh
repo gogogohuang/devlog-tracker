@@ -139,17 +139,44 @@ else
   echo "PASS: mismatched .round-open deleted"
 fi
 
-# --- 5: no .round-open -> no-op --------------------------------------------
+# --- 5: no .round-open -> delete .interrupted, do not edit devlog -----------
 write_skeleton
 rm -f "$DEVLOG_DIR/.round-open"
+touch "$DEVLOG_DIR/.interrupted"
 BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
 bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:other"
 AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
 if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: missing .round-open -> unchanged"
+  echo "PASS: missing .round-open -> devlog unchanged"
 else
   echo "FAIL: missing .round-open edited the file"
   FAIL=1
+fi
+if [ -f "$DEVLOG_DIR/.interrupted" ]; then
+  echo "FAIL: missing .round-open should still delete .interrupted"
+  FAIL=1
+else
+  echo "PASS: missing .round-open deleted .interrupted"
+fi
+
+# --- 5b: malformed .round-open -> delete .interrupted, do not edit ---------
+write_skeleton
+printf '%s\n' 'not valid json' > "$DEVLOG_DIR/.round-open"
+touch "$DEVLOG_DIR/.interrupted"
+BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:other"
+AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
+if [ "$BEFORE" = "$AFTER" ]; then
+  echo "PASS: malformed .round-open -> devlog unchanged"
+else
+  echo "FAIL: malformed .round-open edited the file"
+  FAIL=1
+fi
+if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: malformed .round-open should delete both markers"
+  FAIL=1
+else
+  echo "PASS: malformed .round-open deleted both markers"
 fi
 
 # --- 6: last Round after a Checkpoint; only last Round is patched -----------

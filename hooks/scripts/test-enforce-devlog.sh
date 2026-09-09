@@ -602,6 +602,34 @@ else
   echo "PASS: interrupt path deleted markers"
 fi
 
+# --- Recording moments: stale .interrupted without .round-open -------------
+# A leftover .interrupted must not permanently short-circuit Stop when there
+# is no open round — the next Stop must run normal hash/heading enforcement.
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+stale interrupt
+```
+
+### Status
+IN_PROGRESS
+EOF
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+rm -f "$DEVLOG_DIR/.round-open"
+touch "$DEVLOG_DIR/.interrupted"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "stale .interrupted, no .round-open -> first Stop exit 0" 0 $?
+if [ -f "$DEVLOG_DIR/.interrupted" ]; then
+  echo "FAIL: first Stop should clear .interrupted even without .round-open"
+  FAIL=1
+else
+  echo "PASS: stale .interrupted cleared on first Stop"
+fi
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "after stale interrupt cleared -> normal enforcement blocks (hash equal)" 2 $?
+
 # --- Recording moments: loop guard leaves .round-open ----------------------
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00

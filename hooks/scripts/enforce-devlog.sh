@@ -30,6 +30,7 @@ PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
+  rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
   exit 0
 fi
 

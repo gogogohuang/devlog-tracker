@@ -16,7 +16,10 @@ drop_markers() {
 }
 
 [ -f "$ENABLED_FLAG" ] || exit 0
-[ -f "$ROUND_OPEN" ] || exit 0
+if [ ! -f "$ROUND_OPEN" ]; then
+  rm -f "$INTERRUPTED_FLAG" 2>/dev/null || true
+  exit 0
+fi
 
 OPEN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$ROUND_OPEN" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
 case "$OPEN_ROUND" in
