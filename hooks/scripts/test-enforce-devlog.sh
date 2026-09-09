@@ -250,7 +250,18 @@ fi
 # is above the just-corrected stored value of 0 -- the normal -gt path must
 # fire and reset/persist both counters together, proving a real checkpoint
 # write is never blocked or wedged after a resync.
+# round-start.sh opens a skeleton Round first; complete it (Summary+Handoff)
+# before the Checkpoint so the last Round is not left incomplete.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+
+### Summary
+fixture
+
+### Handoff
+#### 現況
+fixture
+EOF
 echo "## Checkpoint（Round 2 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "genuine checkpoint write above the corrected stored value -> allowed" 0 $?
@@ -361,7 +372,10 @@ DEVEOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "headings only inside Checkpoint, last Round missing them -> blocked" 2 $?
 
-# --- Heading Scenario 7: Checkpoint-only append on a complete last Round --
+# --- Heading Scenario 7: Checkpoint after completing the open skeleton Round -
+# round-start.sh always opens a skeleton; Claude must finish Summary+Handoff
+# on that Round. A Checkpoint may follow; the last Round must still have both
+# headings (extraction stops at the Checkpoint ## line).
 cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ## Round 6 — 2026-09-09T10:25:00+08:00
 
@@ -376,6 +390,15 @@ complete
 DONE
 DEVEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+
+### Summary
+complete
+
+### Handoff
+#### 現況
+complete
+DEVEOF
 echo "## Checkpoint（Round 6 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "Checkpoint-only append after a complete last Round -> allowed" 0 $?
@@ -501,6 +524,101 @@ DEVEOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "older Round still uses ### Response, complete last Round -> allowed" 0 $?
 
+# --- Recording moments: skeleton hash-equal still blocks -------------------
+rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.interrupted"
+: > "$DEVLOG_DIR/devlog.md"
+printf '%s' '{"prompt":"block me"}' | bash "$SCRIPT_DIR/round-start.sh"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "skeleton only (hash equal after submit write) -> blocked" 2 $?
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "PASS: .round-open remains after hash-miss block"
+else
+  echo "FAIL: .round-open should remain when Stop blocks"
+  FAIL=1
+fi
+
+# --- Recording moments: Summary+Handoff on same Round deletes .round-open --
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+block me
+```
+
+### Summary
+done
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+# Hash equal would block — simulate Claude's edit by appending a newline after snapshot:
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "headings present and hash changed -> allowed" 0 $?
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: .round-open should be deleted on successful Stop"
+  FAIL=1
+else
+  echo "PASS: .round-open deleted after successful close"
+fi
+
+# --- Recording moments: .interrupted stamps and does not block -------------
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+esc
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+touch "$DEVLOG_DIR/.interrupted"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit ".interrupted -> exit 0 (does not fight Esc)" 0 $?
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+case "$BODY" in
+  *INTERRUPTED*) echo "PASS: .interrupted stamped INTERRUPTED" ;;
+  *) echo "FAIL: expected INTERRUPTED after .interrupted Stop"; FAIL=1 ;;
+esac
+case "$BODY" in
+  *user_interrupt*) echo "PASS: reason is user_interrupt" ;;
+  *) echo "FAIL: expected user_interrupt reason"; FAIL=1 ;;
+esac
+if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: interrupt path should delete both markers"
+  FAIL=1
+else
+  echo "PASS: interrupt path deleted markers"
+fi
+
+# --- Recording moments: loop guard leaves .round-open ----------------------
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+echo '{"stop_hook_active":true}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "loop guard -> exit 0" 0 $?
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "PASS: loop guard did not delete .round-open"
+else
+  echo "FAIL: loop guard should leave .round-open for later heal"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
@@ -508,3 +626,4 @@ else
   echo "Some checks FAILED."
   exit 1
 fi
+
