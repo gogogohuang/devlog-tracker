@@ -252,8 +252,9 @@ DONE
 
 ### 怎麼開一個 span
 
-寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，額外用 Write／Edit
-工具建立 `.devlog/.span-open`：
+寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，使用
+`/devlog-tracker:span`（或跑 `span-open.sh`）建立 `.devlog/.span-open`。
+除非腳本不可用，否則不要手寫 JSON。檔案格式如下：
 
 ```json
 {
