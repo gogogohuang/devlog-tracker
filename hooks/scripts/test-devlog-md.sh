@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+# Self-check for devlog-md.sh's segment-counting and insertion helpers. Run:
+#   bash hooks/scripts/test-devlog-md.sh
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=devlog-md.sh
+. "$SCRIPT_DIR/devlog-md.sh"
+
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
+FAIL=0
+assert_eq() {
+  local desc="$1" expected="$2" actual="$3"
+  if [ "$actual" = "$expected" ]; then
+    echo "PASS: $desc"
+  else
+    echo "FAIL: $desc (expected [$expected], got [$actual])"
+    FAIL=1
+  fi
+}
+assert_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "PASS: $desc" ;;
+    *) echo "FAIL: $desc (missing: $needle)"; FAIL=1 ;;
+  esac
+}
+
+# --- devlog_count_segments: zero segments ----------------------------------
+cat > "$TMP_ROOT/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+hello
+```
+
+### Summary
+done
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+START="$(devlog_list_round_starts "$TMP_ROOT/devlog.md" | awk '$2==1{print $1}')"
+END="$(devlog_block_end "$TMP_ROOT/devlog.md" "$START")"
+COUNT="$(devlog_count_segments "$TMP_ROOT/devlog.md" "$START" "$END")"
+assert_eq "zero segments" "0" "$COUNT"
+
+# --- devlog_count_segments: two existing segments ---------------------------
+cat > "$TMP_ROOT/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+hello
+```
+
+### 段落 1 - 09:00
+first
+
+### 段落 2 - 09:10
+second
+
+### Summary
+done
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+START="$(devlog_list_round_starts "$TMP_ROOT/devlog.md" | awk '$2==1{print $1}')"
+END="$(devlog_block_end "$TMP_ROOT/devlog.md" "$START")"
+COUNT="$(devlog_count_segments "$TMP_ROOT/devlog.md" "$START" "$END")"
+assert_eq "two existing segments" "2" "$COUNT"
+
+# --- devlog_count_segments: a fenced line that itself looks like a heading
+# must not count (fence-awareness, not just the regex anchor) ---------------
+cat > "$TMP_ROOT/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+### 段落 1 - 09:00
+```
+
+### Summary
+done
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+START="$(devlog_list_round_starts "$TMP_ROOT/devlog.md" | awk '$2==1{print $1}')"
+END="$(devlog_block_end "$TMP_ROOT/devlog.md" "$START")"
+COUNT="$(devlog_count_segments "$TMP_ROOT/devlog.md" "$START" "$END")"
+assert_eq "fenced mention of 段落 not counted" "0" "$COUNT"
+
+# --- devlog_insert_before_summary: inserts right before ### Summary --------
+cat > "$TMP_ROOT/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+hello
+```
+
+### Summary
+done
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+
+## Round 2 — 2026-09-09T13:00:00+08:00
+
+### Summary
+other round summary marker should not be touched
+EOF
+printf '### 段落 1 - 09:30（回覆上一輪的問題）\n```text\nmy answer\n```\n\n' > "$TMP_ROOT/segment.txt"
+START="$(devlog_list_round_starts "$TMP_ROOT/devlog.md" | awk '$2==1{print $1}')"
+END="$(devlog_block_end "$TMP_ROOT/devlog.md" "$START")"
+RESULT="$(devlog_insert_before_summary "$TMP_ROOT/devlog.md" "$START" "$END" "$TMP_ROOT/segment.txt")"
+assert_contains "inserted segment text present" "my answer" "$RESULT"
+# The inserted block must appear before Round 1's Summary, not Round 2's.
+BEFORE_R1_SUMMARY="$(printf '%s\n' "$RESULT" | awk '/my answer/{print NR} /^### Summary$/{print NR; exit}')"
+FIRST_LINE="$(printf '%s\n' "$BEFORE_R1_SUMMARY" | head -1)"
+SECOND_LINE="$(printf '%s\n' "$BEFORE_R1_SUMMARY" | tail -1)"
+if [ "$FIRST_LINE" -lt "$SECOND_LINE" ]; then
+  echo "PASS: segment text appears before Round 1's ### Summary"
+else
+  echo "FAIL: segment text did not land before Round 1's ### Summary"
+  FAIL=1
+fi
+ROUND2_COUNT="$(printf '%s\n' "$RESULT" | grep -c 'other round summary marker')"
+assert_eq "round 2 summary untouched (still exactly once)" "1" "$ROUND2_COUNT"
+
+if [ "$FAIL" -eq 0 ]; then
+  echo "All checks passed."
+  exit 0
+else
+  echo "Some checks FAILED."
+  exit 1
+fi

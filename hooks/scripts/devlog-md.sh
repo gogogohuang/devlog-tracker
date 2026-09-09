@@ -31,3 +31,33 @@ devlog_round_status() {
     END { print value }
   ' "$1"
 }
+
+devlog_count_segments() {
+  awk -v start="$2" -v end="$3" '
+    NR < start || NR > end { next }
+    /^```/ { fence = !fence; next }
+    !fence && /^### 段落 / { count++ }
+    END { print count + 0 }
+  ' "$1"
+}
+
+devlog_insert_before_summary() {
+  local file="$1" start="$2" end="$3" text_file="$4"
+  awk -v start="$start" -v end="$end" -v textfile="$text_file" '
+    BEGIN {
+      inserted = 0
+      while ((getline line < textfile) > 0) {
+        ins[ni++] = line
+      }
+      close(textfile)
+    }
+    {
+      if (!inserted && NR >= start && NR <= end && !fence && $0 ~ /^### Summary$/) {
+        for (i = 0; i < ni; i++) print ins[i]
+        inserted = 1
+      }
+      if ($0 ~ /^```/) fence = !fence
+      print
+    }
+  ' "$file"
+}
