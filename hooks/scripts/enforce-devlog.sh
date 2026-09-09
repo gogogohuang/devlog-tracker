@@ -28,10 +28,50 @@ INPUT="$(cat 2>/dev/null || true)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
+DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+TURN_MARKER="$DEVLOG_DIR/.turn-start"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
-  bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
-  rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
-  exit 0
+  # If Claude recovered after is_interrupt (Summary+Handoff already written
+  # and hash moved vs .turn-start), do not overwrite that Round to
+  # INTERRUPTED — clear the marker and fall through to the normal success
+  # path. Only stamp user_interrupt when the last Round is still open /
+  # incomplete. Fail-open: if we cannot tell, keep the stamp behavior.
+  RECOVERED_COMPLETE=0
+  if [ -f "$TURN_MARKER" ] && [ -f "$DEVLOG_FILE" ]; then
+    _TURN_HASH="$(cat "$TURN_MARKER" 2>/dev/null || echo '')"
+    _CUR_HASH="$(cksum < "$DEVLOG_FILE" 2>/dev/null || echo '')"
+    if [ -n "$_TURN_HASH" ] && [ -n "$_CUR_HASH" ] && [ "$_CUR_HASH" != "$_TURN_HASH" ]; then
+      _LAST_ROUND="$(awk '
+        /^[ \t]*```/ { fence = !fence }
+        !fence && /^## Round / { start = NR }
+        { lines[NR] = $0; infence[NR] = fence }
+        END {
+          if (start == 0) exit 0
+          end = NR
+          for (i = start + 1; i <= NR; i++) {
+            if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+          }
+          for (i = start; i <= end; i++) print lines[i]
+        }
+      ' "$DEVLOG_FILE" 2>/dev/null || true)"
+      if [ -n "$_LAST_ROUND" ]; then
+        _HAS_S=0
+        _HAS_H=0
+        printf '%s\n' "$_LAST_ROUND" | grep -q '^### Summary' && _HAS_S=1
+        printf '%s\n' "$_LAST_ROUND" | grep -q '^### Handoff' && _HAS_H=1
+        if [ "$_HAS_S" -eq 1 ] && [ "$_HAS_H" -eq 1 ]; then
+          RECOVERED_COMPLETE=1
+        fi
+      fi
+    fi
+  fi
+  if [ "$RECOVERED_COMPLETE" -eq 1 ]; then
+    rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
+  else
+    bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
+    rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
+    exit 0
+  fi
 fi
 
 if command -v jq >/dev/null 2>&1; then

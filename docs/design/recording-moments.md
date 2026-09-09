@@ -137,9 +137,11 @@ interrupt-stamp, do not block Stop solely on this file).
 ### `.devlog/.interrupted`
 
 Presence file, written by `PostToolUseFailure` when `is_interrupt` is
-true. Stop sees it, patches `INTERRUPTED`, deletes this file and
-`.round-open`, **exits 0** (must not fight Esc). Fail-open if stdin
-cannot be parsed.
+true (best-effort — Esc does not reliably fire this event). Stop sees
+it: if the last Round is still incomplete, patches `INTERRUPTED`,
+deletes this file and `.round-open`, **exits 0**. If Summary+Handoff
+are already present and the hash moved, clears the marker and takes the
+normal success path instead. Fail-open if stdin cannot be parsed.
 
 ### `.devlog/.turn-start`
 
@@ -187,9 +189,13 @@ as on current mainline).
 New order:
 
 1. Read stdin (as today).
-2. If `.interrupted` exists → shared interrupt close `user_interrupt`,
-   exit 0. Do this **before** the loop guard so Esc is not converted
-   into "please write Summary".
+2. If `.interrupted` exists: if the last Round already has `### Summary`
+   and `### Handoff` **and** the current hash differs from `.turn-start`,
+   clear `.interrupted` and fall through (do not stamp — Claude
+   recovered). Otherwise shared interrupt close `user_interrupt`, exit
+   0. Do this **before** the loop guard so an incomplete Esc path is
+   not converted into "please write Summary". Fail-open: if completeness
+   cannot be determined, keep the stamp behavior.
 3. Loop guard `stop_hook_active` → exit 0 (unchanged: one block, then
    release). A released skeleton stays open; the next prompt or
    SessionStart heals it.
@@ -232,10 +238,12 @@ budget).
 
 ### SessionStart (`session-start-devlog.sh`)
 
-Before injecting the last 8 rounds: if `.round-open` exists, shared
-interrupt close `dangling:session_start`. Then existing span warning +
-devlog excerpt. Crash recovery for Status; User Input was already on
-disk at submit.
+Before injecting the last 8 rounds: if `.round-open` exists **and**
+stdin `source` is `startup` / `resume` / `clear` / `fork`, shared
+interrupt close `dangling:session_start`. Skip heal when `source` is
+`compact` or missing/unreadable (mid-turn auto-compact must not cancel
+Stop). Then existing span warning + devlog excerpt. Crash recovery for
+Status; User Input was already on disk at submit.
 
 ### PostToolUseFailure
 
@@ -333,10 +341,20 @@ framework.
 ## Known limitations
 
 - **Hard kill:** User Input is on disk; `INTERRUPTED` waits for
-  SessionStart or the next prompt. Unwritten `### 段落` are still
-  lost. Segment Watch does not help if no further tool call happens.
-- **Esc without `is_interrupt`:** first Stop may still demand
-  Summary/Handoff. Loop guard then releases. Heal on next prompt.
+  SessionStart (`startup` / `resume` / `clear`) or the next prompt.
+  Unwritten `### 段落` are still lost. Segment Watch does not help if
+  no further tool call happens.
+- **Esc / mid-turn cancel is not a reliable immediate stamp.** Unexpected
+  cancel is usually marked `INTERRUPTED` on the **next prompt** or **next
+  SessionStart (`startup` / `resume` / `clear`)**. `PostToolUseFailure`
+  `is_interrupt` is a best-effort extra if it fires — do not assume Esc
+  immediately stamps via that event. When it does not fire, the first Stop
+  may still demand Summary/Handoff; the loop guard then releases; heal on
+  the next prompt / SessionStart.
+- **SessionStart `compact` does not heal.** Mid-turn auto-compact also
+  fires SessionStart; healing there would change the hash and silently
+  cancel Stop's completeness check. Compact still injects the last-8
+  excerpt only.
 - **Usage skip is exact three `error` strings.** Other billing-adjacent
   types that are not those names get recorded.
 - **Concurrent sessions** racing `devlog.md` / `.round-open` — pre-existing.

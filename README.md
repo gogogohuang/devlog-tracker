@@ -10,8 +10,10 @@
   每一輪的結束動作，這一輪沒寫 `devlog.md` 就不能結束——不依賴 Claude 自行判斷「值不值得
   記錄」，也跟任務/plan 是否完成無關。沒下過 `/devlog-tracker:start` 的專案完全不受影響。
   `UserPromptSubmit` 在每一則使用者訊息送出時就先寫好 User Input skeleton；意外中斷
-  （Esc、非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open`）會把同一塊標成
-  `INTERRUPTED`（usage 用光不算中斷）。
+  （非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open`）會把同一塊標成
+  `INTERRUPTED`（usage 用光不算中斷）。中途取消（例如 Esc）通常是在**下一則訊息**或
+  **下次 SessionStart（startup / resume / clear）**才補上；`PostToolUseFailure` 的
+  `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成一定會立刻蓋章。
 - **`/devlog-tracker:pause`**：暫停強制記錄，歷史紀錄不受影響，之後可再用 `/devlog-tracker:start` 重新啟動。
 - **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session 時自動讀取
   `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。

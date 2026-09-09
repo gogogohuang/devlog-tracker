@@ -602,6 +602,50 @@ else
   echo "PASS: interrupt path deleted markers"
 fi
 
+# --- Recording moments: completed round + .interrupted must NOT stamp ------
+# Esc/is_interrupt fired, but Claude recovered and wrote Summary+Handoff.
+# Stop must clear the marker and take the normal success path — not overwrite
+# a finished Round to INTERRUPTED.
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+recover
+```
+
+### Summary
+recovered after interrupt
+
+### Handoff
+#### 現況
+round finished normally
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+touch "$DEVLOG_DIR/.interrupted"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "complete last Round + .interrupted + hash changed -> exit 0" 0 $?
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+case "$BODY" in
+  *INTERRUPTED*) echo "FAIL: completed Round must not be stamped INTERRUPTED"; FAIL=1 ;;
+  *) echo "PASS: completed Round Status left as written (not INTERRUPTED)" ;;
+esac
+case "$BODY" in
+  *DONE*) echo "PASS: Status DONE preserved" ;;
+  *) echo "FAIL: expected Status DONE to remain"; FAIL=1 ;;
+esac
+if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: recovered-complete path should delete .interrupted and .round-open"
+  FAIL=1
+else
+  echo "PASS: recovered-complete path deleted markers"
+fi
+
 # --- Recording moments: stale .interrupted without .round-open -------------
 # A leftover .interrupted must not permanently short-circuit Stop when there
 # is no open round — the next Stop must run normal hash/heading enforcement.

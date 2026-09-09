@@ -7,6 +7,12 @@
 # Span Mode：如果 .devlog/.span-open 還開著（見 SKILL.md），在最前面加一段
 # 提醒，不管 devlog.md 存不存在都要顯示——讀不到／格式壞掉就靜默跳過，
 # 跟這支腳本一貫的 fail-open 原則一致。
+#
+# Dangling heal：只在真正的 session 邊界（startup / resume / clear / fork）
+# 把殘留的 .round-open 標成 INTERRUPTED。mid-turn auto-compact 也會觸發
+# SessionStart（source=compact），此時若 heal 會改雜湊、加 stub，讓隨後的
+# Stop 靜默放行——因此 compact（以及 source 缺失／讀不到）一律跳過 heal，
+# 但仍照常注入最近 8 輪。
 
 set -uo pipefail
 
@@ -17,9 +23,23 @@ SPAN_FILE="$DEVLOG_DIR/.span-open"
 MAX_ROUNDS=8
 
 HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$DEVLOG_DIR/.round-open" ]; then
-  bash "$HOOKS_DIR/close-open-round.sh" "dangling:session_start" || true
+
+INPUT="$(cat 2>/dev/null || true)"
+SOURCE=""
+if command -v jq >/dev/null 2>&1; then
+  SOURCE="$(printf '%s' "$INPUT" | jq -r '.source // empty' 2>/dev/null || echo '')"
+  if [ "$SOURCE" = "null" ]; then SOURCE=""; fi
+else
+  SOURCE="$(printf '%s' "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
 fi
+
+case "$SOURCE" in
+  startup|resume|clear|fork)
+    if [ -f "$DEVLOG_DIR/.round-open" ]; then
+      bash "$HOOKS_DIR/close-open-round.sh" "dangling:session_start" || true
+    fi
+    ;;
+esac
 
 if [ -f "$SPAN_FILE" ]; then
   SPAN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"

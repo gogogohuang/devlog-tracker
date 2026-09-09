@@ -49,9 +49,10 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 這個事件上。
 
 需要誠實說明的邊界：User Input 在送出當下就已經在 `devlog.md`。正常結束時 Stop 仍保證有 Summary / Handoff。
-意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺時，Status 要等下次 SessionStart 或
-下一則訊息才補上）。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個
-工具呼叫時催促。
+意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
+**下一則訊息**或**下次 SessionStart（startup / resume / clear）**才補上）。
+`PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成 Esc
+會立刻蓋章。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個工具呼叫時催促。
 
 ### 兩個穩健性設計（參考 agfnow/agentflow 的 stop-hook.js）
 
@@ -133,8 +134,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
   `DONE` = 這輪請求已結束。
-- `INTERRUPTED` 只由 hook 在意外中斷時寫上（Esc、非 usage 的 API 錯誤、SessionEnd、
-  下次 SessionStart / 下一則訊息發現 `.round-open` 還在）。Claude 正常收尾時不要自己選這個值。
+- `INTERRUPTED` 只由 hook 在意外中斷時寫上（非 usage 的 API 錯誤、SessionEnd、
+  下次 SessionStart（startup / resume / clear）或下一則訊息發現 `.round-open` 還在）。
+  mid-turn 取消（例如 Esc）通常也是走這條延後路徑；`PostToolUseFailure` 的 `is_interrupt`
+  若有觸發只是 best-effort，不能當成一定會立刻蓋章。Claude 正常收尾時不要自己選這個值。
   usage 用光（`rate_limit` / `billing_error` / `account_on_hold`）不標中斷。
 - 每輪一個區塊，不要把多輪內容合併寫成一個 Round。
 - 不要另外開欄位列「這輪用了哪些 skill」——那是稽核用途，跟接續開發沒有直接關係。只有
@@ -324,7 +327,7 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 歸檔不再是自動觸發，而是使用者主動下 `/devlog-tracker:compact` 指令時才做（見 `commands/compact.md`）。
 規則：
 
-- 保留：專案摘要（如果有）、最近 5 輪、所有還沒 `DONE`（`IN_PROGRESS`/`BLOCKED`）的輪次
+- 保留：專案摘要（如果有）、最近 5 輪、所有還沒 `DONE`（`IN_PROGRESS`/`BLOCKED`/`INTERRUPTED`）的輪次
 - 其餘 `DONE` 的舊輪次：完整搬到 `.devlog/devlog.archive.md`（append，不覆寫既有歸檔）
 - 只搬移，不刪除、不改寫內容
 
