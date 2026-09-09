@@ -30,4 +30,5 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
    提醒補上，可以用 `/devlog-tracker:pause` 隨時關掉這個強制機制。
 
 不要因為 `.devlog/.enabled` 已經存在就跳過步驟 5 的進度摘要——每次執行 `/devlog-tracker:start`
-都應該重新確認一次目前進度，這通常代表使用者是在新 session 或 `/clear` 之後手動觸發的。
+都應該重新確認一次目前進度。`/clear` 之後若要接著做上一題，用 `/devlog-tracker:continue`，
+不要用 start 開工。

@@ -1,18 +1,17 @@
 #!/usr/bin/env bash
-# SessionStart hook：在 startup / resume / clear / compact / fork 時執行
-# 讀取目前工作目錄下的 .devlog/devlog.md，只取最後 N 輪 + 開頭摘要（如果有），
-# 印到 stdout 讓 Claude Code 自動注入這次 session 的 context。
-# 找不到檔案就直接 exit 0，不輸出任何東西（不干擾一般沒有用 devlog 的專案）。
+# SessionStart hook：在 startup / resume / clear / compact / fork 時執行。
+# startup / resume / compact / fork：讀 .devlog/devlog.md 最後 N 輪 + 開頭摘要，
+# 印到 stdout 讓 Claude Code 當成 additionalContext 注入。
+# source=clear：只做 dangling heal，不注入、不印 span 提醒——/clear 必須是真的空
+# context，接續改由 /devlog-tracker:continue。找不到檔案就 exit 0。
 #
-# Span Mode：如果 .devlog/.span-open 還開著（見 SKILL.md），在最前面加一段
-# 提醒，不管 devlog.md 存不存在都要顯示——讀不到／格式壞掉就靜默跳過，
-# 跟這支腳本一貫的 fail-open 原則一致。
+# Span Mode：.span-open 還開著時，在注入內容最前面加一段提醒（clear 除外）。
+# 讀不到／格式壞掉就靜默跳過，fail-open。
 #
-# Dangling heal：只在真正的 session 邊界（startup / resume / clear / fork）
-# 把殘留的 .round-open 標成 INTERRUPTED。mid-turn auto-compact 也會觸發
-# SessionStart（source=compact），此時若 heal 會改雜湊、加 stub，讓隨後的
-# Stop 靜默放行——因此 compact（以及 source 缺失／讀不到）一律跳過 heal，
-# 但仍照常注入最近 8 輪。
+# Dangling heal：startup / resume / clear / fork 把殘留的 .round-open 標成
+# INTERRUPTED。source=compact（以及 source 缺失／讀不到）跳過 heal，避免
+# mid-turn auto-compact 改雜湊讓 Stop 靜默放行；compact 仍注入最近 8 輪。
+# close-open-round.sh 必須對 stdout 保持沉默。
 
 set -uo pipefail
 
@@ -40,6 +39,11 @@ case "$SOURCE" in
     fi
     ;;
 esac
+
+# /clear 清空對話；不要把 devlog 或 span 提醒打回 context。
+if [ "$SOURCE" = "clear" ]; then
+  exit 0
+fi
 
 if [ -f "$SPAN_FILE" ]; then
   SPAN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"

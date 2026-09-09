@@ -244,8 +244,12 @@ Before injecting the last 8 rounds: if `.round-open` exists **and**
 stdin `source` is `startup` / `resume` / `clear` / `fork`, shared
 interrupt close `dangling:session_start`. Skip heal when `source` is
 `compact` or missing/unreadable (mid-turn auto-compact must not cancel
-Stop). Then existing span warning + devlog excerpt. Crash recovery for
-Status; User Input was already on disk at submit.
+Stop). Then, for every source **except `clear`**, the existing span
+warning + devlog excerpt. `source=clear` exits 0 after heal with empty
+stdout — `/clear` must leave context empty; resume is
+`/devlog-tracker:continue` (see `docs/design/continue.md`). Crash
+recovery for Status still happens on disk; User Input was already on
+disk at submit.
 
 ### PostToolUseFailure
 
@@ -388,7 +392,7 @@ framework.
 | `hooks/scripts/on-stop-failure.sh` | Skip usage errors; else close-open |
 | `hooks/scripts/on-session-end.sh` | Close-open with SessionEnd reason |
 | `hooks/scripts/on-tool-failure.sh` | Set `.interrupted` when `is_interrupt` |
-| `hooks/scripts/session-start-devlog.sh` | Heal then inject context |
+| `hooks/scripts/session-start-devlog.sh` | Heal then inject context, except `source=clear` (heal only, empty stdout) |
 | `hooks/hooks.json` | Register StopFailure, SessionEnd, PostToolUseFailure |
 | `hooks/scripts/test-*.sh` | Cases listed above |
 | `skills/devlog-tracker/SKILL.md` | Same-Round edit, `INTERRUPTED`, timing |

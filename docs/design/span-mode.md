@@ -80,9 +80,10 @@ there is no dedicated slash command for this), never by a hook script:
   blocking with exit 2 as usual), and resets the counter to 0 once a write
   succeeds.
 - **`session-start-devlog.sh`** (`SessionStart`): if `.span-open` exists at
-  session start (any source — startup/resume/clear/compact), a warning is
+  session start (`startup` / `resume` / `compact` / `fork`), a warning is
   prepended to the injected context naming the Round and open timestamp, so
-  a resumed session knows there's an unclosed span.
+  a resumed session knows there's an unclosed span. `source=clear` does not
+  inject the warning or the log excerpt (`docs/design/continue.md`).
 
 A malformed or unreadable `.span-open` (missing fields, non-numeric values)
 is treated as if no span exists at every read site — fail-open, matching
