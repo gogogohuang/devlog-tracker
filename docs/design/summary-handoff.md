@@ -160,7 +160,6 @@ instead of `User Input / Response / Status`.
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions: format, writing rules, Status, trivial rounds, span closing Round |
 | `README.md` | Feature blurb and "格式固定" line |
 | `commands/start.md` | Mentions of the three-field Round shape |
-| `commands/compact.md` | Mentions of the three-field Round shape |
 | `hooks/scripts/enforce-devlog.sh` | Heading check after a successful hash comparison |
 | `hooks/scripts/test-enforce-devlog.sh` | Coverage for missing Summary, missing Handoff, both present, fail-open when no Round, span one-liner on a Round that already has headings |
 | `docs/design/summary-handoff.md` | This spec |

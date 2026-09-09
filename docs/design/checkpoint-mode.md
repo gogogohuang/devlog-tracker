@@ -30,9 +30,10 @@ sub-section under the round as that phase completes, instead of holding
 everything until the final Summary / Handoff:
 
 ```markdown
-## Round 15
-User Input: 幫我重構 XXX 模組
-Status: IN_PROGRESS
+## Round 15 — 2026-09-09T09:00:00+08:00
+
+### User Input
+幫我重構 XXX 模組
 
 ### 段落 1 - 09:12
 讀完現有程式碼，發現三個地方耦合...
@@ -44,9 +45,13 @@ Status: IN_PROGRESS
 完成拆分，跑測試全過
 
 ### Summary
-完成拆分，測試全過。
+把 XXX 模組拆成 A/B 兩個檔案，測試全過。
 
 ### Handoff
+#### 決策
+拆成 A/B，理由是三處耦合都集中在同一個檔。
+#### 檔案
+新增 a.ts、b.ts；刪除 xxx.ts。尚未 commit。
 #### 現況
 拆分完成，測試全過。
 
