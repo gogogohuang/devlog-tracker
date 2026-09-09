@@ -8,7 +8,7 @@ else
   echo "MISSING_NAME" >&2
   exit 1
 fi
-case "$NAME" in *'/'*|*'\'*|*'..'*) echo "INVALID_NAME" >&2; exit 1 ;; esac
+case "$NAME" in devlog.md|*'/'*|*'\'*|*'..'*) echo "INVALID_NAME" >&2; exit 1 ;; esac
 case "$NAME" in devlog.*) NAME="${NAME#devlog.}" ;; esac
 case "$NAME" in *.md) NAME="${NAME%.md}" ;; esac
 NAME="$(printf '%s' "$NAME" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"

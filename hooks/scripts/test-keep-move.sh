@@ -22,6 +22,14 @@ export CLAUDE_PROJECT_DIR="$TMP/missing"
 bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name x >/dev/null 2>&1
 assert_eq "missing log exit 1" 1 "$?"
 
+BAD="$TMP/bad-name"
+mkdir -p "$BAD/.devlog"
+export CLAUDE_PROJECT_DIR="$BAD"
+make_round "$BAD/.devlog/devlog.md" 1 DONE
+bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name devlog.md >/dev/null 2>&1
+assert_eq "devlog.md name rejected" 1 "$?"
+[ ! -e "$BAD/.devlog/devlog.md.md" ] || { echo "FAIL: devlog.md.md created"; FAIL=1; }
+
 EP="$TMP/episode"
 mkdir -p "$EP/.devlog"
 export CLAUDE_PROJECT_DIR="$EP"

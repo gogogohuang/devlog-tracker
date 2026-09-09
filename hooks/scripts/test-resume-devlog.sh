@@ -13,6 +13,9 @@ check_exit_1() {
 check_exit_1 --name
 check_exit_1 --name archive
 check_exit_1 --name ../x
+INVALID="$(bash "$SCRIPT_DIR/resume-devlog.sh" --name devlog.md 2>&1)"
+[ "$?" -eq 1 ] && [ "$INVALID" = "INVALID_NAME" ] \
+  && echo "PASS: devlog.md rejected" || { echo "FAIL: devlog.md [$INVALID]"; FAIL=1; }
 cat > "$TMP/.devlog/devlog.foo.md" <<'EOF'
 # Kept log
 

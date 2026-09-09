@@ -21,7 +21,7 @@ done
 case "$FROM:$TO" in *[!0-9:]*|:*) echo "範圍無效" >&2; exit 1 ;; esac
 [ "$FROM" -le "$TO" ] || { echo "範圍起點不可大於終點" >&2; exit 1; }
 
-case "$NAME" in *'/'*|*'\'*|*'..'*) echo "檔名無效" >&2; exit 1 ;; esac
+case "$NAME" in devlog.md|*'/'*|*'\'*|*'..'*) echo "檔名無效" >&2; exit 1 ;; esac
 case "$NAME" in devlog.*) NAME="${NAME#devlog.}" ;; esac
 case "$NAME" in *.md) NAME="${NAME%.md}" ;; esac
 NAME="$(printf '%s' "$NAME" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"
