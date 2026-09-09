@@ -341,7 +341,9 @@ framework.
   change.
 - `server_error` → `INTERRUPTED` + reason.
 - SessionEnd with marker → stamp; without marker → no-op.
-- SessionStart with marker → stamp then still print last rounds.
+- SessionStart with marker → stamp; `startup` / `resume` / `fork` (and
+  `compact`, which does not heal) still print the log excerpt; `clear`
+  stamps on disk then prints nothing.
 - Wrong `round` in marker vs last heading → delete marker, do not
   edit.
 
