@@ -136,6 +136,40 @@ fi
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "after compact skip-heal, Stop still enforces (hash equal) -> exit 2" 2 $?
 
+# --- Scenario 7: hooks.json SessionStart matcher includes fork -------------
+HOOKS_JSON="$SCRIPT_DIR/../hooks.json"
+if grep -q '"matcher": "startup|resume|clear|compact|fork"' "$HOOKS_JSON"; then
+  echo "PASS: SessionStart matcher includes fork"
+else
+  echo "FAIL: SessionStart matcher must be exactly startup|resume|clear|compact|fork"
+  FAIL=1
+fi
+
+# --- Scenario 8: source=fork heals an open skeleton (script already does) --
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+fork me
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+OUTPUT="$(echo '{"source":"fork"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "fork still shows Round 1" "Round 1" "$OUTPUT"
+assert_contains "fork heal reason" "dangling:session_start" "$OUTPUT"
+FILE="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "fork stamped INTERRUPTED" "INTERRUPTED" "$FILE"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: fork SessionStart should delete .round-open after heal"
+  FAIL=1
+else
+  echo "PASS: fork SessionStart deleted .round-open"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

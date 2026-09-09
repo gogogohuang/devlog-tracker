@@ -15,7 +15,7 @@
   **下次 SessionStart（startup / resume / clear）**才補上；`PostToolUseFailure` 的
   `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成一定會立刻蓋章。
 - **`/devlog-tracker:pause`**：暫停強制記錄，歷史紀錄不受影響，之後可再用 `/devlog-tracker:start` 重新啟動。
-- **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session 時自動讀取
+- **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session、`/fork` 時自動讀取
   `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。
 - **`/devlog-tracker:compact`**：手動把已完成的舊輪次搬到 `devlog.archive.md`，避免主檔案無限膨脹。
 - **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Summary`（人讀結論）/ `Handoff`（下一輪接續：決策、檔案、現況、下一步）/ `Status`（只寫 `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`），讀檔案就能還原對話重點，不用翻對話紀錄。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。

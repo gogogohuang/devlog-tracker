@@ -341,12 +341,12 @@ framework.
 ## Known limitations
 
 - **Hard kill:** User Input is on disk; `INTERRUPTED` waits for
-  SessionStart (`startup` / `resume` / `clear`) or the next prompt.
+  SessionStart (`startup` / `resume` / `clear` / `fork`) or the next prompt.
   Unwritten `### 段落` are still lost. Segment Watch does not help if
   no further tool call happens.
 - **Esc / mid-turn cancel is not a reliable immediate stamp.** Unexpected
   cancel is usually marked `INTERRUPTED` on the **next prompt** or **next
-  SessionStart (`startup` / `resume` / `clear`)**. `PostToolUseFailure`
+  SessionStart (`startup` / `resume` / `clear` / `fork`)**. `PostToolUseFailure`
   `is_interrupt` is a best-effort extra if it fires — do not assume Esc
   immediately stamps via that event. When it does not fire, the first Stop
   may still demand Summary/Handoff; the loop guard then releases; heal on
