@@ -3,8 +3,12 @@
 devlog_lock_acquire() {
   local dir="${DEVLOG_DIR:-.}/.lock"
   local start now
-  start="$(date +%s 2>/dev/null || echo 0)"
   LOCK_HELD=0
+  command -v mkdir >/dev/null 2>&1 || return 0
+  command -v rmdir >/dev/null 2>&1 || return 0
+  command -v date >/dev/null 2>&1 || return 0
+  command -v sleep >/dev/null 2>&1 || return 0
+  start="$(date +%s 2>/dev/null || echo 0)"
   while true; do
     if mkdir "$dir" 2>/dev/null; then
       LOCK_HELD=1

@@ -27,5 +27,11 @@ ELAPSED=$((END - START))
   && echo "PASS: contention fails open" || { echo "FAIL: contention held=$LOCK_HELD elapsed=$ELAPSED"; FAIL=1; }
 rmdir "$DEVLOG_DIR/.lock"
 
+MIN_PATH="$TMP/min-path"
+mkdir "$MIN_PATH"
+ln -s "$(command -v bash)" "$MIN_PATH/bash"
+HELD="$(PATH="$MIN_PATH" bash -c '. "$1"; DEVLOG_DIR="$2"; devlog_lock_acquire; echo "${LOCK_HELD:-0}"' _ "$SCRIPT_DIR/devlog-lock.sh" "$DEVLOG_DIR")"
+[ "$HELD" = "0" ] && echo "PASS: missing lock tools fails open" || { echo "FAIL: restricted path held=$HELD"; FAIL=1; }
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

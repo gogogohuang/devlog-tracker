@@ -23,6 +23,8 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$SCRIPT_DIR/json-field.sh"
+# shellcheck source=devlog-lock.sh
+. "$SCRIPT_DIR/devlog-lock.sh"
 
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
@@ -77,6 +79,8 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 # 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
 # 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
 [ -f "$ENABLED_FLAG" ] || exit 0
+devlog_lock_acquire
+trap 'devlog_lock_release' EXIT
 
 # --- span 檢查（Span Mode：橫跨多次自動續接的長任務）---------------------
 # Claude 主動宣告的 .devlog/.span-open 存在時（見 SKILL.md），這個 tick 不

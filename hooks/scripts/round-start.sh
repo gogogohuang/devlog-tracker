@@ -14,6 +14,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/json-field.sh"
 # shellcheck source=redact-prompt.sh
 . "$HOOKS_DIR/redact-prompt.sh"
+# shellcheck source=devlog-lock.sh
+. "$HOOKS_DIR/devlog-lock.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -24,6 +26,8 @@ SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
 
 [ -f "$ENABLED_FLAG" ] || exit 0
+devlog_lock_acquire
+trap 'devlog_lock_release' EXIT
 
 INPUT="$(cat 2>/dev/null || true)"
 SESSION_ID=""

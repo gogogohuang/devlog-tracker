@@ -369,7 +369,9 @@ framework.
   excerpt only.
 - **Usage skip is exact three `error` strings.** Other billing-adjacent
   types that are not those names get recorded.
-- **Concurrent sessions** racing `devlog.md` / `.round-open` — pre-existing.
+- **Concurrent sessions** use a short `.devlog/.lock` around writes.
+  Sessions can still interleave after the 2-second fail-open timeout;
+  the lock covers the common overlapping-write window.
 - **Secrets in the prompt** — common provider-prefix tokens are masked;
   other secrets still copy into the project file.
 - **Span + unrelated human message** still not detected.

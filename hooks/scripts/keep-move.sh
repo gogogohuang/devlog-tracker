@@ -5,6 +5,7 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-md.sh"
 . "$SCRIPT_DIR/json-field.sh"
+. "$SCRIPT_DIR/devlog-lock.sh"
 
 FROM=""
 TO=""
@@ -29,6 +30,8 @@ NAME="$(printf '%s' "$NAME" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"
 [ "${#NAME}" -le 64 ] || { echo "檔名超過 64 字元" >&2; exit 1; }
 
 DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+devlog_lock_acquire
+trap 'devlog_lock_release' EXIT
 MAIN="$DEVLOG_DIR/devlog.md"
 TARGET="$DEVLOG_DIR/devlog.$NAME.md"
 [ -f "$MAIN" ] || { echo "devlog.md 不存在" >&2; exit 1; }
@@ -37,7 +40,7 @@ TARGET="$DEVLOG_DIR/devlog.$NAME.md"
 OPEN=""
 [ ! -f "$DEVLOG_DIR/.round-open" ] || OPEN="$(json_int_get "$DEVLOG_DIR/.round-open" round)"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/devlog-keep.XXXXXX")" || exit 1
-trap 'rm -rf "$TMP"' EXIT
+trap 'rm -rf "$TMP"; devlog_lock_release' EXIT
 STARTS="$TMP/starts"
 MOVE_ROUNDS="$TMP/move-rounds"
 MOVE_BLOCKS="$TMP/move-blocks"

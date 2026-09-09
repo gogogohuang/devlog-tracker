@@ -17,12 +17,16 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$SCRIPT_DIR/json-field.sh"
+# shellcheck source=devlog-lock.sh
+. "$SCRIPT_DIR/devlog-lock.sh"
 
 drop_markers() {
   rm -f "$ROUND_OPEN" "$INTERRUPTED_FLAG" 2>/dev/null || true
 }
 
 [ -f "$ENABLED_FLAG" ] || exit 0
+devlog_lock_acquire
+trap 'devlog_lock_release' EXIT
 if [ ! -f "$ROUND_OPEN" ]; then
   rm -f "$INTERRUPTED_FLAG" 2>/dev/null || true
   exit 0
