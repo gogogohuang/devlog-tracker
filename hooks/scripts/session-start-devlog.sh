@@ -16,6 +16,11 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 MAX_ROUNDS=8
 
+HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  bash "$HOOKS_DIR/close-open-round.sh" "dangling:session_start" || true
+fi
+
 if [ -f "$SPAN_FILE" ]; then
   SPAN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
   SPAN_OPENED_AT_RAW="$(grep -o '"opened_at"[[:space:]]*:[[:space:]]*"[^"]*"' "$SPAN_FILE" 2>/dev/null || echo '')"

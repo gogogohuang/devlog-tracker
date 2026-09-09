@@ -71,6 +71,34 @@ else
   FAIL=1
 fi
 
+# --- Scenario 5: open round is stamped INTERRUPTED then still injected ------
+rm -f "$DEVLOG_DIR/.span-open"
+touch "$DEVLOG_DIR/.enabled"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+crash me
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+OUTPUT="$(bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "session start still shows Round 1" "Round 1" "$OUTPUT"
+assert_contains "session start output includes INTERRUPTED" "INTERRUPTED" "$OUTPUT"
+assert_contains "heal reason in the file/output" "dangling:session_start" "$OUTPUT"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: SessionStart should delete .round-open after heal"
+  FAIL=1
+else
+  echo "PASS: SessionStart deleted .round-open"
+fi
+FILE="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "file stamped INTERRUPTED" "INTERRUPTED" "$FILE"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
