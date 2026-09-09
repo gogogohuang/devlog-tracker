@@ -127,6 +127,43 @@ else
   echo "PASS: disabled -> no .interrupted"
 fi
 
+# SessionEnd on a completed open Round must not stamp
+touch "$DEVLOG_DIR/.enabled"
+write_open
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Summary
+finished
+
+### Handoff
+#### 現況
+finished
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+echo '{"reason":"clear"}' | bash "$SCRIPT_DIR/on-session-end.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+case "$BODY" in
+  *INTERRUPTED*) echo "FAIL: SessionEnd must not stamp a completed Round"; FAIL=1 ;;
+  *) echo "PASS: SessionEnd left completed Status DONE" ;;
+esac
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: SessionEnd recovered-complete should delete .round-open"
+  FAIL=1
+else
+  echo "PASS: SessionEnd recovered-complete deleted .round-open"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

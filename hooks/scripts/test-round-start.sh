@@ -28,6 +28,13 @@ assert_contains() {
     *) echo "FAIL: $desc (missing: $needle)"; FAIL=1 ;;
   esac
 }
+assert_not_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "FAIL: $desc (unexpected: $needle)"; FAIL=1 ;;
+    *) echo "PASS: $desc" ;;
+  esac
+}
 assert_file_absent() {
   local desc="$1" path="$2"
   if [ -e "$path" ]; then
@@ -189,6 +196,35 @@ else
   echo "FAIL: last_seen_cksum=$SEEN expected $POST"
   FAIL=1
 fi
+
+# --- 10: dangling heal skips a completed last Round, still opens Round 2 ----
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Summary
+finished
+
+### Handoff
+#### 現況
+finished
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+printf '%s' '{"prompt":"next"}' | bash "$SCRIPT_DIR/round-start.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "completed dangling keeps DONE" $'### Status\nDONE' "$BODY"
+assert_not_contains "completed dangling must not stamp Round 1" "INTERRUPTED" "$BODY"
+assert_contains "still opened Round 2" "## Round 2 —" "$BODY"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

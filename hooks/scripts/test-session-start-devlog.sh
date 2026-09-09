@@ -170,6 +170,40 @@ else
   echo "PASS: fork SessionStart deleted .round-open"
 fi
 
+# --- Scenario 9: startup does not interrupt a completed last Round ---------
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Summary
+finished
+
+### Handoff
+#### 現況
+finished
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "startup still injects Round 1" "Round 1" "$OUTPUT"
+FILE="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "startup recovered keeps DONE" $'### Status\nDONE' "$FILE"
+assert_not_contains "startup must not stamp a completed Round" "INTERRUPTED" "$FILE"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "FAIL: startup recovered-complete should delete .round-open"
+  FAIL=1
+else
+  echo "PASS: startup recovered-complete deleted .round-open"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

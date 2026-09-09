@@ -680,7 +680,7 @@ cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
 rm -f "$DEVLOG_DIR/.round-open"
 touch "$DEVLOG_DIR/.interrupted"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "stale .interrupted, no .round-open -> first Stop exit 0" 0 $?
+assert_exit "stale .interrupted, no .round-open -> normal enforcement blocks" 2 $?
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   echo "FAIL: first Stop should clear .interrupted even without .round-open"
   FAIL=1

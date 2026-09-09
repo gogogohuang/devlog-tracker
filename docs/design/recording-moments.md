@@ -141,7 +141,9 @@ true (best-effort — Esc does not reliably fire this event). Stop sees
 it: if the last Round is still incomplete, patches `INTERRUPTED`,
 deletes this file and `.round-open`, **exits 0**. If Summary+Handoff
 are already present and the hash moved, clears the marker and takes the
-normal success path instead. Fail-open if stdin cannot be parsed.
+normal success path instead. This recovered-complete rule is implemented
+inside `close-open-round.sh`, so SessionEnd, next prompt, and SessionStart
+share it. Fail-open if stdin cannot be parsed.
 
 ### `.devlog/.turn-start`
 
@@ -267,6 +269,10 @@ deleting `.span-open`). Do not rewrite the skeleton Round; it stays
   in `enforce-devlog.sh`; do not fork a second algorithm).
 - If that block's number does not match `.round-open`'s `round`,
   fail-open (delete the marker, do not edit the wrong Round).
+- If the last Round already has `### Summary` and `### Handoff` **and**
+  `devlog.md`'s `cksum` differs from `.turn-start`, delete the markers
+  and do not edit Status (recovered-complete). Missing or equal
+  `.turn-start` still stamps.
 - Patch Status → `INTERRUPTED` + reason; add Summary/Handoff stubs if
   missing.
 - Delete `.round-open` and `.interrupted`.

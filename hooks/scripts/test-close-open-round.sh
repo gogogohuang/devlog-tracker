@@ -213,6 +213,73 @@ assert_contains "round 1 stays DONE" $'### Status\nDONE' "$BODY"
 assert_contains "round 2 interrupted" "INTERRUPTED" "$BODY"
 assert_contains "checkpoint kept" "keep me" "$BODY"
 
+# --- 7: completed last Round + hash moved -> do not stamp -----------------
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Summary
+finished
+
+### Handoff
+#### 現況
+finished
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/devlog.md"
+touch "$DEVLOG_DIR/.interrupted"
+BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:clear"
+AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
+if [ "$BEFORE" = "$AFTER" ]; then
+  echo "PASS: recovered-complete -> devlog.md unchanged"
+else
+  echo "FAIL: recovered-complete edited a finished Round"
+  FAIL=1
+fi
+assert_not_contains "recovered-complete must not stamp" "INTERRUPTED" "$AFTER"
+assert_contains "recovered-complete keeps DONE" $'### Status\nDONE' "$AFTER"
+if [ -f "$DEVLOG_DIR/.round-open" ] || [ -f "$DEVLOG_DIR/.interrupted" ]; then
+  echo "FAIL: recovered-complete should still delete markers"
+  FAIL=1
+else
+  echo "PASS: recovered-complete deleted markers"
+fi
+
+# --- 8: headings present but hash equal -> still stamp (no recovery proof)
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+hello
+```
+
+### Summary
+partial
+
+### Handoff
+#### 現況
+partial
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "hash-equal headings still stamp" "INTERRUPTED" "$BODY"
+assert_contains "hash-equal reason" "user_interrupt" "$BODY"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

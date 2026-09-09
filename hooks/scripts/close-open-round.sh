@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Stamp the open Round as INTERRUPTED. Always exit 0 (fail-open).
 # Usage: close-open-round.sh <reason>
+# Silent on stdout — SessionStart injects stdout as additionalContext.
 set -uo pipefail
 
 REASON="${1:-unknown}"
@@ -10,6 +11,7 @@ ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
 INTERRUPTED_FLAG="$DEVLOG_DIR/.interrupted"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
 drop_markers() {
   rm -f "$ROUND_OPEN" "$INTERRUPTED_FLAG" 2>/dev/null || true
@@ -31,8 +33,17 @@ if [ ! -f "$DEVLOG_FILE" ]; then
   exit 0
 fi
 
+RECOVERED=0
+if [ -f "$TURN_MARKER" ]; then
+  TURN_HASH="$(cat "$TURN_MARKER" 2>/dev/null || echo '')"
+  CUR_HASH="$(cksum < "$DEVLOG_FILE" 2>/dev/null || echo '')"
+  if [ -n "$TURN_HASH" ] && [ -n "$CUR_HASH" ] && [ "$CUR_HASH" != "$TURN_HASH" ]; then
+    RECOVERED=1
+  fi
+fi
+
 TMP="$DEVLOG_FILE.tmp"
-awk -v want="$OPEN_ROUND" -v reason="$REASON" '
+awk -v want="$OPEN_ROUND" -v reason="$REASON" -v recovered="$RECOVERED" '
   /^[ \t]*```/ { fence = !fence }
   !fence && /^## Round / { last_start = NR }
   { lines[NR] = $0; infence[NR] = fence; n = NR }
@@ -52,6 +63,7 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" '
       if (lines[i] ~ /^### Summary/) has_s = 1
       if (lines[i] ~ /^### Handoff/) has_h = 1
     }
+    if (recovered && has_s && has_h) { exit 3 }
 
     skip_val = 0
     saw_status = 0
