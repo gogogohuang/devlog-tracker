@@ -1,26 +1,50 @@
 # devlog-tracker
 
-在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。
+版本 `0.3.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。
 參考 [agfnow/agentflow](https://github.com/agfnow/agentflow) 的 devlog 基礎協定做的簡化版，
-只保留「逐輪對話紀錄」這一層。
+只保留「逐輪對話紀錄」這一層。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
+讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
 ## 特色
 
-- **`/devlog-tracker:start` 明確開啟強制記錄**：建立 `.devlog/.enabled` 開關檔，之後 `Stop` hook 會卡住
-  每一輪的結束動作，這一輪沒寫 `devlog.md` 就不能結束——不依賴 Claude 自行判斷「值不值得
-  記錄」，也跟任務/plan 是否完成無關。沒下過 `/devlog-tracker:start` 的專案完全不受影響。
-  `UserPromptSubmit` 在每一則使用者訊息送出時就先寫好 User Input skeleton；意外中斷
-  （非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open`）會把同一塊標成
-  `INTERRUPTED`（usage 用光不算中斷）。中途取消（例如 Esc）通常是在**下一則訊息**或
-  **下次 SessionStart（startup / resume / clear / fork）**才補上；`PostToolUseFailure` 的
-  `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成一定會立刻蓋章。
-- **`/devlog-tracker:pause`**：暫停強制記錄，歷史紀錄不受影響，之後可再用 `/devlog-tracker:start` 重新啟動。
-- **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session、`/fork` 時自動讀取
-  `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。
-- **`/devlog-tracker:compact`**：手動把已完成的舊輪次搬到 `devlog.archive.md`，避免主檔案無限膨脹。
-- **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Summary`（人讀結論）/ `Handoff`（下一輪接續：決策、檔案、現況、下一步）/ `Status`（只寫 `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`），讀檔案就能還原對話重點，不用翻對話紀錄。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
-- **Span Mode（進階功能）**：`/loop` 動態模式、`Workflow` 這類會被自動排程反覆喚醒的長任務，不用每個自動 tick 都寫一次 devlog——用 tick 計數安全閥（`max_silent_ticks`）保底，崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
-- **段落記錄 + Checkpoint Mode（進階功能）**：單輪內有多個階段性結果時，邊做邊寫成 `### 段落` 子區塊而不是憋到最後；同一輪若連續約 15 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具要求先補一段（門檻可調）。累積輪數夠多時，`Stop` hook 會提醒補上一段跨輪的 `## Checkpoint` 摘要（門檻預設 20 輪、可調）。已經啟用過強制記錄的專案要再跑一次 `/devlog-tracker:start` 才會建立 `.segment-state`。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)、[`docs/design/segment-watch.md`](docs/design/segment-watch.md) 和 SKILL.md。
+### 指令
+
+| 指令 | 做什麼 |
+|---|---|
+| `/devlog-tracker:start` | 建立 `.devlog/.enabled`，從此強制每輪都寫紀錄。不依賴 Claude 自行判斷「值不值得記錄」，也跟任務／plan 是否完成無關。已經啟用過的專案要再跑一次，才會補上 `.segment-state`。 |
+| `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
+| `/devlog-tracker:compact` | 把舊的 `DONE` 輪次搬到 `devlog.archive.md`。 |
+| `/devlog-tracker:keep` | 把有主題的一段搬走成 `devlog.<name>.md`。Claude 會建議範圍與檔名，也可自訂。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
+
+### 強制記錄開著之後
+
+```mermaid
+sequenceDiagram
+  participant U as 使用者
+  participant H as Hooks
+  participant C as Claude
+  participant D as .devlog/devlog.md
+
+  U->>H: 送出訊息
+  H->>D: 先寫 Round skeleton（User Input + IN_PROGRESS）
+  C->>D: 補 Summary / Handoff，改 Status
+  C->>H: 這一輪要結束
+  alt 沒寫完 Summary/Handoff
+    H-->>C: 擋住，要求補寫
+  else 寫完了
+    H-->>C: 放行
+  end
+```
+
+每一輪固定四塊：`User Input`（貼近原話，保留彈性）、`Summary`（給人掃）、`Handoff`（給下一輪 Claude：決策／檔案／現況／下一步）、`Status`（`DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`）。讀檔案就能還原對話重點，不用翻對話紀錄。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
+
+### hook 會自動做的事
+
+- **自動接續**：`SessionStart` hook 在開新 session、resume、`/clear`、`/compact`、`/fork` 時，把最近幾輪注入 context。
+- **意外中斷**：非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open` 會把開著的 Round 標成 `INTERRUPTED`。usage 用光不算中斷。中途取消（例如 Esc）通常是在**下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上；`PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort，不能當成一定會立刻蓋章。細節見 [`docs/design/recording-moments.md`](docs/design/recording-moments.md)。
+- **段落記錄**：長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 15 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具，要求先補一段（門檻可調）。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
+- **Checkpoint Mode**：累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint`（門檻可調）。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
+- **Span Mode**：`/loop`、Workflow 這類自動續接的長任務，不必每個 tick 都寫完整 Round，用 tick 計數當安全閥；崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
 
 ## 安裝
 
@@ -39,21 +63,7 @@
 /devlog-tracker:start
 ```
 
-之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。
-
-暫停強制記錄：
-
-```
-/devlog-tracker:pause
-```
-
-累積輪數變多、檔案太長時：
-
-```
-/devlog-tracker:compact
-```
-
-（以上都是完整的 namespace 形式，plugin 名稱是 `devlog-tracker`。）
+之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。暫停、歸檔、具名搬走見上方指令表（完整 namespace，plugin 名稱是 `devlog-tracker`）。
 
 ## 目錄結構
 
@@ -68,7 +78,8 @@ devlog-tracker/
 │   ├── checkpoint-mode.md     # Checkpoint Mode 設計文件
 │   ├── segment-watch.md       # 單輪沉默 15 分鐘保底
 │   ├── summary-handoff.md     # 每輪 Summary（人）+ Handoff（AI）設計文件
-│   └── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
+│   ├── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
+│   └── keep.md                # 具名搬走成 devlog.<name>.md
 ├── skills/devlog-tracker/SKILL.md
 ├── hooks/
 │   ├── hooks.json                       # SessionStart / UserPromptSubmit / PreToolUse / Stop / StopFailure / SessionEnd / PostToolUseFailure
@@ -90,7 +101,8 @@ devlog-tracker/
 └── commands/
     ├── start.md            # 開啟強制記錄（建立 .enabled、.checkpoint-state、.segment-state）
     ├── pause.md            # 暫停強制記錄
-    └── compact.md          # 壓縮歸檔（保留 Checkpoint 區塊，不搬進 archive）
+    ├── compact.md          # 壓縮歸檔（保留 Checkpoint 區塊，不搬進 archive）
+    └── keep.md             # 具名搬走（確認後寫 devlog.<name>.md，再從主檔刪）
 ```
 
 ## License
