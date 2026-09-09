@@ -3,7 +3,7 @@
 Two related additions to devlog-tracker's recording format, both aimed at
 the same complaint: a long-running interaction (a single sprawling round,
 or a session that's accumulated many rounds) leaves `devlog.md` hard to
-reconstruct from — either because one round's `Response` is a single
+reconstruct from — either because one round's closing summary is a single
 end-of-round summary hiding everything that happened along the way, or
 because skimming dozens of Round entries to find "what actually got done
 in the last hour" is slow.
@@ -27,7 +27,7 @@ What's missing is purely the documented convention for *how* to do it.
 involves multiple distinct phases (exploration, a decision, an
 implementation step, verification), write each as its own timestamped
 sub-section under the round as that phase completes, instead of holding
-everything until the final `Response`:
+everything until the final Summary / Handoff:
 
 ```markdown
 ## Round 15
@@ -43,14 +43,21 @@ Status: IN_PROGRESS
 ### 段落 3 - 09:35
 完成拆分，跑測試全過
 
-Response: (最終總結)
-Status: DONE
+### Summary
+完成拆分，測試全過。
+
+### Handoff
+#### 現況
+拆分完成，測試全過。
+
+### Status
+DONE
 ```
 
 **When to write a segment** is Claude's judgment call — "a meaningful
 stage result," the same bar `Status: IN_PROGRESS` already uses — not a
 rule triggered by elapsed time or tool-call count. A short round with no
-real phases still gets a single `Response` as today; segments are for
+real phases still gets Summary / Handoff as today, with no segment headings; segments are for
 rounds long enough that a single end-of-round summary would hide real
 intermediate decisions.
 

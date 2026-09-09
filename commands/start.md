@@ -17,7 +17,7 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1
 5. 告訴使用者：從現在開始，每一輪結束前都會被要求先把這輪寫進 `.devlog/devlog.md`
-   （User Input / Response / Status），累積到一定輪數沒寫 checkpoint 摘要時也會被
+   （User Input / Summary / Handoff / Status），累積到一定輪數沒寫 checkpoint 摘要時也會被
    提醒補上，可以用 `/devlog-tracker:pause` 隨時關掉這個強制機制。
 
 不要因為 `.devlog/.enabled` 已經存在就跳過步驟 4 的進度摘要——每次執行 `/devlog-tracker:start`

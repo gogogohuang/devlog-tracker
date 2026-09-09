@@ -13,7 +13,7 @@
 - **自動接續**：`SessionStart` hook，`/clear`、resume、開新 session 時自動讀取
   `.devlog/devlog.md` 最後幾輪並注入 context，不用手動喊指令。
 - **`/devlog-tracker:compact`**：手動把已完成的舊輪次搬到 `devlog.archive.md`，避免主檔案無限膨脹。
-- **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Response` / `Status`（`DONE` / `IN_PROGRESS` / `BLOCKED`）三段式，讀檔案就能還原對話重點，不用翻對話紀錄。
+- **格式固定**：每輪都是 `User Input`（貼近原話，保留彈性）/ `Summary`（人讀結論）/ `Handoff`（下一輪接續：決策、檔案、現況、下一步）/ `Status`（只寫 `DONE` / `IN_PROGRESS` / `BLOCKED`），讀檔案就能還原對話重點，不用翻對話紀錄。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
 - **Span Mode（進階功能）**：`/loop` 動態模式、`Workflow` 這類會被自動排程反覆喚醒的長任務，不用每個自動 tick 都寫一次 devlog——用 tick 計數安全閥（`max_silent_ticks`）保底，崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
 - **段落記錄 + Checkpoint Mode（進階功能）**：單輪內有多個階段性結果時，邊做邊寫成 `### 段落` 子區塊而不是憋到最後；累積輪數夠多時，`Stop` hook 會提醒補上一段跨輪的 `## Checkpoint` 摘要（門檻預設 20 輪、可調），翻閱 `devlog.md` 不用逐輪爬完才知道進度。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md) 和 SKILL.md。
 
@@ -59,8 +59,9 @@ devlog-tracker/
 │   ├── plugin.json        # plugin manifest
 │   └── marketplace.json   # 讓這個 repo 本身就是一個 marketplace
 ├── docs/design/
-│   ├── span-mode.md        # Span Mode 設計文件
-│   └── checkpoint-mode.md  # Checkpoint Mode 設計文件
+│   ├── span-mode.md           # Span Mode 設計文件
+│   ├── checkpoint-mode.md     # Checkpoint Mode 設計文件
+│   └── summary-handoff.md     # 每輪 Summary（人）+ Handoff（AI）設計文件
 ├── skills/devlog-tracker/SKILL.md
 ├── hooks/
 │   ├── hooks.json                       # SessionStart / UserPromptSubmit / Stop
