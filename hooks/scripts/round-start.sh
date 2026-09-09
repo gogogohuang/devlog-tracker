@@ -12,6 +12,7 @@ ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
+SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 
 # 沒下過 /devlog-tracker:start（也就是沒有這個開關檔），代表這個專案沒啟動強制記錄，
 # 直接放行，不留下任何 .devlog 檔案。
@@ -58,6 +59,37 @@ if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -f "$CHECKPOINT_FILE" ]; then
         && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
       ;;
   esac
+fi
+
+# Segment Watch：.segment-state 存在且欄位齊就重設 last_change_epoch / last_seen_cksum，
+# 讓這一輪的 15 分鐘保底從現在起算。不動 max_silent_seconds。讀不到或不是數字就跳過。
+if [ -f "$SEGMENT_FILE" ]; then
+  SEG_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SEG_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SEG_SUM_KEY="$(grep -o '"last_seen_cksum"[[:space:]]*:' "$SEGMENT_FILE" 2>/dev/null || echo '')"
+  case "$SEG_EPOCH" in ''|*[!0-9]*) SEG_EPOCH='' ;; esac
+  case "$SEG_MAX" in ''|*[!0-9]*) SEG_MAX='' ;; esac
+  if [ -n "$SEG_EPOCH" ] && [ -n "$SEG_MAX" ] && [ -n "$SEG_SUM_KEY" ]; then
+    SEG_NOW="$(date +%s 2>/dev/null || echo '')"
+    case "$SEG_NOW" in
+      ''|*[!0-9]*) : ;;
+      *)
+        if [ -f "$DEVLOG_FILE" ]; then
+          SEG_CUR="$(cksum < "$DEVLOG_FILE" 2>/dev/null | tr -d '\n' || echo '')"
+        else
+          SEG_CUR="MISSING"
+        fi
+        if [ -n "$SEG_CUR" ]; then
+          awk -v epoch="$SEG_NOW" -v sum="$SEG_CUR" '{
+            gsub(/"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]+/, "\"last_change_epoch\": " epoch);
+            gsub(/"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"last_seen_cksum\": \"" sum "\"");
+            print
+          }' "$SEGMENT_FILE" > "$SEGMENT_FILE.tmp" 2>/dev/null \
+            && mv "$SEGMENT_FILE.tmp" "$SEGMENT_FILE" 2>/dev/null || true
+        fi
+        ;;
+    esac
+  fi
 fi
 
 exit 0
