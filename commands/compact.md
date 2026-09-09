@@ -12,9 +12,11 @@ description: 把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.a
    - 所有 Status 為 `IN_PROGRESS`、`BLOCKED` 或 `INTERRUPTED` 的輪次，不論多舊
    - 所有 `## Checkpoint` 區塊，永遠留在 devlog.md、不搬到 archive——它們是
      checkpoint 機制存在的目的：翻閱時的摘要路標，搬走就失去了作用
-4. 其餘 Status 為 `DONE` 的舊輪次：依原本完整的 `## Round <N> — <時間戳>` 標題與內容，
-   依原始順序 append 到 `.devlog/devlog.archive.md` 尾端（archive 檔案不存在就建立；已存在則接續寫在後面，不要覆寫或重排既有內容）。
-5. 從 `.devlog/devlog.md` 移除步驟 4 搬走的區塊，其餘保持原樣（不要順便改寫使用者或先前 Claude 寫的內容）。
-6. 完成後回報一句摘要：搬移了幾輪到 archive、devlog.md 目前剩幾輪、archive 檔案目前累積幾輪。
+4. 跑（不要自己搬檔）：
+   ```bash
+   CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/compact-devlog.sh"
+   ```
+   檔案不存在時腳本 exit 1：告知沒有東西可壓縮。
+5. 用 stdout 的 `MOVED` / `REMAINING` / `ARCHIVE` 回報一句話。
 
 不要在使用者沒有要求的情況下自動觸發這個流程；這是使用者主動執行 `/devlog-tracker:compact` 時才做的事。不要讀取或寫入 `.devlog/devlog.<name>.md` 具名檔（那是 `/devlog-tracker:keep` 的產物）。
