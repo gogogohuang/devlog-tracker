@@ -10,6 +10,10 @@ for t in "$DIR"/test-*.sh; do
     FAIL=1
   fi
 done
+echo "=== test-adapters.sh ==="
+if ! bash "$DIR/../../cursor/hooks/test-adapters.sh"; then
+  FAIL=1
+fi
 if [ "$FAIL" -ne 0 ]; then
   echo "Some hook self-checks FAILED."
   exit 1

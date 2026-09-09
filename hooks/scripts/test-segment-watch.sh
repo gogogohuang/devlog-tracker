@@ -47,6 +47,7 @@ WRITE_REL='{"tool_name":"Write","tool_input":{"file_path":".devlog/devlog.md"}}'
 WRITE_ABS="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/devlog.md"}}' "$TMP_ROOT")"
 WRITE_OTHER='{"tool_name":"Write","tool_input":{"file_path":"src/foo.ts"}}'
 EDIT_REL='{"tool_name":"Edit","tool_input":{"file_path":".devlog/devlog.md"}}'
+STRREPLACE_REL='{"tool_name":"StrReplace","tool_input":{"file_path":".devlog/devlog.md"}}'
 
 # --- Scenario 1: no .enabled -> exit 0 ------------------------------------
 rm -f "$DEVLOG_DIR/.enabled"
@@ -94,6 +95,10 @@ assert_exit "expired + Write absolute /.devlog/devlog.md -> allowed" 0 $?
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$EDIT_REL" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "expired + Edit .devlog/devlog.md -> allowed" 0 $?
+
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' "$STRREPLACE_REL" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired + StrReplace .devlog/devlog.md -> allowed" 0 $?
 
 # --- Scenario 7: expired + Write other file -> exit 2 -----------------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900

@@ -66,7 +66,7 @@ else
 fi
 [ -n "$TOOL_NAME" ] || exit 0
 
-if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ]; then
+if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ] || [ "$TOOL_NAME" = "StrReplace" ]; then
   case "$FILE_PATH" in
     .devlog/devlog.md|*/.devlog/devlog.md) exit 0 ;;
   esac

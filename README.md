@@ -77,7 +77,7 @@ hook 仍依 Cursor 支援的事件執行。
 
 之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下 `/devlog-tracker:continue`。暫停、歸檔、具名搬走、狀態與 span 見上方指令表（完整 namespace，plugin 名稱是 `devlog-tracker`）。
 
-測試：`bash hooks/scripts/run-tests.sh`（Cursor adapter 另跑 `bash cursor/hooks/test-adapters.sh`）。
+測試：`bash hooks/scripts/run-tests.sh`（含 Cursor adapter）。
 
 ## 目錄結構
 
