@@ -8,7 +8,10 @@
 
 set -uo pipefail
 
-HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_src="${BASH_SOURCE[0]}"
+HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$HOOKS_DIR/json-field.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -28,8 +31,8 @@ fi
 
 SPAN_SKIP=0
 if [ -f "$SPAN_FILE" ]; then
-  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SPAN_MAX="$(grep -o '"max_silent_ticks"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SPAN_TICKS="$(json_int_get "$SPAN_FILE" ticks_since_checkin)"
+  SPAN_MAX="$(json_int_get "$SPAN_FILE" max_silent_ticks)"
   case "$SPAN_TICKS" in ''|*[!0-9]*) SPAN_TICKS='' ;; esac
   case "$SPAN_MAX" in ''|*[!0-9]*) SPAN_MAX='' ;; esac
   if [ -n "$SPAN_TICKS" ] && [ -n "$SPAN_MAX" ]; then
@@ -97,14 +100,13 @@ fi
 
 SPAN_WILL_PASS_THROUGH=0
 if [ -f "$SPAN_FILE" ]; then
-  SPAN_TICKS="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SPAN_MAX="$(grep -o '"max_silent_ticks"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SPAN_TICKS="$(json_int_get "$SPAN_FILE" ticks_since_checkin)"
+  SPAN_MAX="$(json_int_get "$SPAN_FILE" max_silent_ticks)"
   case "$SPAN_TICKS" in ''|*[!0-9]*) SPAN_TICKS='' ;; esac
   case "$SPAN_MAX" in ''|*[!0-9]*) SPAN_MAX='' ;; esac
   if [ -n "$SPAN_TICKS" ]; then
     NEW_TICKS=$((SPAN_TICKS + 1))
-    awk -v new="$NEW_TICKS" '{ gsub(/"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]+/, "\"ticks_since_checkin\": " new); print }' "$SPAN_FILE" > "$SPAN_FILE.tmp" 2>/dev/null \
-      && mv "$SPAN_FILE.tmp" "$SPAN_FILE" 2>/dev/null || true
+    json_int_set "$SPAN_FILE" ticks_since_checkin "$NEW_TICKS"
     if [ -n "$SPAN_MAX" ] && [ "$NEW_TICKS" -lt "$SPAN_MAX" ]; then
       SPAN_WILL_PASS_THROUGH=1
     fi
@@ -112,20 +114,19 @@ if [ -f "$SPAN_FILE" ]; then
 fi
 
 if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -f "$CHECKPOINT_FILE" ]; then
-  CP_ROUNDS="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$CHECKPOINT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  CP_ROUNDS="$(json_int_get "$CHECKPOINT_FILE" rounds_since_checkpoint)"
   case "$CP_ROUNDS" in
     ''|*[!0-9]*) : ;;
     *)
       NEW_CP_ROUNDS=$((CP_ROUNDS + 1))
-      awk -v new="$NEW_CP_ROUNDS" '{ gsub(/"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]+/, "\"rounds_since_checkpoint\": " new); print }' "$CHECKPOINT_FILE" > "$CHECKPOINT_FILE.tmp" 2>/dev/null \
-        && mv "$CHECKPOINT_FILE.tmp" "$CHECKPOINT_FILE" 2>/dev/null || true
+      json_int_set "$CHECKPOINT_FILE" rounds_since_checkpoint "$NEW_CP_ROUNDS"
       ;;
   esac
 fi
 
 if [ -f "$SEGMENT_FILE" ]; then
-  SEG_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SEG_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$SEGMENT_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+  SEG_EPOCH="$(json_int_get "$SEGMENT_FILE" last_change_epoch)"
+  SEG_MAX="$(json_int_get "$SEGMENT_FILE" max_silent_seconds)"
   SEG_SUM_KEY="$(grep -o '"last_seen_cksum"[[:space:]]*:' "$SEGMENT_FILE" 2>/dev/null || echo '')"
   case "$SEG_EPOCH" in ''|*[!0-9]*) SEG_EPOCH='' ;; esac
   case "$SEG_MAX" in ''|*[!0-9]*) SEG_MAX='' ;; esac
@@ -140,12 +141,8 @@ if [ -f "$SEGMENT_FILE" ]; then
           SEG_CUR="MISSING"
         fi
         if [ -n "$SEG_CUR" ]; then
-          awk -v epoch="$SEG_NOW" -v sum="$SEG_CUR" '{
-            gsub(/"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]+/, "\"last_change_epoch\": " epoch);
-            gsub(/"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"/, "\"last_seen_cksum\": \"" sum "\"");
-            print
-          }' "$SEGMENT_FILE" > "$SEGMENT_FILE.tmp" 2>/dev/null \
-            && mv "$SEGMENT_FILE.tmp" "$SEGMENT_FILE" 2>/dev/null || true
+          json_int_set "$SEGMENT_FILE" last_change_epoch "$SEG_NOW"
+          json_str_set "$SEGMENT_FILE" last_seen_cksum "$SEG_CUR"
         fi
         ;;
     esac

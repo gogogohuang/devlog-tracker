@@ -21,7 +21,10 @@ DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 MAX_ROUNDS=8
 
-HOOKS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_src="${BASH_SOURCE[0]}"
+HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$HOOKS_DIR/json-field.sh"
 
 INPUT="$(cat 2>/dev/null || true)"
 SOURCE=""
@@ -46,12 +49,8 @@ if [ "$SOURCE" = "clear" ]; then
 fi
 
 if [ -f "$SPAN_FILE" ]; then
-  SPAN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$SPAN_FILE" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
-  SPAN_OPENED_AT_RAW="$(grep -o '"opened_at"[[:space:]]*:[[:space:]]*"[^"]*"' "$SPAN_FILE" 2>/dev/null || echo '')"
-  SPAN_OPENED_AT=""
-  if [ -n "$SPAN_OPENED_AT_RAW" ]; then
-    SPAN_OPENED_AT="$(printf '%s' "$SPAN_OPENED_AT_RAW" | sed -E 's/^.*:[[:space:]]*"//; s/"$//' 2>/dev/null || echo '')"
-  fi
+  SPAN_ROUND="$(json_int_get "$SPAN_FILE" round)"
+  SPAN_OPENED_AT="$(json_str_get "$SPAN_FILE" opened_at)"
   if [ -n "$SPAN_ROUND" ] && [ -n "$SPAN_OPENED_AT" ]; then
     echo "⚠️ 有一個開啟中的 span：Round ${SPAN_ROUND}，從 ${SPAN_OPENED_AT} 開始，"
     echo "還沒有正式結束。請先確認要繼續這個自動化任務，還是要明確關閉它"

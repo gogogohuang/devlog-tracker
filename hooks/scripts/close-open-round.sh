@@ -13,6 +13,11 @@ INTERRUPTED_FLAG="$DEVLOG_DIR/.interrupted"
 DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
+_src="${BASH_SOURCE[0]}"
+SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$SCRIPT_DIR/json-field.sh"
+
 drop_markers() {
   rm -f "$ROUND_OPEN" "$INTERRUPTED_FLAG" 2>/dev/null || true
 }
@@ -23,7 +28,7 @@ if [ ! -f "$ROUND_OPEN" ]; then
   exit 0
 fi
 
-OPEN_ROUND="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$ROUND_OPEN" 2>/dev/null | grep -o '[0-9]\+$' || echo '')"
+OPEN_ROUND="$(json_int_get "$ROUND_OPEN" round)"
 case "$OPEN_ROUND" in
   ''|*[!0-9]*) drop_markers; exit 0 ;;
 esac
