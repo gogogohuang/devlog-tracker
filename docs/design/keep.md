@@ -236,9 +236,11 @@ Keep does not create `.devlog/` in a project that has no `devlog.md`.
 | Trigger | user command, confirm first | user command, then move |
 
 Neither command touches the other's target files. SessionStart still
-reads only `devlog.md`. Kept files live under `.devlog/`, so they follow
-the same gitignore (or not) as the working log; this plugin does not
-add a separate tracking path.
+reads only `devlog.md`. `/devlog-tracker:continue` also reads only
+`devlog.md` unless that last Handoff's 下一步 names a keep file.
+Kept files live under `.devlog/`, so they follow the same gitignore
+(or not) as the working log; this plugin does not add a separate
+tracking path.
 
 Keep is never auto-run.
 
