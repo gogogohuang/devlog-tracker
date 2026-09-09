@@ -110,6 +110,7 @@ devlog-tracker/
 │       ├── resume-devlog.sh             # /resume：驗證 keep 檔並印出內容
 │       ├── status-devlog.sh             # /status：唯讀狀態
 │       ├── span-open.sh / span-close.sh # /span：寫或刪 .span-open
+│       ├── await-open.sh                # Reply Fold：寫 .awaiting-reply
 │       ├── session-start-devlog.sh      # 接手摘要（clear 不注入）
 │       ├── round-start.sh               # 送出時寫 Round skeleton（含 prompt 遮罩）
 │       ├── close-open-round.sh          # 把開著的 Round 標成 INTERRUPTED

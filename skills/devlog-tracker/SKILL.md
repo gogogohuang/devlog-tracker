@@ -237,6 +237,58 @@ DONE
 
 收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
 
+## Reply Fold：把「Claude 提問、user 回答」記成同一個 Round
+
+一輪如果是 Claude 用純文字結尾提出一個具體問題（不是用 `AskUserQuestion`
+工具、而是整個 turn 就在這句問題上結束），下一則使用者訊息通常就是答案，
+不是新話題。預設行為（每個 `UserPromptSubmit` 開一個新 `## Round`）會把這
+組問答拆成兩個不相關的 Round。Reply Fold 讓這種情況折進同一個 Round，記
+成一個 `### 段落`。
+
+**跟 `AskUserQuestion` 工具的差異：** 用 `AskUserQuestion` 問問題時，問題
+跟答案都在同一個 turn 裡（呼叫工具、拿到結果，沒有中間的 Stop），根本不
+會產生第二個 Round，不需要也不該用 Reply Fold。Reply Fold 只處理「整個
+turn 已經結束、下一則訊息才拿到答案」這種情況。
+
+**什麼時候該開：** 這一輪的 Summary／Handoff／Status 寫完、確定要用文字
+問題結束這個 turn（Status 常見是 `BLOCKED`，但 `IN_PROGRESS` 也可能）時，
+在結束 turn 之前用 Bash 執行：
+
+```bash
+bash hooks/scripts/await-open.sh
+```
+
+這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
+Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
+
+**下一則訊息進來之後會自動發生什麼事：** `round-start.sh` 看到
+`.awaiting-reply` 且輪次跟目前最後一個 `## Round` 吻合，就不開新 Round，
+改成在那個 Round 的 `### Summary` 之前插入一個新段落：
+
+`````markdown
+### 段落 2 - 14:32（回覆上一輪的問題）
+```text
+<使用者這則訊息的原話，跟 User Input 一樣的截斷/遮罩規則>
+```
+`````
+
+`.devlog/.round-open` 會重新指向這個 Round，讓這輪如果又意外中斷，
+`INTERRUPTED` 一樣能正確蓋在同一個 Round 上。折入之後 Claude 照常編輯
+這個 Round 的 Summary／Handoff／Status，反映答案後的結果。
+
+**猜錯的處理：** hook 沒辦法驗證「下一則訊息真的是在回答」，只看
+`.awaiting-reply` 有沒有開著。如果開了之後使用者其實問了不相干的新問題，
+還是會被自動折進舊 Round 當一個段落。發現猜錯時，在那個段落裡說明「其實
+是新話題」，然後自己手動開一個新的 `## Round` 接手新請求——不用回頭改寫
+被誤折的段落。
+
+**跟 Span Mode 的關係：** 兩者同時存在時（不常見），Span Mode 優先——這個
+tick 會被 Span Mode 安靜跳過，`.awaiting-reply` 照樣被消耗掉但不產生任何
+折入。
+
+**跟 checkpoint 計數的關係：** 折入的這個 tick 不算開新 Round，
+`rounds_since_checkpoint` 不會遞增，跟 Span Mode 跳過的 tick 待遇一致。
+
 ## Span Mode：橫跨多次自動續接的長任務
 
 `/loop` 動態模式、`Workflow`、或任何會讓 Claude 被自己排程（`ScheduleWakeup`、
