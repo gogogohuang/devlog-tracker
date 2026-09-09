@@ -146,9 +146,10 @@ A `## Checkpoint` block has a declared Round span in its heading
   move the block only if it sits between the first moved `## Round`
   heading and the end of the last moved Round; otherwise leave it.
 
-Do not edit `.checkpoint-state`. If Checkpoint headings leave
-`devlog.md`, `enforce-devlog.sh` already resyncs `checkpoint_marker_count`
-downward and does not treat that as "a new checkpoint was written".
+Full keep zeros `rounds_since_checkpoint` and does not change
+`max_silent_rounds`. If Checkpoint headings leave `devlog.md`,
+`enforce-devlog.sh` already resyncs `checkpoint_marker_count` downward
+and does not treat that as "a new checkpoint was written".
 
 ## Filenames
 
@@ -246,10 +247,8 @@ Keep is never auto-run.
 
 ## Known limitations
 
-1. **Full keep and checkpoint counter** — Full keep does not zero
-   `rounds_since_checkpoint` in `.checkpoint-state`. Stop may soon demand
-   a Checkpoint on a nearly empty working file; that write self-heals the
-   counter.
+1. **Full keep and checkpoint counter** — Full keep zeros
+   `rounds_since_checkpoint` and does not change `max_silent_rounds`.
 2. **No `.enabled` / no open Round** — When `.enabled` is absent (never
    started or paused), there is no keep-turn skeleton and `.round-open`
    is missing. Keep must not fall back to treating the last historical
