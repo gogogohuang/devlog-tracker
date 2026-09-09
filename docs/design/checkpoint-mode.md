@@ -17,11 +17,12 @@ in the last hour" is slow.
 
 ## Round Segments
 
-**Mechanism: none — pure authoring convention.** The existing Stop-hook
-content-hash check already only cares whether `devlog.md` changed since
-the round started; it doesn't care how many edits happened or when. So
-writing progressively during a round already satisfies enforcement today.
-What's missing is purely the documented convention for *how* to do it.
+**Mechanism: authoring convention plus a silence valve.** When to write a
+segment is still Claude's judgment. The Stop-hook content-hash check only
+cares that `devlog.md` changed by end of turn. Mid-round, if the file's
+hash is unchanged for `max_silent_seconds` (default 900), `segment-watch.sh`
+blocks the next tool until something is appended — see
+[`segment-watch.md`](segment-watch.md).
 
 **Format** (added to `skills/devlog-tracker/SKILL.md`): for a round that
 involves multiple distinct phases (exploration, a decision, an
