@@ -16,6 +16,7 @@
 | `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
 | `/devlog-tracker:compact` | 把舊的 `DONE` 輪次搬到 `devlog.archive.md`。 |
 | `/devlog-tracker:keep` | 把有主題的一段搬走成 `devlog.<name>.md`。Claude 會建議範圍與檔名，也可自訂。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
+| `/devlog-tracker:resume <name>` | 讀取具名保存檔的最後一輪與 Handoff，確認後把新工作接回主 devlog。 |
 | `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch 與最後一輪 Status。 |
 | `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode。 |
 

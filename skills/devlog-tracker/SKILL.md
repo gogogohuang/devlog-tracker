@@ -355,6 +355,11 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 
 把一段（或全部歷史）從 `devlog.md` **搬走**成 `.devlog/devlog.<name>.md`，讓有主題的紀錄可以單獨留名。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
 
+## 接續具名保存：`/devlog-tracker:resume <name>`
+
+需要重啟具名主題時，用 resume 讀取 `.devlog/devlog.<name>.md` 的最後一輪與
+Handoff；新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
+
 ## 跟原版 agentflow 的差異
 
 | | agentflow 原版 | 這個簡化版 |

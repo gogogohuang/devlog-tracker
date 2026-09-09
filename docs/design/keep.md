@@ -266,6 +266,7 @@ the last Round).
 | File | Role |
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
+| `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |
@@ -280,6 +281,6 @@ No hook or `hooks/hooks.json` changes.
 - Non-contiguous Round sets
 - A subdirectory for kept files
 - Auto-prompting keep at the end of a valuable episode
-- Reading or injecting kept files on SessionStart
+- Reading or injecting kept files on SessionStart（只有明確執行 `/devlog-tracker:resume` 才讀）
 - Pulling rounds back out of `devlog.archive.md`
 - A second slash command for full keep
