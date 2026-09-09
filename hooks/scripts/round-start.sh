@@ -85,7 +85,7 @@ if [ -n "$FOLD_ROUND" ]; then
 
   TS="$(date +%H:%M 2>/dev/null || echo unknown)"
   FULL_TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
-  START_LINE="$(devlog_list_round_starts "$DEVLOG_FILE" | awk -v r="$FOLD_ROUND" '$2==r{print $1}')"
+  START_LINE="$(devlog_list_round_starts "$DEVLOG_FILE" | awk -v r="$FOLD_ROUND" '$2==r{print $1}' | tail -1)"
   END_LINE="$(devlog_block_end "$DEVLOG_FILE" "$START_LINE")"
   SEG_N=$(( $(devlog_count_segments "$DEVLOG_FILE" "$START_LINE" "$END_LINE") + 1 ))
 
@@ -103,7 +103,7 @@ if [ -n "$FOLD_ROUND" ]; then
 
   if [ -f "$SEG_TMP" ]; then
     devlog_insert_before_summary "$DEVLOG_FILE" "$START_LINE" "$END_LINE" "$SEG_TMP" > "$DEVLOG_FILE.tmp" 2>/dev/null \
-      && mv "$DEVLOG_FILE.tmp" "$DEVLOG_FILE" 2>/dev/null || true
+      && mv "$DEVLOG_FILE.tmp" "$DEVLOG_FILE" 2>/dev/null || rm -f "$DEVLOG_FILE.tmp" 2>/dev/null || true
     rm -f "$SEG_TMP" 2>/dev/null || true
   fi
 

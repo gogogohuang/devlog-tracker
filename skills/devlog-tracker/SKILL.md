@@ -255,7 +255,7 @@ turn 已經結束、下一則訊息才拿到答案」這種情況。
 在結束 turn 之前用 Bash 執行：
 
 ```bash
-bash hooks/scripts/await-open.sh
+CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh"
 ```
 
 這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
@@ -281,6 +281,11 @@ Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 還是會被自動折進舊 Round 當一個段落。發現猜錯時，在那個段落裡說明「其實
 是新話題」，然後自己手動開一個新的 `## Round` 接手新請求——不用回頭改寫
 被誤折的段落。
+
+這個標記檔也會跨 `/clear` 存活：如果開了之後中間發生過一次 `/clear`，
+下一則訊息進來時 Claude 早就不記得當初問的是什麼，卻還是會被折進那個
+已經沒有上下文的舊 Round。發現時的處理跟上面猜錯的情況一樣——在那個段落
+裡說清楚，再手動開一個新的 `## Round` 接手。
 
 **跟 Span Mode 的關係：** 兩者同時存在時（不常見），Span Mode 優先——這個
 tick 會被 Span Mode 安靜跳過，`.awaiting-reply` 照樣被消耗掉但不產生任何

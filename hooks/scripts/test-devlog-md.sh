@@ -149,6 +149,32 @@ fi
 ROUND2_COUNT="$(printf '%s\n' "$RESULT" | grep -c 'other round summary marker')"
 assert_eq "round 2 summary untouched (still exactly once)" "1" "$ROUND2_COUNT"
 
+# --- devlog_insert_before_summary: still matches "### Summary" with a
+# trailing space/tab (built via printf, not a literal in the heredoc, since
+# editors tend to strip trailing whitespace on save) -----------------------
+{
+  printf '## Round 1 — 2026-09-09T12:00:00+08:00\n\n'
+  printf '### User Input\n```text\nhello\n```\n\n'
+  printf '### Summary \n'
+  printf 'done\n\n'
+  printf '### Handoff\n#### 現況\ndone\n\n'
+  printf '### Status\nDONE\n'
+} > "$TMP_ROOT/devlog_trailing_ws.md"
+printf '### 段落 1 - 09:30（回覆上一輪的問題）\n```text\nmy trailing-ws answer\n```\n\n' > "$TMP_ROOT/segment_ws.txt"
+START="$(devlog_list_round_starts "$TMP_ROOT/devlog_trailing_ws.md" | awk '$2==1{print $1}')"
+END="$(devlog_block_end "$TMP_ROOT/devlog_trailing_ws.md" "$START")"
+RESULT="$(devlog_insert_before_summary "$TMP_ROOT/devlog_trailing_ws.md" "$START" "$END" "$TMP_ROOT/segment_ws.txt")"
+assert_contains "inserted segment text present (Summary has trailing space)" "my trailing-ws answer" "$RESULT"
+BEFORE_SUMMARY_WS="$(printf '%s\n' "$RESULT" | awk '/my trailing-ws answer/{print NR} /^### Summary[ \t]*$/{print NR; exit}')"
+FIRST_LINE_WS="$(printf '%s\n' "$BEFORE_SUMMARY_WS" | head -1)"
+SECOND_LINE_WS="$(printf '%s\n' "$BEFORE_SUMMARY_WS" | tail -1)"
+if [ "$FIRST_LINE_WS" -lt "$SECOND_LINE_WS" ]; then
+  echo "PASS: segment text appears before the trailing-space ### Summary line"
+else
+  echo "FAIL: segment text did not land before the trailing-space ### Summary line"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

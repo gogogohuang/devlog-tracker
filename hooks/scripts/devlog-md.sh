@@ -52,7 +52,7 @@ devlog_insert_before_summary() {
       close(textfile)
     }
     {
-      if (!inserted && NR >= start && NR <= end && !fence && $0 ~ /^### Summary$/) {
+      if (!inserted && NR >= start && NR <= end && !fence && $0 ~ /^### Summary[[:space:]]*$/) {
         for (i = 0; i < ni; i++) print ins[i]
         inserted = 1
       }
