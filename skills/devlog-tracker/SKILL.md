@@ -1,6 +1,6 @@
 ---
 name: devlog-tracker
-description: 在專案根目錄維護一份 devlog.md，把每一輪的請求、所做的決策與結果寫成永久紀錄。使用者下 /devlog-tracker:start 啟動這個專案的強制記錄後，Stop hook 會卡住每一輪的結束動作，逼 Claude 先把這輪寫進 devlog.md 才能結束；SessionStart hook 在 startup / resume / compact / fork 時自動讀檔補齊進度，/clear 不注入；要接續請 /devlog-tracker:continue；/devlog-tracker:pause 可暫停強制、/devlog-tracker:compact 可手動壓縮歸檔、/devlog-tracker:keep 可把有主題的一段搬走成 devlog.<name>.md；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。當使用者提到「devlog」「start」「continue」「接續」「keep」「記錄這輪」，或整個對話呈現需要長期追蹤、跨多個 session 接續的多輪開發工作時，主動使用此技能。
+description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者下 /devlog-tracker:start 後 Stop hook 強制每輪寫入；SessionStart 在 startup / resume / compact / fork 注入進度，/clear 不注入；要接續用 /devlog-tracker:continue。當使用者提到「devlog-tracker」「.devlog/devlog.md」「/devlog-tracker:continue」或明確要寫／接續這份紀錄時使用。
 ---
 
 # Devlog Tracker（簡化版）
