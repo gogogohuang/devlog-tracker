@@ -155,6 +155,63 @@ if [ -n "$LAST_ROUND" ]; then
     echo "最後一個 Round 缺少 \`### Summary\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這兩個標題（Summary 給人掃、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
     exit 2
   fi
+
+  section_body() {
+    local heading="$1"
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
+      $0 ~ h { grab=1; next }
+      grab && /^### / { exit }
+      grab && /^## / { exit }
+      grab { print }
+    '
+  }
+
+  nonempty_body() {
+    section_body "$1" | grep -q '[^[:space:]]'
+  }
+
+  SUM_BODY_OK=0
+  HAN_BODY_OK=0
+  nonempty_body '^### Summary' && SUM_BODY_OK=1
+  nonempty_body '^### Handoff' && HAN_BODY_OK=1
+  if [ "$SUM_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
+    echo "最後一個 Round 的 ### Summary 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    exit 2
+  fi
+
+  STATUS_VAL="$(printf '%s\n' "$LAST_ROUND" | awk '
+    /^### Status/ { grab=1; val=""; next }
+    grab && /^### / { grab=0 }
+    grab && /^## / { grab=0 }
+    grab && $0 ~ /[^[:space:]]/ && val == "" { val=$0 }
+    END { print val }
+  ')"
+  case "$STATUS_VAL" in
+    DONE|IN_PROGRESS|BLOCKED|INTERRUPTED) ;;
+    *)
+      echo "### Status 必須是 DONE、IN_PROGRESS、BLOCKED、INTERRUPTED 其中一個。" >&2
+      exit 2
+      ;;
+  esac
+
+  if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
+    HAS_NEXT=0
+    printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
+    NEXT_OK=0
+    if [ "$HAS_NEXT" -eq 1 ]; then
+      printf '%s\n' "$LAST_ROUND" | awk '
+        /^#### 下一步/ { grab=1; next }
+        grab && /^#### / { exit }
+        grab && /^### / { exit }
+        grab && /^## / { exit }
+        grab { print }
+      ' | grep -q '[^[:space:]]' && NEXT_OK=1
+    fi
+    if [ "$NEXT_OK" -eq 0 ]; then
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
+      exit 2
+    fi
+  fi
 fi
 
 rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
