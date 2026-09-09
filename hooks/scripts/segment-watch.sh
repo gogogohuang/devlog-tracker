@@ -22,13 +22,7 @@ INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
 STORED="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
-INCOMING=""
-if command -v jq >/dev/null 2>&1; then
-  INCOMING="$(printf '%s' "$INPUT" | jq -r '.session_id // empty' 2>/dev/null || true)"
-  [ "$INCOMING" = "null" ] && INCOMING=""
-else
-  INCOMING="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
-fi
+INCOMING="$(json_str_field "$INPUT" session_id)"
 if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
   exit 0
 fi
@@ -63,13 +57,11 @@ if [ "$CURRENT" != "$SEG_SUM" ]; then
   exit 0
 fi
 
-TOOL_NAME=""
+TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
 FILE_PATH=""
 if command -v jq >/dev/null 2>&1; then
-  TOOL_NAME="$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || echo '')"
   FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo '')"
 else
-  TOOL_NAME="$(printf '%s' "$INPUT" | grep -o '"tool_name"[[:space:]]*:[[:space:]]*"[^"]*"' | head -1 | sed 's/.*"tool_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
   FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
 fi
 [ -n "$TOOL_NAME" ] || exit 0
