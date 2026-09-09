@@ -59,7 +59,7 @@ case "$OUT" in
 esac
 
 # pause
-touch "$TMP_ROOT/.devlog/.span-open" "$TMP_ROOT/.devlog/.round-open" "$TMP_ROOT/.devlog/.interrupted"
+touch "$TMP_ROOT/.devlog/.span-open" "$TMP_ROOT/.devlog/.round-open" "$TMP_ROOT/.devlog/.interrupted" "$TMP_ROOT/.devlog/.awaiting-reply"
 echo 'keep me' > "$TMP_ROOT/.devlog/devlog.md"
 OUT="$(bash "$SCRIPT_DIR/pause-devlog.sh")"
 assert_exit "pause -> 0" 0 $?
@@ -67,6 +67,7 @@ assert_not_file "enabled gone" "$TMP_ROOT/.devlog/.enabled"
 assert_not_file "span gone" "$TMP_ROOT/.devlog/.span-open"
 assert_not_file "round-open gone" "$TMP_ROOT/.devlog/.round-open"
 assert_not_file "interrupted gone" "$TMP_ROOT/.devlog/.interrupted"
+assert_not_file "awaiting-reply gone" "$TMP_ROOT/.devlog/.awaiting-reply"
 assert_file "log kept" "$TMP_ROOT/.devlog/devlog.md"
 assert_file "checkpoint kept" "$TMP_ROOT/.devlog/.checkpoint-state"
 

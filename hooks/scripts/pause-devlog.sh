@@ -7,6 +7,7 @@ if [ ! -f "$DEVLOG_DIR/.enabled" ]; then
   exit 0
 fi
 rm -f "$DEVLOG_DIR/.enabled" "$DEVLOG_DIR/.span-open" \
-  "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.interrupted"
+  "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.interrupted" \
+  "$DEVLOG_DIR/.awaiting-reply"
 echo "PAUSED"
 exit 0
