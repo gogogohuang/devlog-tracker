@@ -69,3 +69,7 @@ json_str_field() {
   printf '%s' "$raw" | sed -E "s/^.*\"${key}\"[[:space:]]*:[[:space:]]*\"//; s/\"$//"
   echo
 }
+
+slugify() {
+  printf '%s' "$1" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//'
+}

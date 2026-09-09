@@ -49,5 +49,9 @@ assert_eq "str field null" "" "$(json_str_field "$INPUT" reason)"
 INPUT='not json'
 assert_eq "str field malformed" "" "$(json_str_field "$INPUT" reason)"
 
+assert_eq "slugify basic" "foo-bar" "$(slugify 'foo bar')"
+assert_eq "slugify collapses runs" "foo-bar" "$(slugify 'foo   bar')"
+assert_eq "slugify trims edges" "foo" "$(slugify ' foo ')"
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

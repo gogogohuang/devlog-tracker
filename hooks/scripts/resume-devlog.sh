@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+_src="${BASH_SOURCE[0]}"
+SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$SCRIPT_DIR/json-field.sh"
+
 NAME=""
 if [ "${1:-}" = "--name" ]; then
   NAME="${2:-}"
@@ -11,7 +16,7 @@ fi
 case "$NAME" in devlog.md|*'/'*|*'\'*|*'..'*) echo "INVALID_NAME" >&2; exit 1 ;; esac
 case "$NAME" in devlog.*) NAME="${NAME#devlog.}" ;; esac
 case "$NAME" in *.md) NAME="${NAME%.md}" ;; esac
-NAME="$(printf '%s' "$NAME" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//')"
+NAME="$(slugify "$NAME")"
 [ -n "$NAME" ] && [ "$NAME" != "archive" ] && [ "${#NAME}" -le 64 ] \
   || { echo "INVALID_NAME" >&2; exit 1; }
 
