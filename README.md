@@ -47,6 +47,7 @@ sequenceDiagram
 - **段落記錄**：長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 15 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具，要求先補一段（門檻可調）。子 agent 的工具呼叫不會沿用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
 - **Checkpoint Mode**：累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint`（門檻可調）。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
 - **Span Mode**：`/loop`、Workflow 這類自動續接的長任務，不必每個 tick 都寫完整 Round，用 tick 計數當安全閥；崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
+- **Reply Fold**：Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——先跑 `await-open.sh` 標記，下一則訊息就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。跟 `AskUserQuestion` 工具無關（同一 turn 內問答，本來就不會產生第二個 Round）。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
 
 ## 安裝
 
@@ -97,6 +98,7 @@ devlog-tracker/
 │   ├── segment-watch.md       # 單輪沉默 15 分鐘保底
 │   ├── summary-handoff.md     # 每輪 Summary（人）+ Handoff（AI）設計文件
 │   ├── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
+│   ├── reply-fold.md          # Reply Fold：問答折進同一個 Round
 │   ├── continue.md            # /clear 不注入，/continue 才讀檔接續
 │   └── keep.md                # 具名搬走成 devlog.<name>.md
 ├── skills/devlog-tracker/SKILL.md
