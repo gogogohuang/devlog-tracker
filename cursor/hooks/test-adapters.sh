@@ -52,6 +52,19 @@ printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open"
 OUT="$(printf '{"workspace_roots":["%s"],"status":"aborted"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-stop.sh")"
 grep -q 'INTERRUPTED' "$SUBMIT/.devlog/devlog.md" && echo "PASS: aborted closes round" || { echo "FAIL: aborted"; FAIL=1; }
 
+# sessionEnd delegates its reason to the existing close helper
+cat >> "$SUBMIT/.devlog/devlog.md" <<'EOF'
+
+## Round 2 — now
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 2, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open"
+cksum < "$SUBMIT/.devlog/devlog.md" > "$SUBMIT/.devlog/.turn-start"
+printf '{"workspace_roots":["%s"],"reason":"windowClosed"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-session-end.sh" >/dev/null
+grep -q 'SessionEnd:windowClosed' "$SUBMIT/.devlog/devlog.md" && echo "PASS: session end reason" || { echo "FAIL: session end"; FAIL=1; }
+
 # tool interruption marker
 rm -f "$SUBMIT/.devlog/.interrupted"
 printf '{"workspace_roots":["%s"],"is_interrupt":true}' "$SUBMIT" | bash "$SCRIPT_DIR/on-tool-failure.sh" >/dev/null
