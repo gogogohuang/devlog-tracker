@@ -376,10 +376,11 @@ Keep is never auto-run.
 
 ## Testing
 
-No new hook scripts, so no new hook self-checks. Correctness is the
-command file, as with `compact`. The keep turn's own Round still has to
-satisfy the existing Stop checks (`### Summary` and `### Handoff` on
-the last Round).
+`hooks/scripts/keep-move.sh` has `hooks/scripts/test-keep-move.sh`
+(assert-and-exit). Topic-split *judgment* still lives in
+`commands/keep.md` (LLM steps); the script only moves contiguous
+ranges after confirm. The keep turn's own Round still has to satisfy
+Stop (`### Summary` / `### Handoff` / Status rules).
 
 ## Files
 
@@ -387,13 +388,15 @@ the last Round).
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
+| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm |
+| `hooks/scripts/test-keep-move.sh` | Self-check for `keep-move.sh` |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |
 | `.claude-plugin/marketplace.json` | Same description |
 | `docs/design/keep.md` | This spec |
 
-No hook or `hooks/hooks.json` changes.
+No `hooks/hooks.json` changes (user-invoked script only).
 
 ## Non-goals
 

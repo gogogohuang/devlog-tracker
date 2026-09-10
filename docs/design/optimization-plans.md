@@ -1,5 +1,9 @@
 # Optimization plans (0.4.0 follow-ups)
 
+> **HISTORICAL (0.4.0 → 0.5.0).** Shipped. Do not re-execute.
+> Next polish batch: [`polish-0.9.0-design.md`](polish-0.9.0-design.md).
+
+
 Index for the plans that implement the 2026-09-09 review of `main` @ `29e16b5`.
 This repo gitignores `docs/superpowers/`; plans live under `docs/design/`.
 
@@ -37,3 +41,5 @@ Do not bump to 0.4.1, 0.6.0, or any other intermediate number.
 | 14 | [`version-0.5.0-plan.md`](version-0.5.0-plan.md) — **only version bump** |
 
 Each feature plan is self-contained (TDD, exact files, exact commands). Prefer subagent-driven-development or executing-plans. One PR, one version.
+
+Checkbox bodies left as written at planning time; treat the banner as the status of record.

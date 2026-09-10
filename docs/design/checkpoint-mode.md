@@ -89,7 +89,7 @@ step here):
 | Field | Meaning |
 |---|---|
 | `rounds_since_checkpoint` | Starts at 0. Incremented by `round-start.sh` on every `UserPromptSubmit` that isn't being silently skipped by an open Span Mode span (see Interaction with Span Mode below). Reset to 0 by `enforce-devlog.sh` whenever it detects a new `## Checkpoint` block was actually added (see below) — not just "some write happened," since every ordinary round already causes a write and would otherwise reset the counter every single round, defeating the threshold entirely. |
-| `max_silent_rounds` | Default `20`. Claude may edit this file directly to change the threshold for a given project/session, the same way it chooses `max_silent_ticks` when opening a span — no dedicated slash command. |
+| `max_silent_rounds` | Default `20`. Prefer `/devlog-tracker:checkpoint <N>` (via `checkpoint-set.sh`) to change it; Claude may still edit `.checkpoint-state` directly in a pinch. |
 | `checkpoint_marker_count` | Starts at 0. The last count of `^## Checkpoint` headings `enforce-devlog.sh` observed in `devlog.md`. Compared against the live count each time the hook runs to detect whether a *new* checkpoint block was just added, independent of ordinary round writes. |
 
 ### Hook behavior

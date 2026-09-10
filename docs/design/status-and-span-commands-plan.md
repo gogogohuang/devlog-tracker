@@ -1,5 +1,8 @@
 # Status and span commands Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `/devlog-tracker:status` prints switch/span/checkpoint/segment/last Status. `/devlog-tracker:span` writes or deletes `.span-open` so Claude does not have to remember the JSON shape.

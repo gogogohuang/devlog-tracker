@@ -61,6 +61,7 @@ still edit `max_silent_seconds` directly in a pinch, same as
 |---|---|
 | `last_change_epoch` | Unix seconds. `round-start.sh` sets this to now at the start of every round. `segment-watch.sh` sets it to now whenever `devlog.md`'s cksum differs from `last_seen_cksum`. |
 | `last_seen_cksum` | Last observed `cksum` of `devlog.md` (or `MISSING` if the file is absent). Used only to detect a change; not a second copy of `.turn-start`. |
+| `last_seen_mtime` / `last_seen_size` | Optional cheap identity. When both match the live file, PreToolUse may skip re-running `cksum` and reuse `last_seen_cksum`. Missing keys fall through to a full `cksum`. |
 | `max_silent_seconds` | Default `600` (10 minutes). No enforced range. |
 
 ### Adjusting the threshold
@@ -119,16 +120,24 @@ watch" at every read site.
   `max_silent_seconds`.
 - **`segment-watch.sh`** (`PreToolUse`): after the `.enabled` switch
   check, if `.segment-state` is well-formed:
-  1. Compute the current `devlog.md` cksum. If it differs from
-     `last_seen_cksum`, persist the new cksum and `last_change_epoch =
+  1. If PreToolUse `session_id` is non-empty and differs from the stored
+     id, exit 0. If PreToolUse has a non-empty `agent_id` (Claude Code
+     subagent / dynamic workflow), exit 0.
+  2. Resolve the current `devlog.md` content identity: if on-disk
+     mtime+size match `last_seen_mtime` / `last_seen_size` and
+     `last_seen_cksum` is present, reuse that cksum (skip re-hash).
+     Otherwise compute `cksum`. If it differs from `last_seen_cksum`,
+     persist the new cksum, identity fields, and `last_change_epoch =
      now`, then exit 0.
-  2. If the incoming tool is `Write` or `Edit` and `tool_input.file_path`
+  3. If the incoming tool is `Write`, `Edit`, `StrReplace`, `Read`, or
+     `Grep`, and `tool_input.file_path` (or `tool_input.path` for Grep)
      is exactly `.devlog/devlog.md` or ends with `/.devlog/devlog.md`,
      exit 0. No `realpath`; string suffix only.
-  3. If `now - last_change_epoch >= max_silent_seconds`, print a
-     stderr message asking Claude to append a `### 段落` (one line is
-     enough) to `.devlog/devlog.md`, then exit 2.
-  4. Otherwise exit 0.
+  4. If `now - last_change_epoch >= max_silent_seconds`, print a
+     stderr message telling Claude to Read `.devlog/devlog.md` then
+     Edit/StrReplace-append a `### 段落` (not full-file Write overwrite),
+     then exit 2.
+  5. Otherwise exit 0.
 
 Stdin is the standard Claude Code PreToolUse payload
 (`tool_name`, `tool_input`). Parse with `jq` when present; otherwise
@@ -164,6 +173,9 @@ to open or close a watch.
 
 ## Known Limitations
 
+- **PreToolUse may skip `cksum`** when `devlog.md` mtime+size match
+  `last_seen_mtime` / `last_seen_size`. Content changes that preserve
+  both (rare) would not reset the timer until identity drifts.
 - **No background alarm.** If Claude thinks for 10 minutes without
   calling a tool, the valve does not fire.
 - **Bash (and other tools) that rewrite `devlog.md` are not
@@ -182,6 +194,15 @@ to open or close a watch.
   its non-empty `session_id` differs from the id stored at
   UserPromptSubmit. Missing or unreadable ids preserve the existing
   parent-round valve.
+- **Claude Code dynamic workflow / subagents.** They usually share the
+  parent `session_id`, so session_id isolation alone does not skip them.
+  When PreToolUse includes a non-empty `agent_id`, Segment Watch exits 0
+  (subagents must not append parent-round `### 段落` under this valve).
+  Main-thread calls omit `agent_id` and still hit the valve.
+- **Unblock without wiping.** Expired main-thread may Read/Grep
+  `.devlog/devlog.md`, then Edit/StrReplace to append. Full-file Write
+  overwrite remains technically allowlisted for legacy paths but SKILL
+  and stderr forbid it — prefer append.
 
 ## Files
 

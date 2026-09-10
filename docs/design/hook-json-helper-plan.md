@@ -1,5 +1,8 @@
 # Hook JSON helper Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** One sourced helper for the flat JSON state files (`.span-open`, `.checkpoint-state`, `.segment-state`, `.round-open`) so hooks stop duplicating grep/awk `gsub`.

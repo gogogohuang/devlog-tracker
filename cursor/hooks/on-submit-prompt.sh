@@ -14,7 +14,9 @@ if command -v jq >/dev/null 2>&1; then
   PAYLOAD="$(jq -n --arg prompt "$PROMPT" --arg session_id "$SESSION_ID" '{prompt:$prompt,session_id:$session_id}')"
 else
   PROMPT="$(printf '%s' "$INPUT" | grep -o '"prompt"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"prompt"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
-  PAYLOAD="$(printf '{"prompt":"%s"}' "$PROMPT")"
+  SESSION_ID="$(printf '%s' "$INPUT" | grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+  # Escape only what we embed; prompts with quotes remain a known no-jq limitation.
+  PAYLOAD="$(printf '{"prompt":"%s","session_id":"%s"}' "$PROMPT" "$SESSION_ID")"
 fi
 printf '%s' "$PAYLOAD" | bash "$PLUGIN_SCRIPTS/round-start.sh" >/dev/null 2>&1 || true
 printf '{"continue":true}\n'

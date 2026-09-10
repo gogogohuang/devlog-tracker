@@ -13,8 +13,10 @@ description: 把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.a
    - 所有 `## Checkpoint` 區塊，永遠留在 devlog.md、不搬到 archive——它們是
      checkpoint 機制存在的目的：翻閱時的摘要路標，搬走就失去了作用
 4. 跑（不要自己搬檔）：
+   先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
    ```bash
-   CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/compact-devlog.sh"
+   PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
+   CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/compact-devlog.sh"
    ```
    檔案不存在時腳本 exit 1：告知沒有東西可壓縮。
 5. 用 stdout 的 `MOVED` / `REMAINING` / `ARCHIVE` 回報一句話。

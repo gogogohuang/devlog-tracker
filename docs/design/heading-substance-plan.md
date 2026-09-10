@@ -1,5 +1,8 @@
 # Heading substance Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** After the last Round has `### Summary` and `### Handoff` headings, require non-empty bodies, a legal Status, and `#### 下一步` when Status is `IN_PROGRESS` or `BLOCKED`.

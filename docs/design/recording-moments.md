@@ -240,12 +240,14 @@ budget).
 
 ### SessionStart (`session-start-devlog.sh`)
 
-Before injecting the last 8 rounds: if `.round-open` exists **and**
+Before injecting the SessionStart excerpt (last Checkpoint if any, plus
+the last two Rounds' Summary / Handoff / Status — see
+`session-start-devlog.sh`): if `.round-open` exists **and**
 stdin `source` is `startup` / `resume` / `clear` / `fork`, shared
 interrupt close `dangling:session_start`. Skip heal when `source` is
 `compact` or missing/unreadable (mid-turn auto-compact must not cancel
 Stop). Then, for every source **except `clear`**, the existing span
-warning + devlog excerpt. `source=clear` exits 0 after heal with empty
+warning + excerpt. `source=clear` exits 0 after heal with empty
 stdout — `/clear` must leave context empty; resume is
 `/devlog-tracker:continue` (see `docs/design/continue.md`). Crash
 recovery for Status still happens on disk; User Input was already on
@@ -347,8 +349,9 @@ framework.
 - Wrong `round` in marker vs last heading → delete marker, do not
   edit.
 
-`compact.md` instruction coverage is documentation: retain
-`INTERRUPTED`. No compact script exists today; do not add one.
+`compact-devlog.sh` + `commands/compact.md` move older DONE rounds to
+`devlog.archive.md`. Retain `INTERRUPTED` rounds in the main file per
+compact rules. Do not invent a second compact mechanism.
 
 ## Known limitations
 
@@ -365,15 +368,19 @@ framework.
   the next prompt / SessionStart.
 - **SessionStart `compact` does not heal.** Mid-turn auto-compact also
   fires SessionStart; healing there would change the hash and silently
-  cancel Stop's completeness check. Compact still injects the last-8
-  excerpt only.
+  cancel Stop's completeness check. Compact still injects the SessionStart excerpt (last Checkpoint + last
+  two Rounds' close) only — it does not heal.
 - **Usage skip is exact three `error` strings.** Other billing-adjacent
   types that are not those names get recorded.
 - **Concurrent sessions** use a short `.devlog/.lock` around writes.
   Sessions can still interleave after the 2-second fail-open timeout;
   the lock covers the common overlapping-write window.
-- **Secrets in the prompt** — common provider-prefix tokens are masked;
-  other secrets still copy into the project file.
+- **Secrets in the prompt** — common provider-prefix tokens are masked
+  (`sk-ant-*`, OpenAI-style `sk-…`, `ghp_` / `github_pat_`, Slack `xox*`,
+  `AKIA*`, `Bearer …`, JWT-shaped `eyJ…`, PEM private keys). Truncation at
+  4000 characters still happens **before** redact, so a token split by
+  truncate may remain. This is not a general secret scanner; other secrets
+  still copy into the project file.
 - **Span + unrelated human message** still not detected.
 - **Pause mid-round** leaves an `IN_PROGRESS` skeleton without
   Summary; that is intentional, not `INTERRUPTED`.

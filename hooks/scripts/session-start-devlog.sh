@@ -10,7 +10,8 @@
 #
 # Dangling heal：startup / resume / clear / fork 把殘留的 .round-open 標成
 # INTERRUPTED。source=compact（以及 source 缺失／讀不到）跳過 heal，避免
-# mid-turn auto-compact 改雜湊讓 Stop 靜默放行；compact 仍注入最近 8 輪。
+# mid-turn auto-compact 改雜湊讓 Stop 靜默放行；compact 仍注入 excerpt
+#（最後一個 Checkpoint + 最近兩輪 Summary/Handoff/Status），不 heal。
 # close-open-round.sh 必須對 stdout 保持沉默。
 
 set -uo pipefail

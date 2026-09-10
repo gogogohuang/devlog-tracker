@@ -53,7 +53,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 
 需要誠實說明的邊界：User Input 在送出當下就已經在 `devlog.md`。正常結束時 Stop 仍保證有 Summary / Handoff。
 意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
-**下一則訊息**或**下次 SessionStart（startup / resume / clear）**才補上）。
+**下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上）。
 `PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成 Esc
 會立刻蓋章。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個工具呼叫時催促。
 
@@ -154,7 +154,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
   `DONE` = 這輪請求已結束。
 - `INTERRUPTED` 只由 hook 在意外中斷時寫上（非 usage 的 API 錯誤、SessionEnd、
-  下次 SessionStart（startup / resume / clear）或下一則訊息發現 `.round-open` 還在）。
+  下次 SessionStart（startup / resume / clear / fork）或下一則訊息發現 `.round-open` 還在）。
   mid-turn 取消（例如 Esc）通常也是走這條延後路徑；`PostToolUseFailure` 的 `is_interrupt`
   若有觸發只是 best-effort，不能當成一定會立刻蓋章。Claude 正常收尾時不要自己選這個值。
   usage 用光（`rate_limit` / `billing_error` / `account_on_hold`）不標中斷。
@@ -230,11 +230,13 @@ DONE
 
 主路徑仍是判斷何時寫段落，不是照時間機械切段。另外有一道保底：`/devlog-tracker:start`
 之後，同一輪若連續 10 分鐘（`max_silent_seconds`，預設 600）都沒改 `devlog.md`，
-下一個工具會被 PreToolUse hook 擋住，要求先追加一段 `### 段落`（一行也可以）。
-寫了任何內容計時就歸零。被擋時用 Write／Edit 改 `.devlog/devlog.md`，不要用 Bash
-繞過。沒呼叫工具就不會響。門檻用 `/devlog-tracker:segment-watch <時間長度>`
-（例如 `/devlog-tracker:segment-watch 5 分鐘`）調整，不用手改
-`.devlog/.segment-state` 的 `max_silent_seconds`。
+下一個工具會被 PreToolUse hook 擋住。被擋時先 **Read** `.devlog/devlog.md`，再用
+Edit／StrReplace **追加**一段 `### 段落`（一行也可以）；**禁止**用 Write 覆寫整份檔。
+寫了任何內容計時就歸零。不要用 Bash 繞過。沒呼叫工具就不會響。Claude Code
+dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門會跳過（它們
+與主對話共用 `session_id`，不該被逼寫父輪段落）。門檻用
+`/devlog-tracker:segment-watch <時間長度>`（例如 `/devlog-tracker:segment-watch 5 分鐘`）
+調整，不用手改 `.devlog/.segment-state` 的 `max_silent_seconds`。
 
 收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
 
@@ -399,9 +401,9 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 
 ### 調整門檻
 
-`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，可以直接編輯
-`.devlog/.checkpoint-state` 改掉這個數字，跟 Span Mode 調整 `max_silent_ticks`
-是同一套邏輯。
+`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，用
+`/devlog-tracker:checkpoint <正整數輪數>` 調整（不要手改
+`.devlog/.checkpoint-state`，除非指令不可用）。
 
 ### `/devlog-tracker:pause` 之後
 

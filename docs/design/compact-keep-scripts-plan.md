@@ -1,5 +1,8 @@
 # Compact / keep scripts Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Move compact and keep with bash so range cuts, write-before-delete, Checkpoint rules, and full-keep checkpoint reset are not LLM-authored. Commands still propose range/name and wait for confirm.

@@ -1,5 +1,8 @@
 # SessionStart excerpt Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** On `startup` / `resume` / `compact` / `fork`, inject the last Checkpoint plus the last two Rounds' Summary / Handoff / Status, using fence-aware parsing. Do not inject on `clear`. Do not empty new sessions.
