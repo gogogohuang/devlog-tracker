@@ -25,6 +25,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/json-field.sh"
 # shellcheck source=devlog-lock.sh
 . "$SCRIPT_DIR/devlog-lock.sh"
+# shellcheck source=workspace-snapshot.sh
+. "$SCRIPT_DIR/workspace-snapshot.sh"
 
 # Extracts the last "## Round N ..." block from $1 (fence-aware: a line
 # starting with ``` — optionally indented — toggles in/out of a code
@@ -167,6 +169,17 @@ if [ -n "$LAST_ROUND" ]; then
     '
   }
 
+  handoff_subsection_body() {
+    local heading="$1"
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
+      $0 ~ h { grab=1; next }
+      grab && /^#### / { exit }
+      grab && /^### / { exit }
+      grab && /^## / { exit }
+      grab { print }
+    '
+  }
+
   nonempty_body() {
     section_body "$1" | grep -q '[^[:space:]]'
   }
@@ -200,17 +213,29 @@ if [ -n "$LAST_ROUND" ]; then
     printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
     NEXT_OK=0
     if [ "$HAS_NEXT" -eq 1 ]; then
-      printf '%s\n' "$LAST_ROUND" | awk '
-        /^#### 下一步/ { grab=1; next }
-        grab && /^#### / { exit }
-        grab && /^### / { exit }
-        grab && /^## / { exit }
-        grab { print }
-      ' | grep -q '[^[:space:]]' && NEXT_OK=1
+      handoff_subsection_body '^#### 下一步' | grep -q '[^[:space:]]' && NEXT_OK=1
     fi
     if [ "$NEXT_OK" -eq 0 ]; then
       echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
       exit 2
+    fi
+
+    # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,
+    # Phase 1): #### 工作區 must match a freshly computed git snapshot
+    # exactly. Turns it from an unverified claim into a write-time fact
+    # instead of something only continue/resume catch on the next turn.
+    # git unavailable -> fail-open, skip this check like every other one here.
+    if command -v git >/dev/null 2>&1; then
+      EXPECTED_WS="$(workspace_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+      if [ -n "$EXPECTED_WS" ]; then
+        ACTUAL_WS="$(handoff_subsection_body '^#### 工作區' | sed -e '/^[[:space:]]*$/d')"
+        if [ "$ACTUAL_WS" != "$EXPECTED_WS" ]; then
+          echo "#### 工作區 跟目前 git 狀態不符（或缺漏）。請把這一節內容換成以下逐字內容：" >&2
+          echo "" >&2
+          printf '%s\n' "$EXPECTED_WS" >&2
+          exit 2
+        fi
+      fi
     fi
   fi
 fi

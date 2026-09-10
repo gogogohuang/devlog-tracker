@@ -794,6 +794,8 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 還在做。
 
 ### Handoff
+#### 工作區
+非 git 工作區
 #### 現況
 做到一半。
 #### 下一步
