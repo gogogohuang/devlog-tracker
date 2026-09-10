@@ -37,6 +37,7 @@ export CLAUDE_PROJECT_DIR="$(pwd)"
 bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
 # pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
 ```
 
@@ -64,6 +65,7 @@ bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
 | `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch 與最後一輪 Status。 |
 | `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode（不要手寫 `.span-open` JSON）。 |
 | `/devlog-tracker:segment-watch <時間長度>` | 調整 Segment Watch 的沉默門檻（預設 10 分鐘）。專案還沒 `/devlog-tracker:start` 時回報 `NOT_STARTED`，不會建立任何檔案。 |
+| `/devlog-tracker:checkpoint <輪數>` | 調整 Checkpoint Mode 的沉默門檻（預設 20 輪）。專案還沒 start 時回報 `NOT_STARTED`。 |
 
 ## 強制記錄開著之後
 
