@@ -98,13 +98,13 @@ Round numbering, timestamps, and User Input rules are unchanged.
    `DONE` and there is nothing further to do. `下一步` must be concrete
    enough that the next turn can start from it; do not write 「繼續完成」.
    `工作區` is the git snapshot at close, written from command output,
-   not from memory. The exact commands and the four output formats
-   (clean / dirty / not a git repo / detached HEAD) are canonical in
-   `skills/devlog-tracker/SKILL.md` (`#### 工作區`) — not respelled here.
-   Interrupt stubs omit `工作區`. The Stop hook does not require this
-   heading. Continue / resume encode live git in those four formats,
-   then compare that snapshot to this block before acting on `下一步`
-   (`docs/design/continue.md`).
+   not from memory. The exact commands and output formats are canonical
+   in `skills/devlog-tracker/SKILL.md` (`#### 工作區`) — not respelled
+   here. Interrupt stubs omit `工作區`. The Stop hook requires this
+   heading to match a live git snapshot when Status is `IN_PROGRESS` or
+   `BLOCKED` (`hooks/scripts/workspace-snapshot.sh`). Continue / resume
+   encode live git in that same format set, then compare that snapshot
+   to this block before acting on `下一步` (`docs/design/continue.md`).
 4. **Status is only the enum.**
    - `IN_PROGRESS`: work remains and can proceed.
    - `BLOCKED`: work cannot proceed without external input.
@@ -157,10 +157,12 @@ add the missing heading(s) to that last Round.
 
 Details:
 
-- **Presence only, not quality.** The hook does not check that Summary is
-  2–4 sentences, that Handoff has the five subsections, that `工作區`
-  matches git, or that bodies are non-empty. Same trust level as Checkpoint's
-  `^## Checkpoint` marker.
+- **Presence plus a light structure check, plus one machine-verified
+  cache field.** The hook does not check that Summary is 2–4 sentences,
+  that Handoff has the five subsections, or that 決策／現況／檔案 prose
+  is accurate. `IN_PROGRESS` / `BLOCKED` `#### 工作區` is compared to a
+  snapshot the hook computes (`workspace-snapshot.sh`). Bodies must be
+  non-empty.
 - **Last Round is the unit.** A turn that only appends a Checkpoint, or a
   Span budget-expiry one-liner, passes as long as the last Round already
   has both headings.
@@ -196,9 +198,12 @@ not off `### Response`.
 - **Presence plus a light structure check.** Headings must exist, Summary
   and Handoff bodies must contain a non-whitespace line, Status must be
   one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`, and
-  `IN_PROGRESS` / `BLOCKED` require a non-empty `#### 下一步`. `#### 工作區`
-  is an authoring contract only; the hook does not require it. Prose
-  quality is still on Claude.
+  `IN_PROGRESS` / `BLOCKED` require a non-empty `#### 下一步`.
+  `IN_PROGRESS` / `BLOCKED` also require `#### 工作區` to match a git
+  snapshot the hook computes itself (`hooks/scripts/workspace-snapshot.sh`,
+  `docs/design/devlog-as-ssot-assessment.md` Phase 1) — content-verified,
+  not just presence-checked. `DONE` / `INTERRUPTED` do not require it.
+  Prose quality elsewhere (Summary, 決策, 現況) is still on Claude.
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
   Acceptable: no plausible reason for those headings to appear except a
@@ -213,6 +218,7 @@ not off `### Response`.
 ## Out of scope
 
 - Rewriting or migrating historical Rounds that still use `### Response`.
-- Hook checks for `#### 決策` / `#### 檔案` / `#### 工作區` / `#### 現況`,
-  or scoring Summary prose.
+- Hook checks for `#### 決策` / `#### 檔案` / `#### 現況`, or scoring
+  Summary prose. (`#### 工作區` content is checked for `IN_PROGRESS` /
+  `BLOCKED`; see Known limitations.)
 - Changing compact's retain rules.

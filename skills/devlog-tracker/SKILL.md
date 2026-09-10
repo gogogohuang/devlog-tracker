@@ -10,8 +10,12 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 
 ## 核心原則
 
-devlog.md 是 single source of truth。使用者在裡面許願、Claude 也在裡面回報進度與結果——
-取代「終端機一 clear 就沒了」的對話記錄，讓工作可以隨時中斷、隨時接續。
+devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步）的 single source of truth，
+不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git（`#### 工作區` 是收尾當下的已核對快取：
+`IN_PROGRESS`／`BLOCKED` 時 Stop hook 會對過 live git；接手時樹可能已變，`continue`／`resume`
+仍以實際工作樹為準，見 `docs/design/continue.md`）；完整逐字過程的真相是對話 transcript（`/clear` 後不存在）；設計
+決策的真相是 `docs/design/*.md`。使用者在裡面許願、Claude 也在裡面回報進度與結果——取代「終端機
+一 clear 就沒了」的對話記錄，讓工作可以隨時中斷、隨時接續。
 
 ## 檔案位置
 
@@ -97,7 +101,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 如果 hook 在 startup / resume / fork 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些
 環境問題沒跑），Claude 仍應主動：使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次
 `.devlog/devlog.md` 最後幾輪。最後一輪 `DONE`：只對進度，不核對、不開工。否則依
-`commands/continue.md` 步驟 5 核對後再接手（步驟 5.1 編成同一格式再對；有快照但不符才先寫 `### 段落`，沒有快照直接以實際狀態為準）。
+`commands/continue.md` 步驟 5 核對後再接手。
 這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有說 continue，就不要讀檔。
 
 ## 接續：`/devlog-tracker:continue`
@@ -163,7 +167,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   - detached 乾淨：`HEAD detached @ a1b2c3d`（一行）
   - detached 有未提交：第一行 `HEAD detached @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   （此五種格式與 `commands/continue.md` 步驟 5.1 逐字同步，改一邊要一起改。）
-  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。接手先把 live git 編成同一格式再對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
+  `INTERRUPTED` stub 不寫這一節。`IN_PROGRESS`／`BLOCKED` 收尾時，Stop hook 會自己算一次
+  即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`hooks/scripts/workspace-snapshot.sh`，
+  docs/design/devlog-as-ssot-assessment.md Phase 1）——`DONE`／`INTERRUPTED` 不受影響。
+  接手先把 live git 編成同一格式再對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -181,7 +188,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」，且 `#### 工作區` 跟 hook 算出的 git 快照相符。
 新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）
