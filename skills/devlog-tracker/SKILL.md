@@ -426,6 +426,10 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 需要重啟具名主題時，用 resume 讀取 `.devlog/devlog.<name>.md` 的最後一輪與
 Handoff；新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
 
+## 無條件清空：`/devlog-tracker:clean`
+
+把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下，重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。
+
 ## 跟原版 agentflow 的差異
 
 | | agentflow 原版 | 這個簡化版 |
