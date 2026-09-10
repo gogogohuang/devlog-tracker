@@ -59,12 +59,12 @@ if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
   rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
   # Helper is silent. If it stamped, the last Round now has
-  # INTERRUPTED + <!-- reason: user_interrupt --> — exit 0 so Esc is not
+  # INTERRUPTED + [reason: user_interrupt] — exit 0 so Esc is not
   # converted into "please write Summary". Recovered-complete or a stale
   # flag leaves Status alone; fall through to hash / headings / checkpoint.
   _LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
   case "$_LAST_ROUND" in
-    *$'\nINTERRUPTED\n<!-- reason: user_interrupt -->'*) exit 0 ;;
+    *$'\nINTERRUPTED\n[reason: user_interrupt]'*) exit 0 ;;
   esac
 fi
 

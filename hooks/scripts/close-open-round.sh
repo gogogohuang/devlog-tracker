@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Stamp the open Round as INTERRUPTED. Always exit 0 (fail-open).
 # Usage: close-open-round.sh <reason> [detail]
-# The reason is written as an HTML comment under Status (`<!-- reason: ... -->`)
-# so it reads as internal debug metadata, not a broken/extra Status value —
-# devlog.md is meant to be read by a human without touching hook internals.
+# The reason is written as a bracketed tag under Status (`[reason: ...]`) so
+# it reads as internal debug metadata, not a broken/extra Status value — and
+# stays visible even through a Markdown renderer (unlike an HTML comment,
+# which a renderer would silently drop, losing the debug trail).
 # detail (optional): "awaiting_question" makes the stub Summary/Handoff name
 # the likely cause (interrupted while an AskUserQuestion answer was pending)
 # instead of the generic "沒有正常收尾" — caller decides via
@@ -111,7 +112,7 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
         }
         print "### Status"
         print "INTERRUPTED"
-        print "<!-- reason: " reason " -->"
+        print "[reason: " reason "]"
         skip_val = 1
         continue
       }
@@ -131,7 +132,7 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
       }
       print "### Status"
       print "INTERRUPTED"
-      print "<!-- reason: " reason " -->"
+      print "[reason: " reason "]"
     }
   }
 ' "$DEVLOG_FILE" > "$TMP" 2>/dev/null
