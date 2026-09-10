@@ -152,7 +152,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
-  `DONE` = 這輪請求已結束。
+  `DONE` = 這輪請求已結束。**例外只有 hook 自動蓋 `INTERRUPTED` 時**：`close-open-round.sh`
+  會在下面多印一行 `<!-- reason: ... -->`（例如 `dangling:next_prompt`），這是 hook 自己的
+  除錯代號、以 HTML 註解形式標記成內部 metadata，不算違反「只寫一個值」——看到這行不用
+  當成錯誤，Claude 也不用去動它。
 - `INTERRUPTED` 只由 hook 在意外中斷時寫上（非 usage 的 API 錯誤、SessionEnd、
   下次 SessionStart（startup / resume / clear / fork）或下一則訊息發現 `.round-open` 還在）。
   mid-turn 取消（例如 Esc）通常也是走這條延後路徑；`PostToolUseFailure` 的 `is_interrupt`

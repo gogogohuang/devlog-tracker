@@ -2,7 +2,7 @@
 # Self-check for segment-watch-set.sh. Run:
 #   bash hooks/scripts/test-segment-watch-set.sh
 set -uo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 export CLAUDE_PROJECT_DIR="$TMP_ROOT"

@@ -18,6 +18,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/devlog-lock.sh"
 # shellcheck source=devlog-md.sh
 . "$HOOKS_DIR/devlog-md.sh"
+# shellcheck source=detect-pending-question.sh
+. "$HOOKS_DIR/detect-pending-question.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -36,7 +38,11 @@ INPUT="$(cat 2>/dev/null || true)"
 SESSION_ID="$(json_str_field "$INPUT" session_id)"
 
 if [ -f "$ROUND_OPEN" ]; then
-  bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" || true
+  DANGLING_DETAIL=""
+  if [ -n "$(detect_pending_question "$(json_str_field "$INPUT" transcript_path)")" ]; then
+    DANGLING_DETAIL="awaiting_question"
+  fi
+  bash "$HOOKS_DIR/close-open-round.sh" "dangling:next_prompt" "$DANGLING_DETAIL" || true
 fi
 
 FOLD_ROUND=""
