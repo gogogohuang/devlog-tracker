@@ -76,7 +76,8 @@ suite unless `下一步` is itself a test command. Do not ask 「上次做到哪
     and wait. A matching or mismatching `工作區` does not prove the
     input arrived.
 
-`/devlog-tracker:resume` runs the same git check (steps 5.1–5.2) and
+`/devlog-tracker:resume` runs the same git check (`commands/continue.md`
+steps 5.1–5.2, not this doc's own step numbering above) and
 writes a `### 段落` on mismatch, then still waits for confirmation
 before doing `下一步`. It must not follow continue's immediate-act
 step (5.3). SessionStart still does not inject git; if the injected

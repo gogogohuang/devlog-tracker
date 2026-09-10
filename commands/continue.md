@@ -13,7 +13,8 @@ description: 讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區�
       - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
       - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
       - 非 git：一行 `非 git 工作區`
-      - detached：`HEAD detached @ a1b2c3d`
+      - detached 乾淨：`HEAD detached @ a1b2c3d`（一行）
+      - detached 有未提交：第一行 `HEAD detached @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
    2. 把編成的實際快照對照該歷史 Round 的 `#### 工作區` 正文。
       - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才編成的實際快照為準。
       - 有這一節但跟編成的實際快照不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（用上面四種格式）。

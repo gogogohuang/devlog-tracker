@@ -160,7 +160,9 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
   - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   - 非 git：一行 `非 git 工作區`
-  - detached：`HEAD detached @ a1b2c3d`
+  - detached 乾淨：`HEAD detached @ a1b2c3d`（一行）
+  - detached 有未提交：第一行 `HEAD detached @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
+  （此五種格式與 `commands/continue.md` 步驟 5.1 逐字同步，改一邊要一起改。）
   `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。接手先把 live git 編成同一格式再對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
