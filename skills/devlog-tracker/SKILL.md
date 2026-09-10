@@ -401,9 +401,9 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 
 ### 調整門檻
 
-`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，可以直接編輯
-`.devlog/.checkpoint-state` 改掉這個數字，跟 Span Mode 調整 `max_silent_ticks`
-是同一套邏輯。
+`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，用
+`/devlog-tracker:checkpoint <正整數輪數>` 調整（不要手改
+`.devlog/.checkpoint-state`，除非指令不可用）。
 
 ### `/devlog-tracker:pause` 之後
 
