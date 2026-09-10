@@ -25,6 +25,8 @@ _src="${BASH_SOURCE[0]}"
 HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$HOOKS_DIR/json-field.sh"
+# shellcheck source=detect-pending-question.sh
+. "$HOOKS_DIR/detect-pending-question.sh"
 
 INPUT="$(cat 2>/dev/null || true)"
 SOURCE="$(json_str_field "$INPUT" source)"
@@ -32,7 +34,11 @@ SOURCE="$(json_str_field "$INPUT" source)"
 case "$SOURCE" in
   startup|resume|clear|fork)
     if [ -f "$DEVLOG_DIR/.round-open" ]; then
-      bash "$HOOKS_DIR/close-open-round.sh" "dangling:session_start" || true
+      DANGLING_DETAIL=""
+      if [ -n "$(detect_pending_question "$(json_str_field "$INPUT" transcript_path)")" ]; then
+        DANGLING_DETAIL="awaiting_question"
+      fi
+      bash "$HOOKS_DIR/close-open-round.sh" "dangling:session_start" "$DANGLING_DETAIL" || true
     fi
     ;;
 esac

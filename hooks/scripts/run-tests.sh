@@ -4,7 +4,7 @@ set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FAIL=0
 shopt -s nullglob
-for t in "$DIR"/test-*.sh; do
+for t in "$DIR"/tests/test-*.sh; do
   echo "=== $(basename "$t") ==="
   if ! bash "$t"; then
     FAIL=1

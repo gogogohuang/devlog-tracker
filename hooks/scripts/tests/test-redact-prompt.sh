@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$SCRIPT_DIR/redact-prompt.sh"
 FAIL=0
 check() {

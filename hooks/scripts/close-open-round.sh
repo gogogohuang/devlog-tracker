@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 # Stamp the open Round as INTERRUPTED. Always exit 0 (fail-open).
-# Usage: close-open-round.sh <reason>
+# Usage: close-open-round.sh <reason> [detail]
+# The reason is written as a bracketed tag under Status (`[reason: ...]`) so
+# it reads as internal debug metadata, not a broken/extra Status value — and
+# stays visible even through a Markdown renderer (unlike an HTML comment,
+# which a renderer would silently drop, losing the debug trail).
+# detail (optional): "awaiting_question" makes the stub Summary/Handoff name
+# the likely cause (interrupted while an AskUserQuestion answer was pending)
+# instead of the generic "沒有正常收尾" — caller decides via
+# detect-pending-question.sh; empty/unknown detail falls back to the generic
+# stub, same as before.
 # Silent on stdout — SessionStart injects stdout as additionalContext.
 set -uo pipefail
 
 REASON="${1:-unknown}"
+DETAIL="${2:-}"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
@@ -52,7 +62,15 @@ if [ -f "$TURN_MARKER" ]; then
 fi
 
 TMP="$DEVLOG_FILE.tmp"
-awk -v want="$OPEN_ROUND" -v reason="$REASON" -v recovered="$RECOVERED" '
+awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="$RECOVERED" '
+  function summary_stub() {
+    if (detail == "awaiting_question") return "這輪在等待使用者回答 AskUserQuestion 時結束，還沒收到答案。"
+    return "這輪意外中斷。"
+  }
+  function handoff_stub() {
+    if (detail == "awaiting_question") return "Claude 提了問題還在等回答，session 就先結束了；不是中途出錯，只是還沒收到答案。需要的話重新確認一次問題再繼續。"
+    return "這輪沒有正常收尾。"
+  }
   /^[ \t]*```/ { fence = !fence }
   !fence && /^## Round / { last_start = NR }
   { lines[NR] = $0; infence[NR] = fence; n = NR }
@@ -83,18 +101,18 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v recovered="$RECOVERED" '
         saw_status = 1
         if (!has_s) {
           print "### Summary"
-          print "這輪意外中斷。"
+          print summary_stub()
           print ""
         }
         if (!has_h) {
           print "### Handoff"
           print "#### 現況"
-          print "這輪沒有正常收尾。"
+          print handoff_stub()
           print ""
         }
         print "### Status"
         print "INTERRUPTED"
-        print reason
+        print "[reason: " reason "]"
         skip_val = 1
         continue
       }
@@ -103,18 +121,18 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v recovered="$RECOVERED" '
     if (!saw_status) {
       if (!has_s) {
         print "### Summary"
-        print "這輪意外中斷。"
+        print summary_stub()
         print ""
       }
       if (!has_h) {
         print "### Handoff"
         print "#### 現況"
-        print "這輪沒有正常收尾。"
+        print handoff_stub()
         print ""
       }
       print "### Status"
       print "INTERRUPTED"
-      print reason
+      print "[reason: " reason "]"
     }
   }
 ' "$DEVLOG_FILE" > "$TMP" 2>/dev/null
