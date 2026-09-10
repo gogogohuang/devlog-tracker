@@ -216,6 +216,82 @@ printf '{"last_change_epoch": 1, "max_silent_seconds": 900}\n' > "$DEVLOG_DIR/.s
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "segment-state missing last_seen_cksum key -> allowed" 0 $?
 
+# --- Scenario 15: identity match skips cksum but still blocks when expired --
+# round-start may have rewritten the file; re-seed so cksum matches identity.
+printf 'seed\n' > "$DEVLOG_DIR/devlog.md"
+SEED_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+
+file_identity() {
+  local f="$1" mt sz
+  if mt="$(stat -f '%m' "$f" 2>/dev/null)" && sz="$(stat -f '%z' "$f" 2>/dev/null)"; then
+    printf '%s %s\n' "$mt" "$sz"
+    return 0
+  fi
+  if mt="$(stat -c '%Y' "$f" 2>/dev/null)" && sz="$(stat -c '%s' "$f" 2>/dev/null)"; then
+    printf '%s %s\n' "$mt" "$sz"
+    return 0
+  fi
+  return 1
+}
+
+ID_LINE="$(file_identity "$DEVLOG_DIR/devlog.md")"
+ID_MT="${ID_LINE%% *}"
+ID_SZ="${ID_LINE#* }"
+printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "last_seen_mtime": "%s", "last_seen_size": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
+  "$EXPIRED" "$SEED_CKSUM" "$ID_MT" "$ID_SZ" > "$DEVLOG_DIR/.segment-state"
+
+SPY="$TMP_ROOT/spybin"
+mkdir -p "$SPY"
+REAL_CKSUM="$(command -v cksum)"
+rm -f "$TMP_ROOT/cksum_count"
+cat > "$SPY/cksum" <<EOF
+#!/usr/bin/env bash
+echo 1 >> "$TMP_ROOT/cksum_count"
+exec "$REAL_CKSUM" "\$@"
+EOF
+chmod +x "$SPY/cksum"
+printf '%s' "$BASH_PAYLOAD" | PATH="$SPY:$PATH" bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "identity match + expired -> still blocked" 2 $?
+if [ ! -f "$TMP_ROOT/cksum_count" ]; then
+  echo "PASS: identity match skipped cksum"
+else
+  echo "FAIL: cksum was invoked despite matching identity"
+  FAIL=1
+fi
+
+# --- Scenario 16: identity mismatch forces cksum and clears silence ---------
+printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "last_seen_mtime": "%s", "last_seen_size": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
+  "$EXPIRED" "$SEED_CKSUM" "$ID_MT" "$ID_SZ" > "$DEVLOG_DIR/.segment-state"
+printf 'x' >> "$DEVLOG_DIR/devlog.md"
+NEW_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mtime/size change -> allowed (re-hash)" 0 $?
+SEEN_MT="$(grep -o '"last_seen_mtime"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_mtime"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+SEEN_SZ="$(grep -o '"last_seen_size"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_size"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+SEEN_SUM="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
+ID_LINE2="$(file_identity "$DEVLOG_DIR/devlog.md")"
+ID_MT2="${ID_LINE2%% *}"
+ID_SZ2="${ID_LINE2#* }"
+if [ "$SEEN_MT" = "$ID_MT2" ] && [ "$SEEN_SZ" = "$ID_SZ2" ] && [ "$SEEN_SUM" = "$NEW_CKSUM" ]; then
+  echo "PASS: identity mismatch refreshed cksum + identity fields"
+else
+  echo "FAIL: expected mtime=$ID_MT2 size=$ID_SZ2 cksum=$NEW_CKSUM, got mtime=$SEEN_MT size=$SEEN_SZ cksum=$SEEN_SUM"
+  FAIL=1
+fi
+
+# --- Scenario 17: missing identity fields fall through to cksum -------------
+printf 'seed\n' > "$DEVLOG_DIR/devlog.md"
+SEED_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
+  "$EXPIRED" "$SEED_CKSUM" > "$DEVLOG_DIR/.segment-state"
+printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "missing identity fields + expired -> still blocked via cksum" 2 $?
+
+printf '{"last_change_epoch": %s, "last_seen_cksum": "stale-sum", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
+  "$EXPIRED" > "$DEVLOG_DIR/.segment-state"
+printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "missing identity + hash change -> allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

@@ -61,6 +61,7 @@ still edit `max_silent_seconds` directly in a pinch, same as
 |---|---|
 | `last_change_epoch` | Unix seconds. `round-start.sh` sets this to now at the start of every round. `segment-watch.sh` sets it to now whenever `devlog.md`'s cksum differs from `last_seen_cksum`. |
 | `last_seen_cksum` | Last observed `cksum` of `devlog.md` (or `MISSING` if the file is absent). Used only to detect a change; not a second copy of `.turn-start`. |
+| `last_seen_mtime` / `last_seen_size` | Optional cheap identity. When both match the live file, PreToolUse may skip re-running `cksum` and reuse `last_seen_cksum`. Missing keys fall through to a full `cksum`. |
 | `max_silent_seconds` | Default `600` (10 minutes). No enforced range. |
 
 ### Adjusting the threshold

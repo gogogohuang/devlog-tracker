@@ -241,7 +241,27 @@ if [ -f "$SEGMENT_FILE" ]; then
         if [ -n "$SEG_CUR" ]; then
           json_int_set "$SEGMENT_FILE" last_change_epoch "$SEG_NOW"
           json_str_set "$SEGMENT_FILE" last_seen_cksum "$SEG_CUR"
-          if [ -n "$SESSION_ID" ]; then
+          SEG_MT=""; SEG_SZ=""
+          if [ -f "$DEVLOG_FILE" ]; then
+            if SEG_ID="$(stat -f '%m %z' "$DEVLOG_FILE" 2>/dev/null || stat -c '%Y %s' "$DEVLOG_FILE" 2>/dev/null || true)"; then
+              SEG_MT="${SEG_ID%% *}"
+              SEG_SZ="${SEG_ID#* }"
+            fi
+          fi
+          if [ -n "$SEG_MT" ] && [ -n "$SEG_SZ" ]; then
+            if ! grep -q '"last_seen_mtime"' "$SEGMENT_FILE" 2>/dev/null; then
+              SEG_SID="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
+              if [ -n "$SESSION_ID" ]; then SEG_SID="$SESSION_ID"; fi
+              printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "last_seen_mtime": "%s", "last_seen_size": "%s", "max_silent_seconds": %s, "session_id": "%s"}\n' \
+                "$SEG_NOW" "$SEG_CUR" "$SEG_MT" "$SEG_SZ" "$SEG_MAX" "${SEG_SID}" > "$SEGMENT_FILE" 2>/dev/null || true
+            else
+              json_str_set "$SEGMENT_FILE" last_seen_mtime "$SEG_MT"
+              json_str_set "$SEGMENT_FILE" last_seen_size "$SEG_SZ"
+              if [ -n "$SESSION_ID" ]; then
+                json_str_set "$SEGMENT_FILE" session_id "$SESSION_ID"
+              fi
+            fi
+          elif [ -n "$SESSION_ID" ]; then
             json_str_set "$SEGMENT_FILE" session_id "$SESSION_ID"
             SEG_SESSION="$(json_str_get "$SEGMENT_FILE" session_id)"
             if [ "$SEG_SESSION" != "$SESSION_ID" ]; then
