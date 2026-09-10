@@ -1,5 +1,8 @@
 # Batch version 0.5.0 Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** After all thirteen optimization feature plans are on the branch, bump the plugin from `0.4.0` to **`0.5.0` once**.

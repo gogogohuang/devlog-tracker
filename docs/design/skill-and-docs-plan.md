@@ -1,5 +1,8 @@
 # Skill frontmatter and docs-drift Implementation Plan
 
+> **HISTORICAL.** Part of the 0.4→0.5 batch (`optimization-plans.md`). Do not re-execute.
+
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the skill YAML path and over-broad triggers, and catch two docs lines that 0.4.0 `/continue` left stale.
