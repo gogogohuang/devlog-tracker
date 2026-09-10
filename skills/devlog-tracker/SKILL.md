@@ -97,14 +97,14 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 如果 hook 在 startup / resume / fork 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些
 環境問題沒跑），Claude 仍應主動：使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次
 `.devlog/devlog.md` 最後幾輪。最後一輪 `DONE`：只對進度，不核對、不開工。否則依
-`commands/continue.md` 步驟 5 核對後再接手（三道 git 指令；有快照但不符才先寫 `### 段落`，沒有快照直接以實際狀態為準）。
+`commands/continue.md` 步驟 5 核對後再接手（步驟 5.1 編成同一格式再對；有快照但不符才先寫 `### 段落`，沒有快照直接以實際狀態為準）。
 這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有說 continue，就不要讀檔。
 
 ## 接續：`/devlog-tracker:continue`
 
 `/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
 「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的 `#### 工作區`
-（跑步驟 5.1 的三道 git 指令），再依「下一步」開工。有快照但不符才先寫 `### 段落`；
+（跑步驟 5.1，編成同一格式再對），再依「下一步」開工。有快照但不符才先寫 `### 段落`；
 沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
@@ -156,12 +156,12 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 - Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步）。沒發生的整節省略，不要寫「無」。
   `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略。
   `下一步` 要具體到下一輪打開就能做，寫「繼續完成」不算完成。
-- **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
+- **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
   - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
   - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   - 非 git：一行 `非 git 工作區`
   - detached：`HEAD detached @ a1b2c3d`
-  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。接手先對 live git 核對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
+  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。接手先把 live git 編成同一格式再對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；

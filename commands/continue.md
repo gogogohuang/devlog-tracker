@@ -9,10 +9,14 @@ description: 讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區�
 3. 讀最近的 Round（不夠再往前讀；有 `## Checkpoint` 就一併看最後一個）。不要讀 `devlog.archive.md` 或 `devlog.<name>.md`，除非 Handoff 下一步明確指向它們。
 4. 依**最後一個歷史 Round**（不是這一輪 continue 自己的 skeleton）的 Status 行動。`DONE`：告訴使用者上一題已經結束，等新需求。不要核對、不要自己找下一件工作。
 5. `IN_PROGRESS`、`INTERRUPTED`、`BLOCKED`：先核對，再行動。不要先問「上次做到哪」。不要改歷史 Round。
-   1. 跑與寫「工作區」相同的指令：`git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`。不是 git repo 就當實際狀態為 `非 git 工作區`。不要重跑測試套件，除非「下一步」本身就是跑測試。
-   2. 對照該歷史 Round 的 `#### 工作區`（分支、短 HEAD、未提交清單或「工作樹乾淨」）。
-      - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才跑出來的實際狀態為準。
-      - 有這一節但跟實際不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（分支／HEAD／髒檔）。
+   1. 跑與寫「工作區」相同的指令，把輸出編成同一格式（與 `skills/devlog-tracker/SKILL.md` `#### 工作區` 相同）：`git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`。`abbrev-ref` 為 `HEAD` 時用 detached 格式。不是 git repo 就當實際狀態為 `非 git 工作區`。不要重跑測試套件，除非「下一步」本身就是跑測試。格式：
+      - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
+      - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
+      - 非 git：一行 `非 git 工作區`
+      - detached：`HEAD detached @ a1b2c3d`
+   2. 把編成的實際快照對照該歷史 Round 的 `#### 工作區` 正文。
+      - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才編成的實際快照為準。
+      - 有這一節但跟編成的實際快照不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（用上面四種格式）。
       - 有這一節且相符：不用寫 `### 段落`。
    3. 然後依**實際工作樹**行動（不要照 Handoff「工作區」或「現況」的字面當事實）：
       - `IN_PROGRESS`／`INTERRUPTED`：做 Handoff「下一步」（沒有就依「現況」與實際工作樹推出並做）。

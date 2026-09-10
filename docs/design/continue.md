@@ -50,23 +50,22 @@ pick up old work. Only continue (or start, which only summarises).
 ## Verify before acting
 
 Handoff `#### 工作區` is a claim. It becomes a fact only after this
-turn's command output matches it (or after a mismatch is recorded).
+turn's encoded snapshot matches it (or after a mismatch is recorded).
 
 Run the same commands used to *write* 工作區 — the exact commands and
 output format are canonical in `skills/devlog-tracker/SKILL.md`
 (`#### 工作區`) and mirrored verbatim in `commands/continue.md` step
-5.1, not respelled here. Not a git repo → treat live state as
-`非 git 工作區`. Do not re-run the test suite unless `下一步` is itself a
-test command. Do not ask 「上次做到哪」.
-
-Compare to that historical Round's `#### 工作區` (branch, short HEAD,
-dirty list or 工作樹乾淨).
+5.1, not respelled here. Encode the live command output in those four
+formats (clean / dirty / not a git repo / detached HEAD), then compare
+that snapshot to the historical Round's `#### 工作區` body. Not a git
+repo → treat live state as `非 git 工作區`. Do not re-run the test
+suite unless `下一步` is itself a test command. Do not ask 「上次做到哪」.
 
 - **Missing subsection** (older rounds, `INTERRUPTED` stubs) → no
   snapshot, so there is no claim to compare. Do not append a `### 段落`;
-  live output is simply the fact.
+  the encoded live snapshot is simply the fact.
 - **Present but mismatched** → append a `### 段落` on *this* round
-  (claim vs live: branch / HEAD / dirty).
+  (claim vs live, in the same four formats).
 - **Present and matching** → no `### 段落` needed.
 - **Then act from the live tree**, not from the claimed `工作區` /
   `現況` wording:

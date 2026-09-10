@@ -102,8 +102,9 @@ Round numbering, timestamps, and User Input rules are unchanged.
    (clean / dirty / not a git repo / detached HEAD) are canonical in
    `skills/devlog-tracker/SKILL.md` (`#### 工作區`) — not respelled here.
    Interrupt stubs omit `工作區`. The Stop hook does not require this
-   heading. Continue / resume compare this block to live git before
-   acting on `下一步` (`docs/design/continue.md`).
+   heading. Continue / resume encode live git in those four formats,
+   then compare that snapshot to this block before acting on `下一步`
+   (`docs/design/continue.md`).
 4. **Status is only the enum.**
    - `IN_PROGRESS`: work remains and can proceed.
    - `BLOCKED`: work cannot proceed without external input.
