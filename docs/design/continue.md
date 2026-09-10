@@ -61,16 +61,23 @@ Compare to that historical Round's `#### 工作區` (branch, short HEAD,
 dirty list or 工作樹乾淨). Missing subsection (older rounds,
 `INTERRUPTED` stubs) → no snapshot; live output is the fact.
 
-- **Match** → `IN_PROGRESS` / `INTERRUPTED`: do `下一步` (or derive it
-  from 現況 + live tree if `下一步` is absent). `BLOCKED`: state the
-  missing input and wait unless verify shows it is now present.
 - **Mismatch or no snapshot** → append a `### 段落` on *this* round
-  (claim vs live: branch / HEAD / dirty). Then act from the live tree.
+  (claim vs live: branch / HEAD / dirty).
+- **Then act from the live tree**, not from the claimed `工作區` /
+  `現況` wording:
+  - `IN_PROGRESS` / `INTERRUPTED`: do `下一步` (or derive it from 現況
+    + live tree if `下一步` is absent).
+  - `BLOCKED`: whether the missing external input is now present is
+    independent of the git check. If present, proceed; else state it
+    and wait. A matching or mismatching `工作區` does not prove the
+    input arrived.
 
-`/devlog-tracker:resume` uses this same check, then still waits for
-confirmation before starting work. SessionStart still does not inject
-git; if the injected excerpt leads Claude to act on `下一步`, it must
-run this check first. `/devlog-tracker:start` only summarises; no check.
+`/devlog-tracker:resume` runs the same git check (steps 5.1–5.2) and
+writes a `### 段落` on mismatch, then still waits for confirmation
+before doing `下一步`. It must not follow continue's immediate-act
+step (5.4). SessionStart still does not inject git; if the injected
+excerpt leads Claude to act on `下一步`, it must run this check first.
+`/devlog-tracker:start` only summarises; no check.
 
 ## Files
 
