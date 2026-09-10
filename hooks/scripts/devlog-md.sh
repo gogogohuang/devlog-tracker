@@ -56,8 +56,28 @@ devlog_insert_before_summary() {
         for (i = 0; i < ni; i++) print ins[i]
         inserted = 1
       }
-      if ($0 ~ /^[ \t]*```/) fence = !fence
-      print
-    }
+    if ($0 ~ /^[ \t]*```/) fence = !fence
+    print
+  }
   ' "$file"
+}
+
+devlog_kept_index_lines() {
+  awk '
+    /^[ \t]*```/ { fence = !fence; next }
+    !fence && /^## Kept 索引/ { grab = 1; found = 1; buf = ""; next }
+    !fence && grab && /^## / { grab = 0 }
+    grab { buf = buf $0 ORS }
+    END { if (found) printf "%s", buf }
+  ' "$1"
+}
+
+devlog_strip_kept_index() {
+  awk '
+    /^[ \t]*```/ { fence = !fence }
+    !fence && /^## Kept 索引/ { grab = 1; next }
+    !fence && grab && /^## / { grab = 0 }
+    grab { next }
+    { print }
+  ' "$1" > "$2"
 }
