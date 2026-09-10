@@ -97,15 +97,10 @@ Round numbering, timestamps, and User Input rules are unchanged.
    are required for `IN_PROGRESS` and `BLOCKED`. Omit both when Status is
    `DONE` and there is nothing further to do. `下一步` must be concrete
    enough that the next turn can start from it; do not write 「繼續完成」.
-   `工作區` is the git snapshot at close, written from command output
-   (`git status --short`, `git rev-parse --abbrev-ref HEAD`,
-   `git rev-parse --short HEAD`), not from memory:
-   - clean: `main @ a1b2c3d，工作樹乾淨` (one line)
-   - dirty: first line `feat/foo @ a1b2c3d`, second line
-     `未提交：src/a.ts, hooks/foo.sh` (whole-tree uncommitted paths; need
-     not match this round's 檔案 delta)
-   - not a git repo: `非 git 工作區`
-   - detached HEAD: `HEAD detached @ a1b2c3d`
+   `工作區` is the git snapshot at close, written from command output,
+   not from memory. The exact commands and the four output formats
+   (clean / dirty / not a git repo / detached HEAD) are canonical in
+   `skills/devlog-tracker/SKILL.md` (`#### 工作區`) — not respelled here.
    Interrupt stubs omit `工作區`. The Stop hook does not require this
    heading. Continue / resume compare this block to live git before
    acting on `下一步` (`docs/design/continue.md`).

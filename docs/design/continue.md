@@ -52,17 +52,22 @@ pick up old work. Only continue (or start, which only summarises).
 Handoff `#### 工作區` is a claim. It becomes a fact only after this
 turn's command output matches it (or after a mismatch is recorded).
 
-Run the same commands used to *write* 工作區: `git status --short`,
-`git rev-parse --abbrev-ref HEAD`, `git rev-parse --short HEAD`. Not a
-git repo → treat live state as `非 git 工作區`. Do not re-run the test
-suite unless `下一步` is itself a test command. Do not ask 「上次做到哪」.
+Run the same commands used to *write* 工作區 — the exact commands and
+output format are canonical in `skills/devlog-tracker/SKILL.md`
+(`#### 工作區`) and mirrored verbatim in `commands/continue.md` step
+5.1, not respelled here. Not a git repo → treat live state as
+`非 git 工作區`. Do not re-run the test suite unless `下一步` is itself a
+test command. Do not ask 「上次做到哪」.
 
 Compare to that historical Round's `#### 工作區` (branch, short HEAD,
-dirty list or 工作樹乾淨). Missing subsection (older rounds,
-`INTERRUPTED` stubs) → no snapshot; live output is the fact.
+dirty list or 工作樹乾淨).
 
-- **Mismatch or no snapshot** → append a `### 段落` on *this* round
+- **Missing subsection** (older rounds, `INTERRUPTED` stubs) → no
+  snapshot, so there is no claim to compare. Do not append a `### 段落`;
+  live output is simply the fact.
+- **Present but mismatched** → append a `### 段落` on *this* round
   (claim vs live: branch / HEAD / dirty).
+- **Present and matching** → no `### 段落` needed.
 - **Then act from the live tree**, not from the claimed `工作區` /
   `現況` wording:
   - `IN_PROGRESS` / `INTERRUPTED`: do `下一步` (or derive it from 現況
@@ -75,7 +80,7 @@ dirty list or 工作樹乾淨). Missing subsection (older rounds,
 `/devlog-tracker:resume` runs the same git check (steps 5.1–5.2) and
 writes a `### 段落` on mismatch, then still waits for confirmation
 before doing `下一步`. It must not follow continue's immediate-act
-step (5.4). SessionStart still does not inject git; if the injected
+step (5.3). SessionStart still does not inject git; if the injected
 excerpt leads Claude to act on `下一步`, it must run this check first.
 `/devlog-tracker:start` only summarises; no check.
 

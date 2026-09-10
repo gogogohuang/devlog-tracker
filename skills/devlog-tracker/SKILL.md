@@ -97,15 +97,15 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 如果 hook 在 startup / resume / fork 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些
 環境問題沒跑），Claude 仍應主動：使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次
 `.devlog/devlog.md` 最後幾輪。最後一輪 `DONE`：只對進度，不核對、不開工。否則依
-`commands/continue.md` 步驟 5 核對後再接手（三道 git 指令；不符或沒有快照先寫 `### 段落`）。
+`commands/continue.md` 步驟 5 核對後再接手（三道 git 指令；有快照但不符才先寫 `### 段落`，沒有快照直接以實際狀態為準）。
 這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有說 continue，就不要讀檔。
 
 ## 接續：`/devlog-tracker:continue`
 
 `/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
 「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的 `#### 工作區`
-（`git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`），
-再依「下一步」開工。不符或沒有快照時先寫 `### 段落`。步驟見 `commands/continue.md`。
+（跑步驟 5.1 的三道 git 指令），再依「下一步」開工。有快照但不符才先寫 `### 段落`；
+沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
 不要自動觸發。`/devlog-tracker:start` 只對進度，不開工、不核對。
@@ -442,7 +442,7 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 
 需要重啟具名主題時，用 resume 讀取 `.devlog/devlog.<name>.md` 的最後一輪與
-Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.4 立刻開工）；
+Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.3 立刻開工）；
 `IN_PROGRESS`／`INTERRUPTED`／`BLOCKED` 都要核對，提出接續後等使用者確認才做下一步。
 `DONE` 不核對、不開工。新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
 步驟見 `commands/resume.md`。

@@ -10,9 +10,11 @@ description: 讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區�
 4. 依**最後一個歷史 Round**（不是這一輪 continue 自己的 skeleton）的 Status 行動。`DONE`：告訴使用者上一題已經結束，等新需求。不要核對、不要自己找下一件工作。
 5. `IN_PROGRESS`、`INTERRUPTED`、`BLOCKED`：先核對，再行動。不要先問「上次做到哪」。不要改歷史 Round。
    1. 跑與寫「工作區」相同的指令：`git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`。不是 git repo 就當實際狀態為 `非 git 工作區`。不要重跑測試套件，除非「下一步」本身就是跑測試。
-   2. 對照該歷史 Round 的 `#### 工作區`（分支、短 HEAD、未提交清單或「工作樹乾淨」）。沒有這一節（舊 Round、`INTERRUPTED` stub）就沒有可對的快照：以剛才跑出來的實際狀態為準。
-   3. 不相符，或沒有快照：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（分支／HEAD／髒檔）。
-   4. 然後依**實際工作樹**行動（不要照 Handoff「工作區」或「現況」的字面當事實）：
+   2. 對照該歷史 Round 的 `#### 工作區`（分支、短 HEAD、未提交清單或「工作樹乾淨」）。
+      - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才跑出來的實際狀態為準。
+      - 有這一節但跟實際不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（分支／HEAD／髒檔）。
+      - 有這一節且相符：不用寫 `### 段落`。
+   3. 然後依**實際工作樹**行動（不要照 Handoff「工作區」或「現況」的字面當事實）：
       - `IN_PROGRESS`／`INTERRUPTED`：做 Handoff「下一步」（沒有就依「現況」與實際工作樹推出並做）。
       - `BLOCKED`：看缺的外部輸入本身在不在——已經出現就做下一步；仍缺就說明缺什麼並停。git 相不相符不能證明缺件已到，不要發明輸入。
 6. 這一輪若強制記錄開著，hook 已寫好 skeleton。編輯**這一個** Round 的 Summary / Handoff / Status，不要再新增一個 `## Round`。收尾時若 Status 是 `IN_PROGRESS`／`BLOCKED`，照契約寫本輪的 `#### 工作區`。
