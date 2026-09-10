@@ -116,6 +116,7 @@ make_round "$NOOPEN/.devlog/devlog.md" 2 DONE
 printf '%s\n' '{"rounds_since_checkpoint": 5, "max_silent_rounds": 20, "checkpoint_marker_count": 1}' > "$NOOPEN/.devlog/.checkpoint-state"
 printf '%s\n' '# archive' > "$NOOPEN/.devlog/devlog.archive.md"
 printf '%s\n' '# kept' > "$NOOPEN/.devlog/devlog.span-mode.md"
+printf '%s\n' 'enabled' > "$NOOPEN/.devlog/.enabled"
 OUT="$(bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed)"
 assert_eq "no open round: exit 0" 0 "$?"
 assert_eq "no open round: stdout" "CLEANED KEPT_ROUND=0" "$OUT"
@@ -124,6 +125,7 @@ grep -q '"rounds_since_checkpoint": 0' "$NOOPEN/.devlog/.checkpoint-state" && ec
 grep -q '"checkpoint_marker_count": 0' "$NOOPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint marker count reset (no-open)" || { echo "FAIL: checkpoint marker count (no-open)"; FAIL=1; }
 grep -q '^# archive' "$NOOPEN/.devlog/devlog.archive.md" && echo "PASS: archive.md untouched (no-open)" || { echo "FAIL: archive.md touched (no-open)"; FAIL=1; }
 grep -q '^# kept' "$NOOPEN/.devlog/devlog.span-mode.md" && echo "PASS: named keep file untouched (no-open)" || { echo "FAIL: named keep file touched (no-open)"; FAIL=1; }
+[ -f "$NOOPEN/.devlog/.enabled" ] && echo "PASS: .enabled untouched (no-open)" || { echo "FAIL: .enabled removed (no-open)"; FAIL=1; }
 
 # does not touch archive.md or named keep files (open-round branch)
 SIB="$TMP/siblings"
