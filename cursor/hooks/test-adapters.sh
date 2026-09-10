@@ -127,5 +127,32 @@ OUT="$(printf '{"workspace_roots":["%s"],"is_interrupt":true}' "$SUBMIT" | bash 
 [ -f "$SUBMIT/.devlog/.interrupted" ] && echo "PASS: tool interruption marked" || { echo "FAIL: interrupt marker"; FAIL=1; }
 assert_single_json "toolFailure single json" "$OUT"
 
+# --- no-jq session_id must reach segment-state via round-start ------------
+NOJQ_HOME="$TMP/nojq_home"
+mkdir -p "$NOJQ_HOME/.devlog" "$TMP/nojq_path"
+touch "$NOJQ_HOME/.devlog/.enabled"
+printf '%s\n' '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 600, "session_id": ""}' \
+  > "$NOJQ_HOME/.devlog/.segment-state"
+CLEAN_PATH="$TMP/nojq_path"
+# Resolve real binaries (zsh `command -v` may return aliases / builtins).
+for cmd in bash sh cksum date grep sed cat mkdir tr mktemp rm head awk touch \
+  pwd dirname uname ln printf sort cut wc env sleep; do
+  src=""
+  for cand in "/bin/$cmd" "/usr/bin/$cmd"; do
+    if [ -x "$cand" ]; then src="$cand"; break; fi
+  done
+  [ -n "$src" ] && ln -sf "$src" "$CLEAN_PATH/$cmd"
+done
+# Explicitly do NOT link jq.
+OUT="$(printf '{"workspace_roots":["%s"],"prompt":"nojq-hi","session_id":"cursor-nojq"}' "$NOJQ_HOME" \
+  | env PATH="$CLEAN_PATH" bash "$SCRIPT_DIR/on-submit-prompt.sh")"
+case "$OUT" in *'"continue":true'*) echo "PASS: nojq submit continues" ;; *) echo "FAIL: nojq submit [$OUT]"; FAIL=1 ;; esac
+SEG_SID="$(grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$NOJQ_HOME/.devlog/.segment-state" 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+if [ "$SEG_SID" = "cursor-nojq" ]; then
+  echo "PASS: nojq session_id stored in segment-state"
+else
+  echo "FAIL: nojq session_id missing (got [$SEG_SID])"; FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
