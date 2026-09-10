@@ -419,7 +419,7 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 
 ## 具名保存：`/devlog-tracker:keep`
 
-把一段（或全部歷史）從 `devlog.md` **搬走**成 `.devlog/devlog.<name>.md`，讓有主題的紀錄可以單獨留名。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
+掃描整份 `devlog.md`，把值得留名的主題段落一次分別**搬走**成 `.devlog/devlog.<name>.md`（也可只抽出一段，或合併成全部歷史一個檔）。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
 
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 
