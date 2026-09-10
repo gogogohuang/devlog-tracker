@@ -195,11 +195,12 @@ already specifies.
 Not part of the original three-phase roadmap. Only the first is
 worth picking off if the format starts to drift:
 
-- **One snapshot producer.** After Phase 1 the five formats live in
-  SKILL.md (authoring), `commands/continue.md` 5.1 (read-time encode),
-  and `workspace-snapshot.sh` (write-time). Highest remaining leverage:
-  `continue` / `resume` run the same helper instead of Claude
-  re-encoding by hand.
+- **One snapshot producer.** ✅ Implemented
+  (`workspace-snapshot.sh` is runnable; continue 5.1 runs it;
+  `docs/superpowers/plans/2026-09-10-one-snapshot-producer.md`).
+  SKILL.md remains the write-time format contract; the script is the
+  only machine producer. `continue` / `resume` still re-check because
+  the cache may be stale — they no longer re-encode by hand.
 - **Ghost keep-index rows.** Phase 3 never reconciles the index with
   files on disk.
 - **Archive index.** Out of scope — compact is GC, not handoff.

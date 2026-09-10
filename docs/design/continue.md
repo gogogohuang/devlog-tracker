@@ -52,20 +52,19 @@ pick up old work. Only continue (or start, which only summarises).
 Handoff `#### 工作區` is a claim. It becomes a fact only after this
 turn's encoded snapshot matches it (or after a mismatch is recorded).
 
-Run the same commands used to *write* 工作區 — the exact commands and
-output format are canonical in `skills/devlog-tracker/SKILL.md`
-(`#### 工作區`) and mirrored verbatim in `commands/continue.md` step
-5.1, not respelled here. Encode the live command output in those four
-formats (clean / dirty / not a git repo / detached HEAD), then compare
-that snapshot to the historical Round's `#### 工作區` body. Not a git
-repo → treat live state as `非 git 工作區`. Do not re-run the test
-suite unless `下一步` is itself a test command. Do not ask 「上次做到哪」.
+Run `hooks/scripts/workspace-snapshot.sh` the same way `commands/continue.md`
+step 5.1 does (`PLUGIN_ROOT` + `CLAUDE_PROJECT_DIR`). stdout is the live
+snapshot — the only machine encoding of the five formats in
+`skills/devlog-tracker/SKILL.md` (`#### 工作區`). Do not re-run git or
+re-spell those formats here. Compare stdout to the historical Round's
+`#### 工作區` body. Do not re-run the test suite unless `下一步` is
+itself a test command. Do not ask 「上次做到哪」.
 
 - **Missing subsection** (older rounds, `INTERRUPTED` stubs) → no
   snapshot, so there is no claim to compare. Do not append a `### 段落`;
   the encoded live snapshot is simply the fact.
 - **Present but mismatched** → append a `### 段落` on *this* round
-  (claim vs live, in the same four formats).
+  (claim vs live; live is the script stdout, same format set).
 - **Present and matching** → no `### 段落` needed.
 - **Then act from the live tree**, not from the claimed `工作區` /
   `現況` wording:

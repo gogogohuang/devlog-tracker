@@ -167,11 +167,11 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   - 非 git：一行 `非 git 工作區`
   - detached 乾淨：`HEAD detached @ a1b2c3d`（一行）
   - detached 有未提交：第一行 `HEAD detached @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
-  （此五種格式與 `commands/continue.md` 步驟 5.1 逐字同步，改一邊要一起改。）
+  （五種格式的機器生產者只有 `hooks/scripts/workspace-snapshot.sh`。寫入照上面手寫；Stop 用同一 function 核對。改格式時改 SKILL 與該腳本，不要在 continue.md 再抄一份。）
   `INTERRUPTED` stub 不寫這一節。`IN_PROGRESS`／`BLOCKED` 收尾時，Stop hook 會自己算一次
   即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`hooks/scripts/workspace-snapshot.sh`，
   docs/design/devlog-as-ssot-assessment.md Phase 1）——`DONE`／`INTERRUPTED` 不受影響。
-  接手先把 live git 編成同一格式再對這一節（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。
+  接手跑 `workspace-snapshot.sh`（`PLUGIN_ROOT` 同其他指令），stdout 就是要對的快照，不要手編（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。腳本找不到才退回上面五種格式手編。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
