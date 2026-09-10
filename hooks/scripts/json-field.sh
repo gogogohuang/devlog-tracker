@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # sourced by hook scripts. Do not execute.
 json_int_get() {
   local file="$1" key="$2" raw=""

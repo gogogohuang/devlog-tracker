@@ -25,7 +25,7 @@ devlog_list_round_starts "$MAIN" > "$STARTS"
 : > "$CANDIDATES"
 
 TOTAL="$(wc -l < "$STARTS" | tr -d ' ')"
-while read -r start round; do
+while read -r start _; do
   [ -n "${start:-}" ] || continue
   end="$(devlog_block_end "$MAIN" "$start")"
   status="$(devlog_round_status "$MAIN" "$start" "$end")"
