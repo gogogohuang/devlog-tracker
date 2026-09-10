@@ -59,8 +59,9 @@ subsection if no files changed.>
 
 #### 工作區
 <git snapshot at close, for the next Claude to check against the real tree.
-Required when Status is IN_PROGRESS or BLOCKED. Omit on DONE / trivial
-rounds and on INTERRUPTED stubs. See writing rule 3.>
+Required when Status is IN_PROGRESS or BLOCKED. Omit when Status is DONE
+and there is nothing further to do, and on INTERRUPTED stubs. See writing
+rule 3.>
 
 #### 現況
 <task state the next Claude should assume (how far the work got, what is
@@ -106,7 +107,8 @@ Round numbering, timestamps, and User Input rules are unchanged.
    - not a git repo: `非 git 工作區`
    - detached HEAD: `HEAD detached @ a1b2c3d`
    Interrupt stubs omit `工作區`. The Stop hook does not require this
-   heading.
+   heading. Continue / resume compare this block to live git before
+   acting on `下一步` (`docs/design/continue.md`).
 4. **Status is only the enum.**
    - `IN_PROGRESS`: work remains and can proceed.
    - `BLOCKED`: work cannot proceed without external input.

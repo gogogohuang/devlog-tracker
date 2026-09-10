@@ -1,5 +1,5 @@
 ---
-description: 讀取具名保存的 devlog，依最後一輪 Handoff 接續該段工作。
+description: 讀取具名保存的 devlog，核對最後一輪 Handoff 工作區後再接續該段工作。
 ---
 
 取得使用者提供的 `<name>`；沒有名稱時先詢問。跑：
@@ -14,7 +14,7 @@ CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/resume-devlog.sh"
 ```
 
 若回傳 `MISSING`，列出 `CANDIDATES` 讓使用者選，不要自動執行工作。
-找到檔案後，像 `/devlog-tracker:continue` 一樣讀最後一個歷史 Round：
-`IN_PROGRESS` 時依 Handoff 的「下一步」提出接續方式。等待使用者確認後才開工。
+找到檔案後，像 `/devlog-tracker:continue` 一樣讀最後一個歷史 Round，並先做同樣的工作區核對（見 `commands/continue.md` 步驟 5）。
+`IN_PROGRESS` 時依核對後的實際狀態，依 Handoff 的「下一步」提出接續方式。等待使用者確認後才開工。
 
 後續紀錄一律寫進 `.devlog/devlog.md`，不要改寫具名 keep 檔。

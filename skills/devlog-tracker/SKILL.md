@@ -28,7 +28,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 
 - 使用者下 `/devlog-tracker:start`：建立這個開關檔（見 `commands/start.md`），代表「這個專案從現在起
   要強制記錄」，同時讀一次現有 devlog 摘要目前進度（對進度，不自動開工）
-- 使用者下 `/devlog-tracker:continue`：讀現有 devlog，依最後一輪 Handoff 的下一步接著做（見
+- 使用者下 `/devlog-tracker:continue`：讀現有 devlog，核對最後一輪 Handoff「工作區」後再依下一步接著做（見
   `commands/continue.md`）。`/clear` 之後要接續，用這個，不要用 start
 - 使用者下 `/devlog-tracker:pause`：刪掉開關檔，暫停強制記錄，但完全不動歷史紀錄
 - 沒下過 `/devlog-tracker:start` 的專案：這個 plugin 裝著也不會有任何動作，不會留下 `.devlog/` 檔案
@@ -89,22 +89,24 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 `/clear` 時 hook 仍可能把殘留的開著 Round 標成 `INTERRUPTED`，但 stdout 什麼都不印。
 之後只有使用者下 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時，
-才讀 `.devlog/devlog.md` 並依 Handoff 下一步接著做（見 `commands/continue.md`）。
+才讀 `.devlog/devlog.md`，核對 Handoff「工作區」後再依下一步接著做（見 `commands/continue.md`）。
 一般新請求當成空白對話，不要先讀檔接舊工作。`/devlog-tracker:start` 只對進度，不開工。
 
 找不到 `.devlog/devlog.md` 時 hook 直接 exit 0，不輸出任何東西，不會干擾沒有用 devlog 的專案。
 
 如果 hook 在 startup / resume / fork 沒有生效（例如使用者不是用 Claude Code、或 hook 因為某些
 環境問題沒跑），Claude 仍應主動：使用者在已有 devlog.md 的專案裡提出一般開發需求時，先讀一次
-`.devlog/devlog.md` 最後幾輪再接手。這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有
+`.devlog/devlog.md` 最後幾輪，核對「工作區」後再接手。這個 fallback **不適用於 `/clear` 之後**——clear 之後沒有
 說 continue，就不要讀檔。
 
 ## 接續：`/devlog-tracker:continue`
 
 `/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
-「接續」「繼續上一題」）。讀 `devlog.md`，依最後一輪 Handoff 的下一步立刻開工。
-`DONE` 就說明上一題已結束、等新需求；`BLOCKED` 就說明缺什麼、不要發明輸入。
-步驟見 `commands/continue.md`。不要自動觸發。`/devlog-tracker:start` 只對進度，不開工。
+「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的 `#### 工作區`
+（對 `git status --short` 與 HEAD），再依「下一步」開工。步驟見 `commands/continue.md`。
+`DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED` 核對後仍缺外部輸入就停，不要發明輸入。
+SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。不要自動觸發。
+`/devlog-tracker:start` 只對進度，不開工、不核對。
 
 ## 每一輪的紀錄格式
 
@@ -127,7 +129,7 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 <新增／修改／刪除的路徑；有 commit 就寫 hash 或說明沒 commit。沒動檔就整節省略>
 
 #### 工作區
-<IN_PROGRESS／BLOCKED 必寫；DONE／瑣碎輪整節省略。收尾前跑 git 再寫，見下方格式>
+<IN_PROGRESS／BLOCKED 必寫；DONE 且沒有後續就整節省略。收尾前跑 git 再寫，見下方格式>
 
 #### 現況
 <任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有>
@@ -157,7 +159,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   - 非 git：一行 `非 git 工作區`
   - detached：`HEAD detached @ a1b2c3d`
-  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。
+  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。接手（continue／resume／fallback）先對 live git 核對這一節，再做「下一步」（見 `commands/continue.md`）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -438,7 +440,8 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 
 需要重啟具名主題時，用 resume 讀取 `.devlog/devlog.<name>.md` 的最後一輪與
-Handoff；新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
+Handoff，先做與 continue 相同的工作區核對，等使用者確認後才開工；新工作仍記錄到
+`devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。步驟見 `commands/resume.md`。
 
 ## 無條件清空：`/devlog-tracker:clean`
 
