@@ -12,7 +12,7 @@ if [ ! -f "$DEVLOG_DIR/.checkpoint-state" ]; then
     > "$DEVLOG_DIR/.checkpoint-state" || exit 1
 fi
 if [ ! -f "$DEVLOG_DIR/.segment-state" ]; then
-  printf '%s\n' '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 900, "session_id": ""}' \
+  printf '%s\n' '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 600, "session_id": ""}' \
     > "$DEVLOG_DIR/.segment-state" || exit 1
 fi
 GITIGNORE_DEVLOG=no

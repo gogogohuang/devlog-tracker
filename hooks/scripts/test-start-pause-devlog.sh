@@ -34,7 +34,7 @@ case "$OUT" in
 esac
 grep -q '"max_silent_rounds": 20' "$TMP_ROOT/.devlog/.checkpoint-state" \
   && echo "PASS: default checkpoint" || { echo "FAIL: checkpoint defaults"; FAIL=1; }
-grep -q '"max_silent_seconds": 900' "$TMP_ROOT/.devlog/.segment-state" \
+grep -q '"max_silent_seconds": 600' "$TMP_ROOT/.devlog/.segment-state" \
   && echo "PASS: default segment" || { echo "FAIL: segment defaults"; FAIL=1; }
 grep -q '"session_id": ""' "$TMP_ROOT/.devlog/.segment-state" \
   && echo "PASS: default segment session id" || { echo "FAIL: segment session id"; FAIL=1; }

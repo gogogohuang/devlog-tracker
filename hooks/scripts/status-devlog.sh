@@ -22,7 +22,7 @@ rounds="$(json_int_get "$DEVLOG_DIR/.checkpoint-state" rounds_since_checkpoint)"
 checkpoint_max="$(json_int_get "$DEVLOG_DIR/.checkpoint-state" max_silent_rounds)"
 printf 'CHECKPOINT=%s/%s\n' "${rounds:-0}" "${checkpoint_max:-20}"
 seconds="$(json_int_get "$DEVLOG_DIR/.segment-state" max_silent_seconds)"
-printf 'SEGMENT=max_silent_seconds=%s\n' "${seconds:-900}"
+printf 'SEGMENT=max_silent_seconds=%s\n' "${seconds:-600}"
 
 status="none"
 if [ -f "$DEVLOG_DIR/devlog.md" ]; then

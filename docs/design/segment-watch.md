@@ -3,9 +3,9 @@
 Round Segments stay a judgment call: Claude writes a `### 段落` when a
 meaningful stage result exists, not on a timer. Segment Watch is a
 safety valve for the remaining case — a single round that runs a long
-time with **no** `devlog.md` change. After 15 minutes of silence it
-blocks the next tool (`PreToolUse`, exit 2) until Claude appends
-something, even one line.
+time with **no** `devlog.md` change. After 10 minutes of silence
+(default; adjustable, see below) it blocks the next tool (`PreToolUse`,
+exit 2) until Claude appends something, even one line.
 
 This is not Span Mode (automated wakeups) and not Checkpoint Mode
 (cross-round summaries). Those mechanisms stay unchanged.
@@ -25,7 +25,7 @@ the last time `devlog.md`'s content hash changed.
 ## Design constraint
 
 - **Precision first.** Do not require `### 段落` headings, and do not
-  block just because the round has lasted 15 minutes. Only silence
+  block just because the round has lasted 10 minutes. Only silence
   (no hash change) trips the valve. A short round, or a long round
   that already wrote segments, is unaffected.
 - **Fail-open.** Same as every other hook in this plugin: missing
@@ -46,19 +46,62 @@ the last time `devlog.md`'s content hash changed.
 ### `.devlog/.segment-state`
 
 Created by `/devlog-tracker:start` alongside `.enabled` and
-`.checkpoint-state`. Hooks own the file (Claude may edit
-`max_silent_seconds` directly, same as `max_silent_rounds`). If the
-file already exists, start must not reset `max_silent_seconds`.
+`.checkpoint-state`. Hooks own the file; `/devlog-tracker:start` itself
+must not reset `max_silent_seconds` on an existing file. The dedicated
+`/devlog-tracker:segment-watch <time length>` command is the supported way
+to change the threshold (see "Adjusting the threshold" below); Claude may
+still edit `max_silent_seconds` directly in a pinch, same as
+`max_silent_rounds`.
 
 ```json
-{ "last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 900 }
+{ "last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 600 }
 ```
 
 | Field | Meaning |
 |---|---|
 | `last_change_epoch` | Unix seconds. `round-start.sh` sets this to now at the start of every round. `segment-watch.sh` sets it to now whenever `devlog.md`'s cksum differs from `last_seen_cksum`. |
 | `last_seen_cksum` | Last observed `cksum` of `devlog.md` (or `MISSING` if the file is absent). Used only to detect a change; not a second copy of `.turn-start`. |
-| `max_silent_seconds` | Default `900` (15 minutes). No enforced range. |
+| `max_silent_seconds` | Default `600` (10 minutes). No enforced range. |
+
+### Adjusting the threshold
+
+A dedicated command, `/devlog-tracker:segment-watch <time length>`, sets
+`max_silent_seconds` without touching anything else `/devlog-tracker:start`
+manages. `commands/segment-watch.md` tells Claude to get a time length from
+the user (asking if none was given — never guessing one), convert it to a
+positive integer number of seconds, and run:
+
+```bash
+hooks/scripts/segment-watch-set.sh <seconds>
+```
+
+`segment-watch-set.sh` behavior:
+
+- `.devlog/.enabled` missing (project never started): print `NOT_STARTED`
+  and exit 0 — no files created or changed. `commands/segment-watch.md`
+  offers to run `/devlog-tracker:start` instead of guessing a threshold
+  for a project that isn't tracking yet.
+- `$1` is not a positive integer (missing, non-digit, or `0`): exit 1 with
+  a stderr message; no files are created or changed.
+- `.segment-state` missing: create it fresh with `$1` as
+  `max_silent_seconds` (matching `start-devlog.sh`'s default shape).
+- `.segment-state` exists: patch just `max_silent_seconds` via
+  `json_int_set`, preserving `last_change_epoch` / `last_seen_cksum` /
+  `session_id`. If the existing file didn't have a matching key to patch
+  (hand-edited / malformed), rebuild it fresh from whatever fields could
+  still be read, rather than silently leaving the requested value
+  unapplied.
+
+The script always echoes `SEGMENT_MAX_SILENT_SECONDS=<n>` (the value now
+in effect), so Claude can tell the user the threshold that's active
+without a separate read of `.segment-state`.
+
+This is a one-shot setter, not a mode toggle — nothing about it is
+persisted differently from a hand-edit of `.segment-state`; it exists
+purely so Claude doesn't have to touch that file directly.
+`start-devlog.sh` itself takes no arguments and never resets an existing
+threshold; `max_silent_seconds` now has the dedicated command
+`checkpoint-mode.md`'s `max_silent_rounds` still doesn't.
 
 `/devlog-tracker:pause` deletes `.enabled` (and `.span-open`, as
 today) but leaves `.segment-state` in place so the threshold survives
@@ -104,7 +147,7 @@ problem this valve exists for.
 
 `round-start.sh` still resets `last_change_epoch` on every
 `UserPromptSubmit`, including automated ticks. A loop that wakes
-every few minutes and does little work will not trip the 15-minute
+every few minutes and does little work will not trip the 10-minute
 valve; a single long tick can.
 
 ### Interaction with Checkpoint Mode
@@ -121,7 +164,7 @@ to open or close a watch.
 
 ## Known Limitations
 
-- **No background alarm.** If Claude thinks for 15 minutes without
+- **No background alarm.** If Claude thinks for 10 minutes without
   calling a tool, the valve does not fire.
 - **Bash (and other tools) that rewrite `devlog.md` are not
   allowlisted.** Only Write/Edit on that path pass while expired.
@@ -148,8 +191,11 @@ to open or close a watch.
 | `hooks/scripts/segment-watch.sh` | New PreToolUse checker |
 | `hooks/scripts/test-segment-watch.sh` | Self-check (no `.enabled`; fresh round; expired + Bash blocks; expired + Write `devlog.md` passes; hash change then Bash passes; expired + Write other file blocks; malformed state fail-open) |
 | `hooks/hooks.json` | Register PreToolUse → `segment-watch.sh` |
-| `commands/start.md` | Create `.segment-state` if missing |
-| `skills/devlog-tracker/SKILL.md` | Document the 15-minute valve under Round Segments |
+| `commands/start.md` | Create `.segment-state` if missing (default `600`) |
+| `hooks/scripts/segment-watch-set.sh` | `/devlog-tracker:segment-watch` filesystem side: patch or create `.segment-state`'s `max_silent_seconds` |
+| `commands/segment-watch.md` | Get a time length from the user, convert to seconds, call `segment-watch-set.sh` |
+| `hooks/scripts/test-segment-watch-set.sh` | Self-check for `segment-watch-set.sh` (not started; fresh create; override preserves other fields; malformed-key rebuild; bad/zero/missing arg) |
+| `skills/devlog-tracker/SKILL.md` | Document the 10-minute valve under Round Segments |
 | `docs/design/checkpoint-mode.md` | Point Round Segments' "mechanism: none" at this valve |
 | `README.md` | Mention the mid-round silence valve |
 
