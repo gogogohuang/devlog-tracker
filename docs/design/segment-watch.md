@@ -123,8 +123,11 @@ watch" at every read site.
   1. If PreToolUse `session_id` is non-empty and differs from the stored
      id, exit 0. If PreToolUse has a non-empty `agent_id` (Claude Code
      subagent / dynamic workflow), exit 0.
-  2. Compute the current `devlog.md` cksum. If it differs from
-     `last_seen_cksum`, persist the new cksum and `last_change_epoch =
+  2. Resolve the current `devlog.md` content identity: if on-disk
+     mtime+size match `last_seen_mtime` / `last_seen_size` and
+     `last_seen_cksum` is present, reuse that cksum (skip re-hash).
+     Otherwise compute `cksum`. If it differs from `last_seen_cksum`,
+     persist the new cksum, identity fields, and `last_change_epoch =
      now`, then exit 0.
   3. If the incoming tool is `Write`, `Edit`, `StrReplace`, `Read`, or
      `Grep`, and `tool_input.file_path` (or `tool_input.path` for Grep)
@@ -170,6 +173,9 @@ to open or close a watch.
 
 ## Known Limitations
 
+- **PreToolUse may skip `cksum`** when `devlog.md` mtime+size match
+  `last_seen_mtime` / `last_seen_size`. Content changes that preserve
+  both (rare) would not reset the timer until identity drifts.
 - **No background alarm.** If Claude thinks for 10 minutes without
   calling a tool, the valve does not fire.
 - **Bash (and other tools) that rewrite `devlog.md` are not
