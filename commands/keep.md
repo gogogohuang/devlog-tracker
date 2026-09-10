@@ -74,8 +74,11 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 
 把步驟 4 驗證通過的段落，依 `from` 由小到大排序。對每一段依序跑（一段一次，不要自己搬檔，也不要一次塞多段給腳本）：
 
+先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+
 ```bash
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/keep-move.sh" \
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
+CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/keep-move.sh" \
   --from <from> --to <to> --name "<name>"
 ```
 

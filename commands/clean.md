@@ -30,7 +30,12 @@ description: 無條件清空 .devlog/devlog.md（含專案摘要與所有 Round 
 ## 3. 跑清空腳本
 
 ```bash
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/clean-devlog.sh" --confirmed
+先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
+CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/clean-devlog.sh" --confirmed
+```
 ```
 
 `--confirmed` 是必要參數，只有在使用者明確回覆「清空」之後才可以帶這個參數執行；不要在其他情況下跑這支腳本。腳本是唯一的實作來源：有沒有開著的 Round、要重編成 Round 1 還是整份刪除、重置 `.span-open` 與 checkpoint 狀態，都不要自己動手做。exit 1 時原樣顯示 stderr，不要自行重試、不要自己動手改檔案。

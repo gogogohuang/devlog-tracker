@@ -6,7 +6,12 @@ description: 調整 Segment Watch 的沉默門檻——同一輪連續多久沒�
 換算成整數秒數 `<seconds>`，跑：
 
 ```bash
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/segment-watch-set.sh" <seconds>
+先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+
+```bash
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
+CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/segment-watch-set.sh" <seconds>
+```
 ```
 
 不要自己手改 `.devlog/.segment-state`。

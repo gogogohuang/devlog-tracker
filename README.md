@@ -27,6 +27,19 @@ Claude Code 仍是主要安裝方式。若要在 Cursor workspace 使用，先�
 Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的
 hook 仍依 Cursor 支援的事件執行。
 
+Cursor 沒有 `/devlog-tracker:*` slash 指令面；hooks 裝好後，請用與 Claude commands
+相同的腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
+`DEVLOG_TRACKER_ROOT`）：
+
+```bash
+export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
+export CLAUDE_PROJECT_DIR="$(pwd)"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
+# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
+```
+
 ## 快速開始
 
 在專案裡下一次：
