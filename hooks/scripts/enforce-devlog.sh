@@ -193,6 +193,45 @@ if [ -n "$LAST_ROUND" ]; then
     exit 2
   fi
 
+  # --- Handoff subsection order check (docs/design/devlog-as-ssot-assessment.md,
+  # Phase 2). 決策 → 檔案 → 工作區 → 現況 → 下一步 is a fixed order (SKILL.md
+  # writing rule, docs/design/summary-handoff.md rule 3). Detect a present-but
+  # -reordered or duplicated recognized subsection. Unrecognized #### headings
+  # are ignored — this only tightens what SKILL.md already promises, it does
+  # not invent a new rule.
+  HANDOFF_BODY="$(section_body '^### Handoff')"
+  ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk '
+    BEGIN {
+      order["決策"] = 1; order["檔案"] = 2; order["工作區"] = 3
+      order["現況"] = 4; order["下一步"] = 5
+      last = 0; prev_name = ""
+    }
+    /^#### / {
+      name = $0
+      sub(/^#### [ \t]*/, "", name)
+      sub(/[ \t]+$/, "", name)
+      if (!(name in order)) next
+      idx = order[name]
+      if (seen[name]) { print "duplicate:" name; exit }
+      seen[name] = 1
+      if (idx < last) { print "order:" prev_name ">" name; exit }
+      last = idx
+      prev_name = name
+    }
+  ')"
+  if [ -n "$ORDER_ERR" ]; then
+    case "$ORDER_ERR" in
+      duplicate:*)
+        DUP_NAME="${ORDER_ERR#duplicate:}"
+        echo "Handoff 的「#### ${DUP_NAME}」出現超過一次。請合併成一節。" >&2
+        ;;
+      order:*)
+        echo "Handoff 小節順序錯了（應該是 決策 → 檔案 → 工作區 → 現況 → 下一步）：${ORDER_ERR#order:}" >&2
+        ;;
+    esac
+    exit 2
+  fi
+
   STATUS_VAL="$(printf '%s\n' "$LAST_ROUND" | awk '
     /^### Status/ { grab=1; val=""; next }
     grab && /^### / { grab=0 }

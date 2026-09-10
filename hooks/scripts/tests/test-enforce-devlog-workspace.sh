@@ -43,12 +43,12 @@ write_round() {
     echo "fixture"
     echo ""
     echo "### Handoff"
-    echo "#### 現況"
-    echo "fixture"
     if [ -n "$ws" ]; then
       echo "#### 工作區"
       printf '%s\n' "$ws"
     fi
+    echo "#### 現況"
+    echo "fixture"
     echo "#### 下一步"
     echo "fixture next step"
     echo ""
