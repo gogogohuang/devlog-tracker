@@ -1,20 +1,28 @@
 # Keep (named episode save)
 
-`/devlog-tracker:keep` moves a contiguous stretch of history out of
-`.devlog/devlog.md` into `.devlog/devlog.<name>.md` when that stretch is
-worth keeping under a name. One command covers two user choices:
+`/devlog-tracker:keep` scans `.devlog/devlog.md`, splits its historical
+Rounds into topic segments, and moves each segment worth keeping out
+into its own `.devlog/devlog.<name>.md`. One command run can produce
+several named files in one confirmation, one per topic.
 
-- **This episode** — Claude proposes a Round range from the file's
-  content; the user may change the endpoints.
-- **All history** — the range is every Round except the open keep turn;
-  the working file restarts at Round 1.
+- **Multiple topics** — Claude partitions every historical Round (all
+  of `devlog.md` except the open Round) into contiguous topic
+  segments, keeps only the ones worth naming, and proposes all of them
+  at once. The user can accept everything, edit or drop individual
+  segments, or fall back to one merged file.
+- **All history, one file** — an explicit escape hatch: the user asks
+  for the whole historical range as a single named file instead of a
+  topic split.
 
-The operation is always a **move**. The named file becomes the canonical
-copy of those blocks; they are deleted from `devlog.md` after the named
-file is written.
+The operation is always a **move**. Each named file becomes the
+canonical copy of the blocks it received; those blocks are deleted
+from `devlog.md` after the named file is written and verified.
 
 This is a slash command only. No new hooks. SessionStart still injects
-only `.devlog/devlog.md`.
+only `.devlog/devlog.md`. The underlying move primitive
+(`hooks/scripts/keep-move.sh`) still only knows how to move one
+contiguous range into one named file — `commands/keep.md` calls it
+once per confirmed segment.
 
 ## Motivation
 
@@ -28,6 +36,12 @@ filename derived from the content (or a name the user types), and get it
 out of the rolling working log. Compact never reads or writes
 `devlog.<name>.md` files. Keep never writes `devlog.archive.md`.
 
+A working log accumulates more than one theme between keep runs. Only
+proposing "the latest stretch" meant peeling off one topic per
+invocation and re-running the command repeatedly to clear a file that
+covers several finished threads. Scanning the whole file and proposing
+every keep-worthy topic at once does that in one confirmation.
+
 ## Design constraint
 
 Keep runs inside an ordinary interactive turn. `UserPromptSubmit` has
@@ -38,33 +52,48 @@ no open Round and no keep-turn skeleton — every `## Round` in the file
 is historical; do not treat the last Round as open for exclusion. When
 judging `## ` headings, ignore lines inside fenced code blocks (```),
 matching how the hook scripts parse. The open Round is **not** part of
-any keep range. If the file has no historical Rounds besides that
+any keep segment. If the file has no historical Rounds besides that
 skeleton, keep stops and does not create a named file.
 
-Judging "worth keeping", proposing a range, and proposing a slug are
-LLM work. They belong in `commands/keep.md`, the same way compact's
-move rules live in `commands/compact.md`. Do not add a hook that tries
-to detect a keep-worthy episode.
+Judging "worth keeping", partitioning into segments, and proposing
+slugs are LLM work. They belong in `commands/keep.md`, the same way
+compact's move rules live in `commands/compact.md`. Do not add a hook
+that tries to detect keep-worthy episodes. `keep-move.sh` stays a
+single-range primitive; looping over segments is `commands/keep.md`'s
+job, not the script's.
 
 ## Command flow
 
 1. Read `.devlog/devlog.md`. If it is missing, or the only Round is the
    open keep skeleton, tell the user there is nothing to keep. Stop.
-2. Assess whether the content (defaulting to the latest coherent episode,
-   otherwise the whole history minus the open Round) is worth a named
-   file. Signals are the same as the skill's "how detailed should this
-   round be" table, applied to the stretch: file changes, decisions that
-   affect later work, non-`DONE` / unfinished work, information that
-   would be lost if the stretch disappeared into archive. Chatter,
-   confirmations, and repeats are low value.
-3. Reply once with: the value judgment, a proposed contiguous range
-   (or all history), and a proposed filename. If value is low, lead
-   with a recommendation not to keep, and still include the range and
-   filename so the user can insist in one reply.
-4. Wait. Do not write files yet.
-5. On cancel, or on low value without an explicit insist, write nothing.
-6. On confirm (accept / edit range / edit name / all history), validate
-   the range and `<name>`, then move.
+2. Partition every historical Round (all `## Round` headings except the
+   open one) into contiguous, non-overlapping topic segments, oldest to
+   newest, covering all of the history with no gaps at this stage —
+   using the same topic-shift signal as before (`### User Input` /
+   `### Summary` changes), just applied across the whole file instead
+   of only the most recent stretch.
+3. Assess each segment with the same "how detailed should this round
+   be" signals as the skill uses: file changes, decisions that affect
+   later work, non-`DONE` / unfinished work, information that would be
+   lost if the segment disappeared into archive. A segment that is only
+   chatter, confirmations, or repeats is dropped here — it is not
+   listed and stays in `devlog.md` untouched. Segments that pass become
+   candidates.
+4. If no segment passes, tell the user there is nothing worth keeping
+   by topic. Stop; write nothing.
+5. Propose a filename for each candidate segment (see Filenames).
+   Reply once with every candidate: its Round range, a one-line topic
+   description, and its proposed filename, plus a short note on which
+   Rounds are being left behind as too thin. Then stop and wait — do
+   not write anything before the user responds.
+6. On the user's reply, apply zero or more edits to the batch (range,
+   name, or dropping a candidate — see Editing the batch), or accept a
+   full-history-as-one-file override, or cancel.
+7. On cancel, or no candidates survive the requested edits, write
+   nothing.
+8. Otherwise, validate the final set of segments (see Range and
+   Filenames), then move each one in oldest-to-newest order (see
+   Execution order and full keep).
 
 The keep turn itself still closes with `### Summary` / `### Handoff` /
 `### Status` on the leftover open Round, or Stop will block as usual.
@@ -74,49 +103,85 @@ sequenceDiagram
   participant U as User
   participant C as Claude
   participant D as devlog.md
-  participant K as devlog.name.md
+  participant K as devlog.<name>.md (one or more)
 
   U->>C: /devlog-tracker:keep
   C->>D: read
   alt missing file or no historical Rounds
     C-->>U: nothing to keep
   else has history
-    C-->>U: value, range, filename
-    U-->>C: accept / edit / all / cancel
-    alt cancel or low value without insist
-      C-->>U: no files changed
-    else confirmed
-      C->>K: write named file first
-      C->>D: delete moved blocks
-      C-->>U: path, rounds moved, rounds left
+    C->>C: partition into topic segments, drop thin ones
+    alt no segment passes
+      C-->>U: nothing worth keeping by topic
+    else at least one candidate
+      C-->>U: all candidates (range + name each) + what stays behind
+      U-->>C: accept / edit some / merge to one file / cancel
+      alt cancel or nothing left after edits
+        C-->>U: no files changed
+      else confirmed
+        loop each confirmed segment, oldest to newest
+          C->>K: write named file, verify
+          C->>D: delete moved blocks
+        end
+        C-->>U: path + rounds moved per file, rounds left in devlog.md
+      end
     end
   end
 ```
 
+## Editing the batch
+
+The confirmation reply may combine any of:
+
+- `採用` — write every proposed candidate as shown.
+- `改第 N 段範圍 <from>-<to>` — change one candidate's range.
+- `改第 N 段檔名 <name>` — change one candidate's filename.
+- `移除第 N 段` — drop that candidate; its Rounds stay in `devlog.md`,
+  untouched, available for a future keep run.
+- `全部歷史合併成一個檔 <name>` — discard the topic split entirely and
+  fall back to the pre-split behavior: every historical Round (still
+  excluding the open Round) as a single named file. This is the only
+  way to get one file covering multiple topics.
+- `取消` — write nothing.
+
+Numbering (`N`) refers to the candidate list as proposed; edits do not
+renumber other candidates. Multiple edits in one reply are applied
+before validation. Editing a range to reference a Round that isn't
+historical, isn't in the file, or belongs to the open Round is
+rejected the same way as an out-of-range single segment (see Range);
+ask again, write nothing yet.
+
 ## Range
 
-The range is a contiguous inclusive pair of existing Round numbers,
-`from`–`to`, and **never includes the open keep Round**.
+Each candidate's range is a contiguous inclusive pair of existing
+Round numbers, `from`–`to`, and **never includes the open keep Round**.
+This is unchanged from the single-segment design — what's new is that
+one keep run now validates and moves a *list* of such ranges instead
+of one.
 
-Claude proposes the latest stretch that reads as one piece of work,
-using topic shifts in `### User Input` and `### Summary`. Propose the
-full historical range only when the whole file is that one piece of
-work. The user may change `from` / `to`, or say all history (every
-Round except the open one).
+Claude's initial partition covers all historical Rounds with no gaps
+between candidates (every Round is in exactly one segment, whether or
+not that segment survives the worth-keeping filter). After the user's
+edits, the confirmed set of ranges may have gaps — Rounds inside a
+dropped or never-proposed segment simply stay in `devlog.md`. The
+confirmed ranges must not overlap each other and must not include the
+open Round.
 
-Non-contiguous picks are out of scope. A range that is inverted, names
-a Round that is not in the file, or includes the open keep Round is
-rejected; ask again, write nothing.
+A range that is inverted, names a Round that is not in the file,
+includes the open keep Round, or overlaps another confirmed segment's
+range is rejected; ask again, write nothing.
 
 Unfinished historical Rounds (`IN_PROGRESS`, `BLOCKED`, `INTERRUPTED`)
 may be moved. Do not block keep on them.
 
 ### Full keep vs episode keep
 
-**Full keep** is not a second code path. It is the case where the
-confirmed range covers every historical Round in `devlog.md`.
+**Full keep** is not a second code path. It is the case where a single
+`keep-move.sh` invocation's range covers every historical Round still
+in `devlog.md` at the time it runs (see Execution order and full keep
+for how this can happen inside a multi-segment batch).
 
-| | Episode (some historical Rounds remain) | Full (none remain except the open keep Round) |
+| | Episode (some historical Rounds remain after this move) | Full (none remain except the open keep Round) |
 |---|---|---|
 | Project summary (text before the first `## Round`) | stays in `devlog.md` | moves into the named file, after the provenance header |
 | Round numbers in `devlog.md` | unchanged (gaps are allowed) | rewrite the leftover open Round heading to `## Round 1`, keep its timestamp and body |
@@ -135,10 +200,11 @@ on a full keep.
 ### Checkpoints
 
 A `## Checkpoint` block has a declared Round span in its heading
-(e.g. `## Checkpoint（Round 10-20 摘要）`).
+(e.g. `## Checkpoint（Round 10-20 摘要）`). This applies per segment,
+independently, each time `keep-move.sh` runs:
 
-- Declared span fully inside `from`–`to` → move the block with the
-  Rounds.
+- Declared span fully inside that segment's `from`–`to` → move the
+  block with the Rounds.
 - Declared span fully outside → leave it in `devlog.md`.
 - Declared span crosses the cut → leave it in `devlog.md`. Do not copy
   it into the named file.
@@ -151,6 +217,32 @@ Full keep zeros `rounds_since_checkpoint` and does not change
 `enforce-devlog.sh` already resyncs `checkpoint_marker_count` downward
 and does not treat that as "a new checkpoint was written".
 
+## Execution order and full keep
+
+`commands/keep.md` runs `keep-move.sh` once per confirmed segment, in
+ascending Round order (the oldest confirmed segment first). Each
+invocation only knows about its own `--from`/`--to`/`--name`; it has no
+notion of "batch" and does not change.
+
+Because segments dropped as too-thin generally stay behind, most batch
+runs never reach the full-keep case. But if the confirmed segments
+happen to cover every remaining historical Round with no gaps, the
+*last* invocation in the sequence will see `moved == historical` and
+trigger `keep-move.sh`'s existing full-keep behavior — project summary
+into that file, open Round renumbered to 1 — exactly as it would for a
+single full keep. Processing oldest-to-newest means this is always the
+chronologically last segment, matching what a user would expect if
+"everything got kept." This is intentional: batching does not get a
+separate full-keep rule, it just runs the same primitive enough times
+that the primitive's own full-keep detection can fire on the final
+call.
+
+If an earlier invocation in the sequence fails (`keep-move.sh` exits
+1), stop immediately: show its stderr as-is, do not retry or hand-roll
+the move, and do not run the remaining queued segments. Report which
+segments already moved (with their file paths) and which were not
+attempted, so the user knows `devlog.md`'s exact state.
+
 ## Filenames
 
 Path: `.devlog/devlog.<name>.md`, same directory as `devlog.md` and
@@ -158,14 +250,17 @@ Path: `.devlog/devlog.<name>.md`, same directory as `devlog.md` and
 
 ### Suggested `<name>`
 
-Taken from the stretch that will move (not from leftover Rounds):
+Taken from the segment that will move (not from leftover Rounds):
 lowercase ASCII kebab-case, two to four segments, topic only. No date,
 no `round-12-18` in the filename; the range belongs in the provenance
 header.
 
 Examples: `span-mode`, `summary-handoff`.
 
-The first suggestion is always this ASCII slug. The user may replace it.
+The first suggestion is always this ASCII slug. The user may replace
+it. When a batch's initial partition happens to suggest the same slug
+for two different segments, disambiguate before showing them to the
+user the same way an on-disk collision is handled (see Collision).
 
 ### Normalizing what the user types
 
@@ -186,9 +281,12 @@ above.
 
 ### Collision
 
-Never overwrite an existing `.devlog/devlog.<name>.md`. If it exists,
-propose `devlog.<name>-2.md` (then `-3`, …) and wait for confirm or a
-different name.
+Never overwrite an existing `.devlog/devlog.<name>.md`. If it exists —
+or if another segment in the same confirmed batch already claimed that
+name — propose `devlog.<name>-2.md` (then `-3`, …) and wait for confirm
+or a different name. Check on-disk collisions and within-batch
+collisions together; a batch never produces two segments destined for
+the same path.
 
 ## Named file shape
 
@@ -208,23 +306,33 @@ order and wording. Do not rewrite Round or Checkpoint bodies.
 
 On a full keep, the project summary (if any) sits after this header and
 before the first `## Round`. `rounds` is the actual moved inclusive
-range (the open keep Round is not in it).
+range (the open keep Round is not in it). In a multi-file batch, the
+project summary can only land in the one segment that ends up
+triggering full keep (see Execution order and full keep); every other
+named file's header carries only its own range.
 
 ## Write order and failures
+
+For each confirmed segment, in order (see Execution order and full
+keep):
 
 1. Create the named file with the header plus moved blocks.
 2. Confirm that file exists and contains those Round headings.
 3. Delete the moved blocks from `devlog.md` (and apply the full-keep
    leftover heading rewrite, `.round-open` `"round"` → `1`, and
-   `.span-open` delete when they apply).
+   `.span-open` delete when they apply to this segment).
 
 Delete-first is forbidden: a crash between delete and write would drop
-the episode. If step 1 fails, stop; `devlog.md` is unchanged. If step 3
-fails after a successful write, tell the user both copies exist and do
-not retry a delete blindly.
+the episode. If step 1 fails for a segment, stop the whole batch;
+`devlog.md` is unchanged for that segment and any segments after it in
+the sequence are not attempted. If step 3 fails after a successful
+write for a segment, tell the user both copies exist for that segment
+and do not retry a delete blindly; still stop the remaining queued
+segments.
 
-Other stops with no writes: missing file, no historical Rounds, cancel,
-low value without insist, illegal range, illegal `<name>`.
+Other stops with no writes at all: missing file, no historical Rounds,
+no candidate segment worth keeping, cancel, illegal range, illegal
+`<name>`.
 
 Keep does not create `.devlog/` in a project that has no `devlog.md`.
 
@@ -232,7 +340,7 @@ Keep does not create `.devlog/` in a project that has no `devlog.md`.
 
 | | `keep` | `compact` |
 |---|---|---|
-| Purpose | name and move a themed stretch (or all history) | append old `DONE` rounds to a dump |
+| Purpose | name and move one or more themed stretches (or all history) | append old `DONE` rounds to a dump |
 | Target | `devlog.<name>.md` (one topic per file) | `devlog.archive.md` (append only) |
 | Trigger | user command, confirm first | user command, then move |
 
@@ -252,7 +360,19 @@ Keep is never auto-run.
 2. **No `.enabled` / no open Round** — When `.enabled` is absent (never
    started or paused), there is no keep-turn skeleton and `.round-open`
    is missing. Keep must not fall back to treating the last historical
-   Round as open; all Rounds in the file are eligible for the range.
+   Round as open; all Rounds in the file are eligible for partitioning.
+3. **Which segment gets full keep is a side effect of ordering** — When
+   a batch happens to cover all of history, the project summary and the
+   Round-1 renumbering land on whichever segment is chronologically
+   last, purely because segments run oldest-to-newest. There is no
+   separate rule the user can use to pick a different destination for
+   the project summary in that case.
+4. **A dropped-then-wanted segment needs a second run** — a segment the
+   partition filtered out as too thin is never offered in the batch; if
+   the user wants it kept anyway, that is a separate, later
+   `/devlog-tracker:keep` invocation (it will very likely be filtered
+   out again unless the file around it changed), not an option inside
+   this batch's edit grammar.
 
 ## Testing
 
@@ -267,7 +387,7 @@ the last Round).
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
-| `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact |
+| `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |
 | `.claude-plugin/marketplace.json` | Same description |
@@ -278,9 +398,13 @@ No hook or `hooks/hooks.json` changes.
 ## Non-goals
 
 - Copy instead of move
-- Non-contiguous Round sets
+- A single named file spanning non-contiguous Rounds (each named file
+  is still one contiguous range; a batch run achieving several files
+  is not the same thing — see Range)
 - A subdirectory for kept files
 - Auto-prompting keep at the end of a valuable episode
 - Reading or injecting kept files on SessionStart（只有明確執行 `/devlog-tracker:resume` 才讀）
 - Pulling rounds back out of `devlog.archive.md`
 - A second slash command for full keep
+- Rolling back an already-written segment if a later segment in the
+  same batch fails (see Write order and failures)
