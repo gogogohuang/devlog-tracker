@@ -50,7 +50,7 @@ awk -v move_file="$MOVE" -v moved_file="$MOVED_BLOCKS" '
   BEGIN {
     while ((getline line < move_file) > 0) move[line] = 1
   }
-  /^```/ { fence = !fence }
+  /^[ \t]*```/ { fence = !fence }
   !fence && /^## / {
     moving = (NR in move)
   }

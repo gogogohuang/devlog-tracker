@@ -2,7 +2,7 @@
 
 devlog_list_round_starts() {
   awk '
-    /^```/ { fence = !fence; next }
+    /^[ \t]*```/ { fence = !fence; next }
     !fence && /^## Round [0-9]+/ {
       round = $0
       sub(/^## Round /, "", round)
@@ -15,7 +15,7 @@ devlog_list_round_starts() {
 devlog_block_end() {
   awk -v start="$2" '
     NR < start { next }
-    /^```/ { fence = !fence }
+    /^[ \t]*```/ { fence = !fence }
     NR > start && !fence && /^## / { print NR - 1; found = 1; exit }
     END { if (!found) print NR }
   ' "$1"
@@ -24,7 +24,7 @@ devlog_block_end() {
 devlog_round_status() {
   awk -v start="$2" -v end="$3" '
     NR < start || NR > end { next }
-    /^```/ { fence = !fence; next }
+    /^[ \t]*```/ { fence = !fence; next }
     !fence && /^### Status[[:space:]]*$/ { status = 1; value = ""; next }
     !fence && /^### / && status { status = 0 }
     status && $0 !~ /^[[:space:]]*$/ { value = $0 }
@@ -35,7 +35,7 @@ devlog_round_status() {
 devlog_count_segments() {
   awk -v start="$2" -v end="$3" '
     NR < start || NR > end { next }
-    /^```/ { fence = !fence; next }
+    /^[ \t]*```/ { fence = !fence; next }
     !fence && /^### 段落 / { count++ }
     END { print count + 0 }
   ' "$1"
@@ -56,7 +56,7 @@ devlog_insert_before_summary() {
         for (i = 0; i < ni; i++) print ins[i]
         inserted = 1
       }
-      if ($0 ~ /^```/) fence = !fence
+      if ($0 ~ /^[ \t]*```/) fence = !fence
       print
     }
   ' "$file"

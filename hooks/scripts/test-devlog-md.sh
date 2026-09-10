@@ -175,6 +175,33 @@ else
   FAIL=1
 fi
 
+
+# --- indented fence must hide ## Round N from list_round_starts ----------
+cat > "$TMP_ROOT/indent.md" <<'EOF'
+## Round 1 — real
+
+### Status
+DONE
+
+    ```text
+    ## Round 99 — fake
+    ```
+
+## Round 2 — real
+
+### Status
+DONE
+EOF
+OUT="$(devlog_list_round_starts "$TMP_ROOT/indent.md")"
+echo "$OUT" | grep -q ' 1$' || { echo "FAIL: missing round 1"; FAIL=1; }
+echo "$OUT" | grep -q ' 2$' || { echo "FAIL: missing round 2"; FAIL=1; }
+if echo "$OUT" | grep -q '99'; then
+  echo "FAIL: fenced round 99 counted"
+  FAIL=1
+else
+  echo "PASS: indented fence hides Round 99"
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

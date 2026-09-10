@@ -74,7 +74,7 @@ FULL=0
 FIRST_MOVED="$(awk 'NR == 1 { print $1 }' "$MOVE_ROUNDS")"
 
 awk '
-  /^```/ { fence = !fence }
+  /^[ \t]*```/ { fence = !fence }
   !fence && /^## / { print NR "\t" $0 }
 ' "$MAIN" > "$H2"
 while IFS="$(printf '\t')" read -r start heading; do
@@ -99,7 +99,7 @@ KEPT_AT="$(date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
     "$FROM" "$TO" "$KEPT_AT"
   awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" '
     BEGIN { while ((getline n < selected) > 0) move[n] = 1 }
-    /^```/ { fence = !fence }
+    /^[ \t]*```/ { fence = !fence }
     !fence && /^## / { moving = (NR in move) }
     full && NR < first_round { print; next }
     moving { print }
@@ -113,7 +113,7 @@ done < "$MOVE_ROUNDS"
 
 awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v open="$OPEN" '
   BEGIN { while ((getline n < selected) > 0) move[n] = 1 }
-  /^```/ { fence = !fence }
+  /^[ \t]*```/ { fence = !fence }
   !fence && /^## / { moving = (NR in move) }
   full && NR < first_round { next }
   moving { next }
