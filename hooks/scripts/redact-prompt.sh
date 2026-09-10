@@ -9,8 +9,11 @@ redact_prompt() {
   ' | sed -E \
     -e 's/sk-ant-api03-[A-Za-z0-9_-]+/（已遮罩）/g' \
     -e 's/sk-ant-[A-Za-z0-9_-]{20,}/（已遮罩）/g' \
+    -e 's/sk-[A-Za-z0-9]{20,}/（已遮罩）/g' \
     -e 's/ghp_[A-Za-z0-9]{20,}/（已遮罩）/g' \
     -e 's/github_pat_[A-Za-z0-9_]{20,}/（已遮罩）/g' \
     -e 's/xox[baprs]-[A-Za-z0-9-]{10,}/（已遮罩）/g' \
-    -e 's/AKIA[A-Z0-9]{16}/（已遮罩）/g'
+    -e 's/AKIA[A-Z0-9]{16}/（已遮罩）/g' \
+    -e 's/Bearer [A-Za-z0-9._+=/-]{20,}/（已遮罩）/g' \
+    -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/（已遮罩）/g'
 }
