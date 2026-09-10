@@ -126,8 +126,11 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 #### 檔案
 <新增／修改／刪除的路徑；有 commit 就寫 hash 或說明沒 commit。沒動檔就整節省略>
 
+#### 工作區
+<IN_PROGRESS／BLOCKED 必寫；DONE／瑣碎輪整節省略。收尾前跑 git 再寫，見下方格式>
+
 #### 現況
-<工作區現在的實際狀態，讓下一輪不用重探。幾乎每輪都該有>
+<任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有>
 
 #### 下一步
 <下一輪第一件具體要做的事（路徑、指令、要載入的 skill）。
@@ -146,9 +149,15 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   log 或程式碼）時，可以留原文最相關的部分、把明顯的雜訊留在原處摘要帶過，怎麼拿捏由
   Claude 自己判斷，不用每次都整段複製。
 - **兩個讀者拆開：** `Summary` 只給人掃；`Handoff` 只給下一輪 Claude 接手。同一件事不要兩邊複述。
-- Handoff 四個小節順序固定（決策 → 檔案 → 現況 → 下一步）。沒發生的整節省略，不要寫「無」。
-  `現況` 幾乎每輪都該有。`下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫，且要具體到下一輪打開就能做，
-  不要寫「繼續完成」。
+- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步）。沒發生的整節省略，不要寫「無」。
+  `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略。
+  `下一步` 要具體到下一輪打開就能做，寫「繼續完成」不算完成。
+- **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
+  - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
+  - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
+  - 非 git：一行 `非 git 工作區`
+  - detached：`HEAD detached @ a1b2c3d`
+  `INTERRUPTED` stub 不寫這一節。Hook 不檢查這一節在不在。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -177,7 +186,7 @@ Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Han
 判斷測試：**如果把這一輪從 devlog 刪掉，之後光讀檔案接續工作，會不會漏掉重要資訊？**
 會漏掉就不瑣碎，要完整寫；不會漏掉（純確認、閒聊、使用者只回「好」「謝謝」、沒有產生任何
 實質變化或懸而未決的事）就是瑣碎，但**還是要有這個 Round 區塊**，只是 Summary 一句話、
-Handoff 只留「現況」一句，Status 多半 `DONE`。兩個標題仍然都要有。
+Handoff 只留「現況」一句（沒有「工作區」），Status 多半 `DONE`。兩個標題仍然都要有。
 
 具體訊號：
 
@@ -225,7 +234,7 @@ Handoff 只留「現況」一句，Status 多半 `DONE`。兩個標題仍然都�
 DONE
 `````
 
-這個範例是 DONE 且沒有後續，所以沒有 `#### 下一步` 標題；只有 IN_PROGRESS／BLOCKED 才寫這個小節。
+這個範例是 DONE 且沒有後續，所以沒有 `#### 工作區` 與 `#### 下一步`；這兩節只有 IN_PROGRESS／BLOCKED 才寫。
 
 **什麼時候該寫一個段落**：跟判斷 `Status: IN_PROGRESS` 用的同一套標準——「有意義的
 階段性結果」，不是照時間或工具呼叫次數機械觸發。短的、沒什麼階段可言的一輪，
@@ -355,8 +364,8 @@ devlog.md 完全不用動。一旦累積到門檻，Stop hook 會退回正常模
 
 整個 Ask 真的做完時：**開一個新的 Round**（不要回頭改寫當初開 span 那個
 Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」；Summary 用 2–4 句
-給人看這段自動化的結論；Handoff 依四個小節總結整段期間做了什麼（決策／檔案／現況／
-下一步）；Status 正常寫 `DONE`／`IN_PROGRESS`／`BLOCKED`；然後刪掉 `.devlog/.span-open`。
+給人看這段自動化的結論；Handoff 依小節總結整段期間做了什麼（決策／檔案／工作區／現況／
+下一步；`DONE` 省略工作區與下一步）；Status 正常寫 `DONE`／`IN_PROGRESS`／`BLOCKED`；然後刪掉 `.devlog/.span-open`。
 
 ### 已知限制：分辨不出「這是自動續接還是真人插話」
 

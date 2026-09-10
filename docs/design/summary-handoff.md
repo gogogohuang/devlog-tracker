@@ -30,7 +30,7 @@ The two audiences need different information:
 | Reader | Needs | Does not need |
 |---|---|---|
 | Human | Conclusion, stuck-or-not | Paths, hashes, skill names, stepwise commands |
-| Next Claude | Decisions, files, workspace state, next concrete action | Prose restating the conclusion |
+| Next Claude | Decisions, this-round files, git snapshot, task state, next concrete action | Prose restating the conclusion |
 
 ## Round format
 
@@ -57,9 +57,15 @@ if no choice was made.>
 subject). If files changed but were not committed, say that. Omit the whole
 subsection if no files changed.>
 
+#### 工作區
+<git snapshot at close, for the next Claude to check against the real tree.
+Required when Status is IN_PROGRESS or BLOCKED. Omit on DONE / trivial
+rounds and on INTERRUPTED stubs. See writing rule 3.>
+
 #### 現況
-<the actual workspace / task state the next Claude should assume. Almost
-every round should have this.>
+<task state the next Claude should assume (how far the work got, what is
+stuck). Git snapshot belongs in 工作區, not here. Almost every round
+should have this.>
 
 #### 下一步
 <the first concrete action of the next turn, specific enough to start
@@ -84,11 +90,23 @@ Round numbering, timestamps, and User Input rules are unchanged.
 2. **Summary is 2–4 sentences.** Conclusion and blockers only. Forbidden
    in Summary: file paths, commit hashes, skill names, stepwise commands.
 3. **Handoff subsections are ordered and optional-by-absence.** Order is
-   always 決策 → 檔案 → 現況 → 下一步. A subsection that did not occur is
-   omitted entirely — do not write a heading whose body is 「無」.
-   `現況` should be present on almost every round. `下一步` is required
-   for `IN_PROGRESS` and `BLOCKED`, and must be concrete enough that the
-   next turn can start from it; do not write 「繼續完成」.
+   always 決策 → 檔案 → 工作區 → 現況 → 下一步. A subsection that did not
+   occur is omitted entirely — do not write a heading whose body is 「無」.
+   `現況` should be present on almost every round. `工作區` and `下一步`
+   are required for `IN_PROGRESS` and `BLOCKED`. Omit both when Status is
+   `DONE` and there is nothing further to do. `下一步` must be concrete
+   enough that the next turn can start from it; do not write 「繼續完成」.
+   `工作區` is the git snapshot at close, written from command output
+   (`git status --short`, `git rev-parse --abbrev-ref HEAD`,
+   `git rev-parse --short HEAD`), not from memory:
+   - clean: `main @ a1b2c3d，工作樹乾淨` (one line)
+   - dirty: first line `feat/foo @ a1b2c3d`, second line
+     `未提交：src/a.ts, hooks/foo.sh` (whole-tree uncommitted paths; need
+     not match this round's 檔案 delta)
+   - not a git repo: `非 git 工作區`
+   - detached HEAD: `HEAD detached @ a1b2c3d`
+   Interrupt stubs omit `工作區`. The Stop hook does not require this
+   heading.
 4. **Status is only the enum.**
    - `IN_PROGRESS`: work remains and can proceed.
    - `BLOCKED`: work cannot proceed without external input.
@@ -99,8 +117,8 @@ Round numbering, timestamps, and User Input rules are unchanged.
      Summary/Handoff quality checks.
    The former "接下來要做什麼" sentence no longer belongs under Status.
 5. **Trivial rounds still get a full Round block.** One-sentence Summary;
-   Handoff keeps only `現況` (one sentence); Status is usually `DONE`.
-   Both `### Summary` and `### Handoff` headings are still required.
+   Handoff keeps only `現況` (one sentence, no `工作區`); Status is usually
+   `DONE`. Both `### Summary` and `### Handoff` headings are still required.
 6. **Handoff describes what already happened**, except `下一步`, which is
    the only place future tense is allowed.
 
@@ -142,8 +160,9 @@ add the missing heading(s) to that last Round.
 Details:
 
 - **Presence only, not quality.** The hook does not check that Summary is
-  2–4 sentences, that Handoff has the four subsections, or that bodies are
-  non-empty. Same trust level as Checkpoint's `^## Checkpoint` marker.
+  2–4 sentences, that Handoff has the five subsections, that `工作區`
+  matches git, or that bodies are non-empty. Same trust level as Checkpoint's
+  `^## Checkpoint` marker.
 - **Last Round is the unit.** A turn that only appends a Checkpoint, or a
   Span budget-expiry one-liner, passes as long as the last Round already
   has both headings.
@@ -179,7 +198,8 @@ not off `### Response`.
 - **Presence plus a light structure check.** Headings must exist, Summary
   and Handoff bodies must contain a non-whitespace line, Status must be
   one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`, and
-  `IN_PROGRESS` / `BLOCKED` require a non-empty `#### 下一步`. Prose
+  `IN_PROGRESS` / `BLOCKED` require a non-empty `#### 下一步`. `#### 工作區`
+  is an authoring contract only; the hook does not require it. Prose
   quality is still on Claude.
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
@@ -195,6 +215,6 @@ not off `### Response`.
 ## Out of scope
 
 - Rewriting or migrating historical Rounds that still use `### Response`.
-- Hook checks for `#### 決策` / `#### 檔案` / `#### 現況`, or scoring
-  Summary prose.
+- Hook checks for `#### 決策` / `#### 檔案` / `#### 工作區` / `#### 現況`,
+  or scoring Summary prose.
 - Changing compact's retain rules.

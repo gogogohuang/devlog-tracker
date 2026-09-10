@@ -87,7 +87,7 @@ sequenceDiagram
   end
 ```
 
-每一輪固定四塊：`User Input`（貼近原話，常見 token 會遮罩）、`Summary`（給人掃）、`Handoff`（給下一輪 Claude：決策／檔案／現況／下一步）、`Status`（`DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`）。Stop 會確認標題底下有內容、Status 是這四個值之一，以及進行中／卡住時有「下一步」。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
+每一輪固定四塊：`User Input`（貼近原話，常見 token 會遮罩）、`Summary`（給人掃）、`Handoff`（給下一輪 Claude：決策／檔案／工作區／現況／下一步）、`Status`（`DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`）。`工作區` 是收尾時的 git 快照（進行中／卡住必寫）；Stop 會確認標題底下有內容、Status 是這四個值之一，以及進行中／卡住時有「下一步」，不檢查「工作區」。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md) 和 SKILL.md。
 
 ## Hook 會自動做的事
 
