@@ -87,7 +87,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 自動注入時：
 
-1. 腳本讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
+1. 腳本讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）、最後一個 `## Kept 索引`（若有；不是具名檔內容），加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
 2. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
 3. Claude 收到這段 context 後，開場就已經知道目前進度
 
@@ -448,6 +448,11 @@ span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` �
 ## 具名保存：`/devlog-tracker:keep`
 
 掃描整份 `devlog.md`，把值得留名的主題段落一次分別**搬走**成 `.devlog/devlog.<name>.md`（也可只抽出一段，或合併成全部歷史一個檔）。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
+
+每次搬走都會在 `devlog.md` 尾端留一個 `## Kept 索引` 區塊（自動重建，永遠只有一份），
+每個具名檔一行：`devlog.<name>.md`、搬走的 Round 範圍、`kept_at` 時間戳。SessionStart
+注入的接手摘要會帶上這個索引（不是具名檔的內容），讓「哪個主題被搬去哪個檔」不用翻完整份
+`devlog.md` 或憑印象猜檔名（`docs/design/devlog-as-ssot-assessment.md` Phase 3）。
 
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 

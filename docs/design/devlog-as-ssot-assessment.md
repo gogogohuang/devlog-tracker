@@ -11,8 +11,8 @@ SKILL.md's 核心原則 already scopes the claim that way.
 
 ## Review (2026-09-10)
 
-Re-evaluated against the three implementation plans. Phases 1 and 2
-have landed. Phase 3 (Kept 索引) is still `- [ ]`:
+Re-evaluated against the three implementation plans. Phases 1–3 have
+landed:
 
 - `docs/superpowers/plans/2026-09-10-devlog-ssot-phase1-workspace-verify.md`
 - `docs/superpowers/plans/2026-09-10-devlog-ssot-phase2-handoff-order.md`
@@ -61,7 +61,7 @@ run, because the tree can change after close.
 |---|---|---|---|
 | 1. Machine-verify `#### 工作區` at Stop | ✅ in HEAD | Write-time honesty of the git cache for `IN_PROGRESS` / `BLOCKED` | SSOT for current git state (#1); check on `DONE` / `INTERRUPTED` |
 | 2. Handoff subsection order + duplicates | ✅ in HEAD | Cheap structure on the five recognized `#### ` names. `下一步` non-empty is already in HEAD | Semantic quality of Summary / 決策 / 現況 / 檔案 |
-| 3. `## Kept 索引` in `devlog.md`, surfaced by SessionStart | planned | Discoverability of keep *files* without injecting their content | A literally single file; auto-injection of keep content; an archive index |
+| 3. `## Kept 索引` in `devlog.md`, surfaced by SessionStart | ✅ in HEAD | Discoverability of keep *files* without injecting their content | A literally single file; auto-injection of keep content; an archive index |
 
 After Phase 1, verify-before-act splits into two moments: Stop already
 matched the snapshot at close; `continue` / `resume` re-check because
@@ -120,14 +120,15 @@ two slices the roadmap actually moves.
 
 4. **It isn't literally single.** History can fragment into
    `devlog.archive.md` (compact) and `devlog.<name>.md` (keep).
-   SessionStart does not inject keep files (SKILL.md, 具名保存) — a
+   SessionStart does not inject keep *files* (SKILL.md, 具名保存) — a
    topic's latest *content* can sit in a file the normal flow never
-   surfaces. Phase 3 narrows the *existence/location* slice: each keep
+   surfaces. Phase 3 narrowed the *existence/location* slice: each keep
    leaves a one-line `## Kept 索引` entry in `devlog.md`, and the
-   SessionStart excerpt prints that block, not the keep file's body.
-   Compact's archive stays unindexed (it is GC, not the handoff hot
-   path). Index lines are not reconciled with the filesystem (a deleted
-   keep file can leave a ghost row).
+   SessionStart excerpt now prints that block, not the keep file's body.
+   Keep content is still never auto-injected, by design. Compact's
+   archive stays unindexed (it is GC, not the handoff hot path). Index
+   lines are not reconciled with the filesystem (a deleted keep file can
+   leave a ghost row).
 
 ## Recommendation
 
@@ -176,8 +177,9 @@ replacing git).
    (heading-substance); this phase adds order + duplicates among
    決策 → 檔案 → 工作區 → 現況 → 下一步.
 
-3. **Make `keep` files discoverable without full injection.** Planned:
-   `docs/superpowers/plans/2026-09-10-devlog-ssot-phase3-kept-index.md`.
+3. **Make `keep` files discoverable without full injection.** ✅ Implemented
+   (`## Kept 索引` in `devlog.md`;
+   `docs/superpowers/plans/2026-09-10-devlog-ssot-phase3-kept-index.md`).
    Narrows #4; does **not** make the log literally single.
    `keep-move.sh` rebuilds one `## Kept 索引` at the true end of
    `devlog.md`; SessionStart prints that block, not keep-file content.
