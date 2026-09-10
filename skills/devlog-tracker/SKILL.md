@@ -229,11 +229,12 @@ DONE
 照舊只寫 Summary／Handoff 就好，不用硬湊段落。不要把段落內容再抄進 Summary 或 Handoff。
 
 主路徑仍是判斷何時寫段落，不是照時間機械切段。另外有一道保底：`/devlog-tracker:start`
-之後，同一輪若連續 15 分鐘（`max_silent_seconds`，預設 900）都沒改 `devlog.md`，
+之後，同一輪若連續 10 分鐘（`max_silent_seconds`，預設 600）都沒改 `devlog.md`，
 下一個工具會被 PreToolUse hook 擋住，要求先追加一段 `### 段落`（一行也可以）。
 寫了任何內容計時就歸零。被擋時用 Write／Edit 改 `.devlog/devlog.md`，不要用 Bash
-繞過。沒呼叫工具就不會響。門檻可直接改 `.devlog/.segment-state` 的
-`max_silent_seconds`。
+繞過。沒呼叫工具就不會響。門檻用 `/devlog-tracker:segment-watch <時間長度>`
+（例如 `/devlog-tracker:segment-watch 5 分鐘`）調整，不用手改
+`.devlog/.segment-state` 的 `max_silent_seconds`。
 
 收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
 
@@ -281,6 +282,14 @@ Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 還是會被自動折進舊 Round 當一個段落。發現猜錯時，在那個段落裡說明「其實
 是新話題」，然後自己手動開一個新的 `## Round` 接手新請求——不用回頭改寫
 被誤折的段落。
+
+**背景 task-notification 也走同一套折疊，但完全自動：** 如果送進來的
+`prompt` 本身是一段 `<task-notification>…</task-notification>`（子 agent
+在背景完成的通知，不是使用者真的打字），`round-start.sh` 會自己偵測、不
+需要 Claude 先跑 `await-open.sh`。原始 XML 不會被記下來，只留一行精簡摘要
+（例如 `Agent "Fix wave" finished（status=completed, task-id=t1）`），折成
+`### 段落 N - HH:MM（背景任務通知）` 插進最後一個 Round；若當時 `devlog.md`
+還沒有任何 Round，才會退回開一個新 Round，但內容一樣是精簡摘要。
 
 這個標記檔也會跨 `/clear` 存活：如果開了之後中間發生過一次 `/clear`，
 下一則訊息進來時 Claude 早就不記得當初問的是什麼，卻還是會被折進那個

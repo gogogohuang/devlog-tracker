@@ -20,7 +20,7 @@ in the last hour" is slow.
 **Mechanism: authoring convention plus a silence valve.** When to write a
 segment is still Claude's judgment. The Stop-hook content-hash check only
 cares that `devlog.md` changed by end of turn. Mid-round, if the file's
-hash is unchanged for `max_silent_seconds` (default 900), `segment-watch.sh`
+hash is unchanged for `max_silent_seconds` (default 600), `segment-watch.sh`
 blocks the next tool until something is appended — see
 [`segment-watch.md`](segment-watch.md).
 

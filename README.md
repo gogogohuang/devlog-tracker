@@ -1,6 +1,6 @@
 # devlog-tracker
 
-版本 `0.6.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
+版本 `0.7.0`。在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，
 讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
 ## 特色
@@ -17,6 +17,7 @@
 | `/devlog-tracker:resume <name>` | 讀具名保存檔的最後一輪與 Handoff，新工作仍寫回主 `devlog.md`。 |
 | `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch 與最後一輪 Status。 |
 | `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode（不要手寫 `.span-open` JSON）。 |
+| `/devlog-tracker:segment-watch <時間長度>` | 調整 Segment Watch 的沉默門檻（預設 10 分鐘）。專案還沒 `/devlog-tracker:start` 時回報 `NOT_STARTED`，不會建立任何檔案。 |
 
 ### 強制記錄開著之後
 
@@ -44,10 +45,10 @@ sequenceDiagram
 
 - **自動接續**：`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，注入最後一個 Checkpoint（若有）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`。細節見 [`docs/design/continue.md`](docs/design/continue.md)。
 - **意外中斷**：非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open` 會把開著的 Round 標成 `INTERRUPTED`。usage 用光不算中斷。中途取消（例如 Esc）通常是在**下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上；`PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort，不能當成一定會立刻蓋章。細節見 [`docs/design/recording-moments.md`](docs/design/recording-moments.md)。
-- **段落記錄**：長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 15 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具，要求先補一段（門檻可調）。子 agent 的工具呼叫不會沿用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
+- **段落記錄**：長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 10 分鐘沒改 `devlog.md`，`PreToolUse` hook 會擋住下一個工具，要求先補一段（門檻可用 `/devlog-tracker:segment-watch <時間長度>` 調整，例如 `/devlog-tracker:segment-watch 5 分鐘`）。子 agent 的工具呼叫不會沿用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
 - **Checkpoint Mode**：累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint`（門檻可調）。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
 - **Span Mode**：`/loop`、Workflow 這類自動續接的長任務，不必每個 tick 都寫完整 Round，用 tick 計數當安全閥；崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
-- **Reply Fold**：Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——先跑 `await-open.sh` 標記，下一則訊息就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。跟 `AskUserQuestion` 工具無關（同一 turn 內問答，本來就不會產生第二個 Round）。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
+- **Reply Fold**：Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——先跑 `await-open.sh` 標記，下一則訊息就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。跟 `AskUserQuestion` 工具無關（同一 turn 內問答，本來就不會產生第二個 Round）。背景 task-notification（子 agent 完成通知）也會自動走同一套折疊機制，不留原始 XML，只記精簡摘要。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
 
 ## 安裝
 
@@ -95,7 +96,7 @@ devlog-tracker/
 ├── docs/design/
 │   ├── span-mode.md           # Span Mode 設計文件
 │   ├── checkpoint-mode.md     # Checkpoint Mode 設計文件
-│   ├── segment-watch.md       # 單輪沉默 15 分鐘保底
+│   ├── segment-watch.md       # 單輪沉默 10 分鐘保底
 │   ├── summary-handoff.md     # 每輪 Summary（人）+ Handoff（AI）設計文件
 │   ├── recording-moments.md   # 送出時 skeleton、正常收尾、意外 INTERRUPTED
 │   ├── reply-fold.md          # Reply Fold：問答折進同一個 Round
@@ -124,13 +125,14 @@ devlog-tracker/
 │       ├── devlog-lock.sh               # .devlog/.lock，寫入序列化
 │       ├── devlog-md.sh                 # fence-aware Round 切塊
 │       ├── segment-watch.sh             # 同一輪太久沒寫就擋住下一個工具
+│       ├── segment-watch-set.sh         # /segment-watch：調整 max_silent_seconds
 │       ├── enforce-devlog.sh            # Stop：Summary/Handoff 內容、Status、Span、Checkpoint
 │       ├── run-tests.sh                 # 執行 hooks/scripts/test-*.sh + cursor/hooks/test-adapters.sh
 │       └── test-*.sh                    # 各腳本自我檢查
 └── commands/
     ├── start.md / pause.md / continue.md
     ├── compact.md / keep.md / resume.md
-    └── status.md / span.md
+    └── status.md / span.md / segment-watch.md
 ```
 
 ## License

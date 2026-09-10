@@ -40,6 +40,7 @@ if [ -f "$ROUND_OPEN" ]; then
 fi
 
 FOLD_ROUND=""
+FOLD_NOTE="（回覆上一輪的問題）"
 if [ -f "$AWAITING_FILE" ]; then
   AWAIT_ROUND="$(json_int_get "$AWAITING_FILE" round)"
   rm -f "$AWAITING_FILE" 2>/dev/null || true
@@ -67,8 +68,44 @@ fi
 
 PROMPT="$(json_str_field "$INPUT" prompt)"
 
+# 背景 task-notification（例如子 agent 完成通知）不是使用者真的打字：不留原始
+# XML，換成精簡摘要；也不當成新話題開新 Round，改折進最後一個 Round 當段落。
+TASK_NOTIF=0
+case "$PROMPT" in
+  *'<task-notification>'*'</task-notification>'*) TASK_NOTIF=1 ;;
+esac
+if [ "$TASK_NOTIF" -eq 1 ]; then
+  NOTIF_SUMMARY="$(printf '%s\n' "$PROMPT" | sed -n 's/.*<summary>\(.*\)<\/summary>.*/\1/p' | head -1)"
+  NOTIF_STATUS="$(printf '%s\n' "$PROMPT" | sed -n 's/.*<status>\(.*\)<\/status>.*/\1/p' | head -1)"
+  NOTIF_TASKID="$(printf '%s\n' "$PROMPT" | sed -n 's/.*<task-id>\(.*\)<\/task-id>.*/\1/p' | head -1)"
+  [ -n "$NOTIF_SUMMARY" ] || NOTIF_SUMMARY="背景任務通知"
+  NOTIF_META=""
+  [ -n "$NOTIF_STATUS" ] && NOTIF_META="status=$NOTIF_STATUS"
+  if [ -n "$NOTIF_TASKID" ]; then
+    if [ -n "$NOTIF_META" ]; then NOTIF_META="$NOTIF_META, task-id=$NOTIF_TASKID"
+    else NOTIF_META="task-id=$NOTIF_TASKID"
+    fi
+  fi
+  if [ -n "$NOTIF_META" ]; then
+    PROMPT="${NOTIF_SUMMARY}（${NOTIF_META}）"
+  else
+    PROMPT="$NOTIF_SUMMARY"
+  fi
+fi
+
 if [ "$SPAN_SKIP" -eq 1 ]; then
   FOLD_ROUND=""
+fi
+
+if [ "$TASK_NOTIF" -eq 1 ] && [ -z "$FOLD_ROUND" ] && [ "$SPAN_SKIP" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; then
+  TASK_NOTIF_LAST="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $2 }')"
+  case "$TASK_NOTIF_LAST" in
+    ''|*[!0-9]*) : ;;
+    *)
+      FOLD_ROUND="$TASK_NOTIF_LAST"
+      FOLD_NOTE="（背景任務通知）"
+      ;;
+  esac
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
@@ -91,7 +128,7 @@ if [ -n "$FOLD_ROUND" ]; then
 
   SEG_TMP="$DEVLOG_DIR/.segment-insert.tmp"
   {
-    printf '### 段落 %s - %s（回覆上一輪的問題）\n' "$SEG_N" "$TS"
+    printf '### 段落 %s - %s%s\n' "$SEG_N" "$TS" "$FOLD_NOTE"
     printf '```text\n'
     printf '%s\n' "$PROMPT"
     printf '```\n'

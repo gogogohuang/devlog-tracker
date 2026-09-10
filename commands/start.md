@@ -13,6 +13,6 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
 3. 讀取 `.devlog/devlog.md`（若存在）：
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1
-4. 告訴使用者：從現在開始，每一則使用者訊息送出時就會先寫 User Input skeleton，結束前仍要補 Summary / Handoff；同一輪約 15 分鐘沒改這個檔，下一個工具會被要求先補 `### 段落`；可以用 `/devlog-tracker:pause` 關掉。
+4. 告訴使用者：從現在開始，每一則使用者訊息送出時就會先寫 User Input skeleton，結束前仍要補 Summary / Handoff；同一輪約 10 分鐘沒改這個檔，下一個工具會被要求先補 `### 段落`（門檻可用 `/devlog-tracker:segment-watch <時間長度>` 調整）；可以用 `/devlog-tracker:pause` 關掉。
 
 不要因為 `.enabled` 已經存在就跳過步驟 3。`/clear` 之後若要接著做上一題，用 `/devlog-tracker:continue`，不要用 start 開工。

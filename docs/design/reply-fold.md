@@ -110,6 +110,40 @@ reopened by a fold.
 `.span-open` / `.round-open` / `.interrupted` cleanup, so a paused project
 never resumes into a stale fold.
 
+## Task-notification folding
+
+A related but separate case: `UserPromptSubmit`'s `prompt` can itself be a
+background task-notification (a subagent finishing while the main turn had
+already ended, delivered as if it were the next user message) rather than
+anything the user typed. Recording that verbatim — a raw
+`<task-notification>...</task-notification>` block — as `### User Input` on
+a brand-new Round is noise: it isn't a new topic, and the full payload
+(task id, tool-use id, output file path, usage stats) is not worth keeping.
+
+Unlike the marker-file mechanism above, this needs no explicit "declare
+intent" step — the shape of the content itself is the signal. `round-start.sh`
+detects it directly:
+
+1. If `PROMPT` contains a `<task-notification>...</task-notification>` pair,
+   extract `<summary>`, `<status>`, and `<task-id>` (best-effort; any that
+   are missing are simply omitted) and replace `PROMPT` with a one-line
+   condensed note before either branch below runs, e.g.:
+   ```
+   Agent "Fix wave" finished（status=completed, task-id=t1）
+   ```
+2. If no `.awaiting-reply` fold already matched, and Span Mode isn't
+   suppressing writes this tick, and `devlog.md` has at least one existing
+   `## Round`: fold the condensed note into the **last** Round as a
+   `### 段落 <k> - HH:MM（背景任務通知）`, exactly like a Reply Fold
+   (`.round-open` rewritten to that Round, no new Round, no
+   `rounds_since_checkpoint` increment).
+3. Otherwise (no Round exists yet) fall back to opening a normal new
+   `## Round` — but still with the condensed note as `### User Input`,
+   never the raw XML.
+
+An open span still wins over this exactly as it does over `.awaiting-reply`:
+during a span, the tick is silently skipped and nothing is written at all.
+
 ## Lifecycle
 
 **Opening**: after Stop would otherwise let a Round close (Summary/Handoff/
@@ -150,7 +184,7 @@ present with content, exactly as before.
 |---|---|
 | `hooks/scripts/await-open.sh` | Writes `.devlog/.awaiting-reply` for the current Round |
 | `hooks/scripts/test-await-open.sh` | Self-check for `await-open.sh` |
-| `hooks/scripts/round-start.sh` | Reads/consumes `.awaiting-reply`; folds a matching reply into the last Round instead of opening a new one |
-| `hooks/scripts/test-round-start.sh` | Self-check covering fold-match, fold-miss, and checkpoint-counter behavior |
+| `hooks/scripts/round-start.sh` | Reads/consumes `.awaiting-reply`; folds a matching reply into the last Round instead of opening a new one; also detects and condenses task-notification prompts, folding them the same way |
+| `hooks/scripts/test-round-start.sh` | Self-check covering fold-match, fold-miss, checkpoint-counter behavior, and task-notification condensing/folding |
 | `hooks/scripts/pause-devlog.sh` | Also deletes `.awaiting-reply` on pause |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Claude (when to open the marker, how a folded segment looks, the `AskUserQuestion` distinction) |

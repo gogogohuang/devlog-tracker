@@ -420,6 +420,88 @@ else
 fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
+# --- 16: task-notification prompt folds into the last Round, condensed -----
+NOTIF_PROMPT='<task-notification><task-id>t1</task-id><status>completed</status><summary>Agent \"Fix wave\" finished</summary></task-notification>'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.checkpoint-state"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 7 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+refactor the widget module
+```
+
+### Summary
+Refactored the widget module.
+
+### Handoff
+#### 現況
+Done, tests pass.
+
+### Status
+DONE
+EOF
+printf '%s\n' '{"rounds_since_checkpoint": 0, "max_silent_rounds": 20, "checkpoint_marker_count": 0}' > "$DEVLOG_DIR/.checkpoint-state"
+printf '{"prompt":"%s"}' "$NOTIF_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+UNFENCED_ROUNDS="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/devlog.md")"
+if [ "$UNFENCED_ROUNDS" = "1" ]; then
+  echo "PASS: task-notification did not open a second Round"
+else
+  echo "FAIL: expected 1 unfenced Round heading, got $UNFENCED_ROUNDS"
+  FAIL=1
+fi
+assert_contains "task-notification segment heading" "### 段落 1 -" "$BODY"
+assert_contains "task-notification segment marked as background" "（背景任務通知）" "$BODY"
+assert_contains "task-notification segment keeps the condensed summary" 'Agent "Fix wave" finished' "$BODY"
+assert_contains "task-notification segment keeps status" "status=completed" "$BODY"
+assert_contains "task-notification segment keeps task-id" "task-id=t1" "$BODY"
+assert_not_contains "task-notification raw tag not recorded" "<task-notification>" "$BODY"
+SEG_LINE="$(grep -n '### 段落 1' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
+SUM_LINE="$(grep -n '^### Summary$' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
+if [ "$SEG_LINE" -lt "$SUM_LINE" ]; then
+  echo "PASS: task-notification segment inserted before Summary"
+else
+  echo "FAIL: task-notification segment landed after Summary (seg=$SEG_LINE summary=$SUM_LINE)"
+  FAIL=1
+fi
+OPEN_N="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.round-open" | grep -o '[0-9]\+$')"
+if [ "$OPEN_N" = "7" ]; then
+  echo "PASS: .round-open reopened to the folded Round (7)"
+else
+  echo "FAIL: expected .round-open round=7, got $OPEN_N"
+  FAIL=1
+fi
+CP="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP" = "0" ]; then
+  echo "PASS: task-notification fold does not increment rounds_since_checkpoint"
+else
+  echo "FAIL: expected rounds_since_checkpoint to stay 0, got $CP"
+  FAIL=1
+fi
+rm -f "$DEVLOG_DIR/.checkpoint-state"
+
+# --- 17: task-notification with no existing Round opens one, still condensed
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start"
+printf '{"prompt":"%s"}' "$NOTIF_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "fresh task-notification opens Round 1" "## Round 1 —" "$BODY"
+assert_contains "fresh task-notification condensed summary" 'Agent "Fix wave" finished' "$BODY"
+assert_not_contains "fresh task-notification raw tag not recorded" "<task-notification>" "$BODY"
+
+# --- 18: task-notification during an open span is still suppressed ---------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start"
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00", "ticks_since_checkin": 0, "max_silent_ticks": 5}' > "$DEVLOG_DIR/.span-open"
+printf '{"prompt":"%s"}' "$NOTIF_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+if [ -f "$DEVLOG_DIR/devlog.md" ]; then
+  echo "FAIL: task-notification during open span should not create devlog.md"
+  FAIL=1
+else
+  echo "PASS: task-notification during open span created no devlog.md"
+fi
+assert_file_absent "task-notification during open span: no .round-open" "$DEVLOG_DIR/.round-open"
+rm -f "$DEVLOG_DIR/.span-open"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
