@@ -157,7 +157,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   log 或程式碼）時，可以留原文最相關的部分、把明顯的雜訊留在原處摘要帶過，怎麼拿捏由
   Claude 自己判斷，不用每次都整段複製。
 - **兩個讀者拆開：** `Summary` 只給人掃；`Handoff` 只給下一輪 Claude 接手。同一件事不要兩邊複述。
-- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步）。沒發生的整節省略，不要寫「無」。
+- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步），Stop hook 會檢查已出現的小節
+  順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整節省略，不要寫「無」。
   `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略。
   `下一步` 要具體到下一輪打開就能做，寫「繼續完成」不算完成。
 - **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
@@ -188,7 +189,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」，且 `#### 工作區` 跟 hook 算出的 git 快照相符。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」，且 `#### 工作區` 跟 hook 算出的 git 快照相符。
 新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）

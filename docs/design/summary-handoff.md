@@ -91,8 +91,11 @@ Round numbering, timestamps, and User Input rules are unchanged.
 2. **Summary is 2–4 sentences.** Conclusion and blockers only. Forbidden
    in Summary: file paths, commit hashes, skill names, stepwise commands.
 3. **Handoff subsections are ordered and optional-by-absence.** Order is
-   always 決策 → 檔案 → 工作區 → 現況 → 下一步. A subsection that did not
-   occur is omitted entirely — do not write a heading whose body is 「無」.
+   always 決策 → 檔案 → 工作區 → 現況 → 下一步, and the Stop hook rejects a
+   present-but-reordered or duplicated recognized subsection (structure
+   only — it does not check whether the content itself is correct). A
+   subsection that did not occur is omitted entirely — do not write a
+   heading whose body is 「無」.
    `現況` should be present on almost every round. `工作區` and `下一步`
    are required for `IN_PROGRESS` and `BLOCKED`. Omit both when Status is
    `DONE` and there is nothing further to do. `下一步` must be concrete
@@ -158,9 +161,10 @@ add the missing heading(s) to that last Round.
 Details:
 
 - **Presence plus a light structure check, plus one machine-verified
-  cache field.** The hook does not check that Summary is 2–4 sentences,
-  that Handoff has the five subsections, or that 決策／現況／檔案 prose
-  is accurate. `IN_PROGRESS` / `BLOCKED` `#### 工作區` is compared to a
+  cache field.** The hook does not check that Summary is 2–4 sentences
+  or that 決策／現況／檔案 prose is accurate. Present Handoff subsections
+  among 決策/檔案/工作區/現況/下一步 must be in that order and not
+  duplicated. `IN_PROGRESS` / `BLOCKED` `#### 工作區` is compared to a
   snapshot the hook computes (`workspace-snapshot.sh`). Bodies must be
   non-empty.
 - **Last Round is the unit.** A turn that only appends a Checkpoint, or a
@@ -203,7 +207,9 @@ not off `### Response`.
   snapshot the hook computes itself (`hooks/scripts/workspace-snapshot.sh`,
   `docs/design/devlog-as-ssot-assessment.md` Phase 1) — content-verified,
   not just presence-checked. `DONE` / `INTERRUPTED` do not require it.
-  Prose quality elsewhere (Summary, 決策, 現況) is still on Claude.
+  Handoff subsection order and duplicates among 決策/檔案/工作區/現況/下一步
+  are also checked; unrecognized `#### ` headings are ignored. Prose
+  quality elsewhere (Summary, 決策, 現況) is still on Claude.
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
   Acceptable: no plausible reason for those headings to appear except a

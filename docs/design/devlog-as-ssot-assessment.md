@@ -11,9 +11,8 @@ SKILL.md's 核心原則 already scopes the claim that way.
 
 ## Review (2026-09-10)
 
-Re-evaluated against the three implementation plans. Phase 1 has
-landed (`workspace-snapshot.sh` + Stop-hook match). Phases 2 and 3
-are still `- [ ]`:
+Re-evaluated against the three implementation plans. Phases 1 and 2
+have landed. Phase 3 (Kept 索引) is still `- [ ]`:
 
 - `docs/superpowers/plans/2026-09-10-devlog-ssot-phase1-workspace-verify.md`
 - `docs/superpowers/plans/2026-09-10-devlog-ssot-phase2-handoff-order.md`
@@ -45,7 +44,8 @@ run, because the tree can change after close.
   this one has write-compliance.
 - **Structured handoff.** Decisions / files / git snapshot / current state
   / next step, in a fixed order, is lower-ambiguity than free-form prose
-  or a raw transcript. Order itself is not hook-checked yet (Phase 2).
+  or a raw transcript. Order of present subsections is hook-checked
+  (Phase 2); unrecognized `#### ` headings are ignored.
 - **Interrupts are stamped, not silently lost.** `INTERRUPTED` rounds
   exist even when a turn dies mid-work (see `docs/design/recording-moments.md`).
   The record is thin (see gap #3) but it exists.
@@ -60,14 +60,14 @@ run, because the tree can change after close.
 | Phase | Status | Buys | Does not buy |
 |---|---|---|---|
 | 1. Machine-verify `#### 工作區` at Stop | ✅ in HEAD | Write-time honesty of the git cache for `IN_PROGRESS` / `BLOCKED` | SSOT for current git state (#1); check on `DONE` / `INTERRUPTED` |
-| 2. Handoff subsection order + duplicates | planned | Cheap structure on the five recognized `#### ` names. `下一步` non-empty is already in HEAD | Semantic quality of Summary / 決策 / 現況 / 檔案 |
+| 2. Handoff subsection order + duplicates | ✅ in HEAD | Cheap structure on the five recognized `#### ` names. `下一步` non-empty is already in HEAD | Semantic quality of Summary / 決策 / 現況 / 檔案 |
 | 3. `## Kept 索引` in `devlog.md`, surfaced by SessionStart | planned | Discoverability of keep *files* without injecting their content | A literally single file; auto-injection of keep content; an archive index |
 
 After Phase 1, verify-before-act splits into two moments: Stop already
 matched the snapshot at close; `continue` / `resume` re-check because
 the cache may be stale, not because the write was unverified.
 
-After Phase 2, `docs/design/summary-handoff.md` should stop saying
+After Phase 2, `docs/design/summary-handoff.md` no longer says
 "Presence only, not quality." Accurate slogan: **structure plus one
 machine-verified cache field; prose quality is still on Claude.**
 
@@ -111,11 +111,11 @@ two slices the roadmap actually moves.
    HEAD already checks more than raw presence: non-empty Summary /
    Handoff, legal Status, non-empty `#### 下一步` for `IN_PROGRESS` /
    `BLOCKED`, and (Phase 1) `#### 工作區` matching live git for those
-   statuses. It still does not confirm Summary is accurate or Handoff
-   prose is complete. A heading written for other reasons still counts
-   (`docs/design/summary-handoff.md`).
-   Phase 2 will reject reordered or duplicated recognized Handoff
-   subsections (unrecognized `#### ` headings stay fail-open).
+   statuses. Present Handoff subsections among 決策/檔案/工作區/現況/下一步
+   must be in that order and not duplicated (Phase 2; unrecognized
+   `#### ` headings stay fail-open). It still does not confirm Summary
+   is accurate or Handoff prose is complete. A heading written for other
+   reasons still counts (`docs/design/summary-handoff.md`).
    Remainder — prose quality — stays unverifiable by design.
 
 4. **It isn't literally single.** History can fragment into
@@ -168,8 +168,9 @@ replacing git).
    `#### 工作區` does not match. Fact at write time; `continue` /
    `resume` still re-check at read time.
 
-2. **Minimal structural checks beyond heading presence.** Planned:
-   `docs/superpowers/plans/2026-09-10-devlog-ssot-phase2-handoff-order.md`.
+2. **Minimal structural checks beyond heading presence.** ✅ Implemented
+   (Handoff subsection order + duplicate check;
+   `docs/superpowers/plans/2026-09-10-devlog-ssot-phase2-handoff-order.md`).
    Remainder of #2's *structure* slice. Not semantic verification —
    that stays unverifiable. `下一步` non-empty is already in HEAD
    (heading-substance); this phase adds order + duplicates among
