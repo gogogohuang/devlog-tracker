@@ -46,8 +46,10 @@ Limitations below.
 
 ### `.devlog/.span-open`
 
-A JSON file, written and maintained directly by Claude (via Write/Edit —
-there is no dedicated slash command for this), never by a hook script:
+A JSON file owned by `/devlog-tracker:span` via `span-open.sh` /
+`span-close.sh` (see `commands/span.md`). Hooks never create or delete
+this file themselves. Do not hand-edit `.span-open` when the slash
+command is available:
 
 ```json
 {

@@ -53,7 +53,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 
 需要誠實說明的邊界：User Input 在送出當下就已經在 `devlog.md`。正常結束時 Stop 仍保證有 Summary / Handoff。
 意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
-**下一則訊息**或**下次 SessionStart（startup / resume / clear）**才補上）。
+**下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上）。
 `PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成 Esc
 會立刻蓋章。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個工具呼叫時催促。
 
@@ -154,7 +154,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
   `DONE` = 這輪請求已結束。
 - `INTERRUPTED` 只由 hook 在意外中斷時寫上（非 usage 的 API 錯誤、SessionEnd、
-  下次 SessionStart（startup / resume / clear）或下一則訊息發現 `.round-open` 還在）。
+  下次 SessionStart（startup / resume / clear / fork）或下一則訊息發現 `.round-open` 還在）。
   mid-turn 取消（例如 Esc）通常也是走這條延後路徑；`PostToolUseFailure` 的 `is_interrupt`
   若有觸發只是 best-effort，不能當成一定會立刻蓋章。Claude 正常收尾時不要自己選這個值。
   usage 用光（`rate_limit` / `billing_error` / `account_on_hold`）不標中斷。
