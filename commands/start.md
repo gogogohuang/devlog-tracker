@@ -10,7 +10,7 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
    CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/start-devlog.sh"
    ```
    不要自己用手建 `.enabled` / `.checkpoint-state` / `.segment-state`。
-2. 若 stdout 有 `GITIGNORE_DEVLOG=no`：告訴使用者 `.devlog/` 會含 prompt，建議把 `.devlog/` 加進專案 `.gitignore`。問要不要現在加。只有使用者明確說要，才在 `.gitignore` 末尾追加一行 `.devlog/`（檔案不存在就建立）。不要改其他行。
+2. 若 stdout 有 `GITIGNORE_DEVLOG=no`：鄭重提醒——`.devlog/` 會寫入使用者原文（遮罩只覆蓋常見 token 前綴，不是通用掃密）。**強烈建議**把 `.devlog/` 加進專案 `.gitignore`。問要不要現在加。只有使用者明確說要，才在 `.gitignore` 末尾追加一行 `.devlog/`（檔案不存在就建立）。不要改其他行。若使用者拒絕，再警告一次「之後若不小心 commit，prompt／殘留密鑰可能進版控」，然後繼續步驟 3。
 3. 讀取 `.devlog/devlog.md`（若存在）：
    - 有內容：摘要目前進度，跟使用者確認「上次做到哪、狀態是什麼」
    - 不存在：告知使用者這是全新開始，準備寫下 Round 1

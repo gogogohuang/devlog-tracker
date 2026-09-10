@@ -375,8 +375,12 @@ compact rules. Do not invent a second compact mechanism.
 - **Concurrent sessions** use a short `.devlog/.lock` around writes.
   Sessions can still interleave after the 2-second fail-open timeout;
   the lock covers the common overlapping-write window.
-- **Secrets in the prompt** — common provider-prefix tokens are masked;
-  other secrets still copy into the project file.
+- **Secrets in the prompt** — common provider-prefix tokens are masked
+  (`sk-ant-*`, OpenAI-style `sk-…`, `ghp_` / `github_pat_`, Slack `xox*`,
+  `AKIA*`, `Bearer …`, JWT-shaped `eyJ…`, PEM private keys). Truncation at
+  4000 characters still happens **before** redact, so a token split by
+  truncate may remain. This is not a general secret scanner; other secrets
+  still copy into the project file.
 - **Span + unrelated human message** still not detected.
 - **Pause mid-round** leaves an `IN_PROGRESS` skeleton without
   Summary; that is intentional, not `INTERRUPTED`.
