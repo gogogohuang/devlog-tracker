@@ -27,6 +27,12 @@ if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
   exit 0
 fi
 
+AGENT_ID="$(json_str_field "$INPUT" agent_id)"
+[ "$AGENT_ID" = "null" ] && AGENT_ID=""
+if [ -n "$AGENT_ID" ]; then
+  exit 0
+fi
+
 SEG_EPOCH="$(json_int_get "$SEGMENT_FILE" last_change_epoch)"
 SEG_MAX="$(json_int_get "$SEGMENT_FILE" max_silent_seconds)"
 SEG_SUM="$(json_str_get "$SEGMENT_FILE" last_seen_cksum)"
@@ -60,21 +66,27 @@ fi
 TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
 FILE_PATH=""
 if command -v jq >/dev/null 2>&1; then
-  FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || echo '')"
+  FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || echo '')"
+  [ "$FILE_PATH" = "null" ] && FILE_PATH=""
 else
   FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+  if [ -z "$FILE_PATH" ]; then
+    FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+  fi
 fi
 [ -n "$TOOL_NAME" ] || exit 0
 
-if [ "$TOOL_NAME" = "Write" ] || [ "$TOOL_NAME" = "Edit" ] || [ "$TOOL_NAME" = "StrReplace" ]; then
-  case "$FILE_PATH" in
-    .devlog/devlog.md|*/.devlog/devlog.md) exit 0 ;;
-  esac
-fi
+case "$TOOL_NAME" in
+  Write|Edit|StrReplace|Read|Grep)
+    case "$FILE_PATH" in
+      .devlog/devlog.md|*/.devlog/devlog.md) exit 0 ;;
+    esac
+    ;;
+esac
 
 ELAPSED=$((NOW - SEG_EPOCH))
 if [ "$ELAPSED" -ge "$SEG_MAX" ]; then
-  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/devlog.md（門檻 ${SEG_MAX} 秒）。請先追加一段「### 段落」（一行也可以），寫完再繼續呼叫工具。" >&2
+  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/devlog.md（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/devlog.md，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。" >&2
   exit 2
 fi
 

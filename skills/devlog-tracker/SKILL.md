@@ -230,11 +230,13 @@ DONE
 
 主路徑仍是判斷何時寫段落，不是照時間機械切段。另外有一道保底：`/devlog-tracker:start`
 之後，同一輪若連續 10 分鐘（`max_silent_seconds`，預設 600）都沒改 `devlog.md`，
-下一個工具會被 PreToolUse hook 擋住，要求先追加一段 `### 段落`（一行也可以）。
-寫了任何內容計時就歸零。被擋時用 Write／Edit 改 `.devlog/devlog.md`，不要用 Bash
-繞過。沒呼叫工具就不會響。門檻用 `/devlog-tracker:segment-watch <時間長度>`
-（例如 `/devlog-tracker:segment-watch 5 分鐘`）調整，不用手改
-`.devlog/.segment-state` 的 `max_silent_seconds`。
+下一個工具會被 PreToolUse hook 擋住。被擋時先 **Read** `.devlog/devlog.md`，再用
+Edit／StrReplace **追加**一段 `### 段落`（一行也可以）；**禁止**用 Write 覆寫整份檔。
+寫了任何內容計時就歸零。不要用 Bash 繞過。沒呼叫工具就不會響。Claude Code
+dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門會跳過（它們
+與主對話共用 `session_id`，不該被逼寫父輪段落）。門檻用
+`/devlog-tracker:segment-watch <時間長度>`（例如 `/devlog-tracker:segment-watch 5 分鐘`）
+調整，不用手改 `.devlog/.segment-state` 的 `max_silent_seconds`。
 
 收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
 
