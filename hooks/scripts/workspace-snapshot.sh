@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Sourced by enforce-devlog.sh (docs/design/devlog-as-ssot-assessment.md,
-# Phase 1). Computes the canonical `#### 工作區` text using the exact
-# commands and five output formats defined in skills/devlog-tracker/SKILL.md
-# (`#### 工作區`) and mirrored in docs/design/continue.md step 5.1 — fix the
-# formats there if they ever change, this function is the only place that
-# produces them at write time.
+# Sourced by enforce-devlog.sh (write-time Stop check) and executed by
+# continue / resume (read-time verify). Computes the canonical `#### 工作區`
+# text using the five output formats defined in skills/devlog-tracker/SKILL.md.
+# This function is the only machine producer — do not re-encode in command docs.
 #
-# Usage: workspace_snapshot "$PROJECT_DIR"
+# Usage (sourced): workspace_snapshot "$PROJECT_DIR"
+# Usage (executed): bash workspace-snapshot.sh [dir]
+#   dir defaults to ${CLAUDE_PROJECT_DIR:-.}
 # Echoes 1 line (clean / non-git / detached-clean) or 2 lines (dirty /
 # detached-dirty). Never fails: any git command error degrades toward
 # "非 git 工作區", matching this hook suite's fail-open design.
@@ -42,3 +42,7 @@ workspace_snapshot() {
     printf '%s @ %s\n未提交：%s\n' "$label" "$hash" "$dirty_files"
   fi
 }
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  workspace_snapshot "${1:-${CLAUDE_PROJECT_DIR:-.}}"
+fi

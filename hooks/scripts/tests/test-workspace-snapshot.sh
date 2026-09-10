@@ -64,6 +64,19 @@ EXPECTED="HEAD detached @ ${HASH}
 未提交：a.txt"
 assert_eq "detached, dirty" "$EXPECTED" "$OUT"
 
+# --- executable entry matches the sourced function --------------------------
+CLI_NONGIT="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$NONGIT")"
+assert_eq "cli non-git directory" "非 git 工作區" "$CLI_NONGIT"
+
+CLI_DETACHED="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$REPO")"
+FUNC_DETACHED="$(workspace_snapshot "$REPO")"
+assert_eq "cli matches function (detached dirty)" "$FUNC_DETACHED" "$CLI_DETACHED"
+
+DEFAULT_DIR="$TMP_ROOT/default-dir"
+mkdir -p "$DEFAULT_DIR"
+CLI_DEFAULT="$(CLAUDE_PROJECT_DIR="$DEFAULT_DIR" bash "$SCRIPT_DIR/workspace-snapshot.sh")"
+assert_eq "cli default dir is CLAUDE_PROJECT_DIR" "非 git 工作區" "$CLI_DEFAULT"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
