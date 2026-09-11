@@ -18,6 +18,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/devlog-lock.sh"
 # shellcheck source=devlog-md.sh
 . "$HOOKS_DIR/devlog-md.sh"
+# shellcheck source=workspace-snapshot.sh
+. "$HOOKS_DIR/workspace-snapshot.sh"
 # shellcheck source=detect-pending-question.sh
 . "$HOOKS_DIR/detect-pending-question.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
@@ -112,6 +114,23 @@ if [ "$TASK_NOTIF" -eq 1 ] && [ -z "$FOLD_ROUND" ] && [ "$SPAN_SKIP" -eq 0 ] && 
       FOLD_NOTE="（背景任務通知）"
       ;;
   esac
+fi
+
+MISMATCH_FILE="$DEVLOG_DIR/.workspace-mismatch"
+rm -f "$MISMATCH_FILE" 2>/dev/null || true
+if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; then
+  CLAIM_ST="$(workspace_claim_state "$PROJECT_DIR" "$DEVLOG_FILE" 2>/dev/null || echo NO_CLAIM)"
+  if [ "$CLAIM_ST" = "MISMATCH" ]; then
+    LAST_START="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $1 }')"
+    LAST_END="$(devlog_block_end "$DEVLOG_FILE" "$LAST_START")"
+    CLAIMED_WS="$(devlog_round_workspace_body "$DEVLOG_FILE" "$LAST_START" "$LAST_END")"
+    LIVE_WS="$(workspace_snapshot "$PROJECT_DIR")"
+    if [ -n "$LIVE_WS" ]; then
+      printf '%s\n' "$LIVE_WS" > "$MISMATCH_FILE" 2>/dev/null || true
+      printf '%s\n' "上一輪 Handoff「#### 工作區」跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
+      printf '\n宣稱：\n%s\n\n實際：\n%s\n' "$CLAIMED_WS" "$LIVE_WS"
+    fi
+  fi
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
