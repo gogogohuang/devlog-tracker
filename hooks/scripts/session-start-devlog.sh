@@ -73,11 +73,13 @@ awk '
     n = NR
     last_cp = 0
     last_kept = 0
+    last_lessons = 0
     rc = 0
     for (i = 1; i <= n; i++) {
       if (infence[i]) continue
       if (lines[i] ~ /^## Checkpoint/) last_cp = i
       if (lines[i] ~ /^## Kept 索引/) last_kept = i
+      if (lines[i] ~ /^## Lessons 索引/) last_lessons = i
       if (lines[i] ~ /^## Round /) { rc++; round_at[rc] = i }
     }
     if (last_cp > 0) {
@@ -94,6 +96,14 @@ awk '
         if (!infence[j] && lines[j] ~ /^## /) { kp_end = j - 1; break }
       }
       for (j = last_kept; j <= kp_end; j++) print lines[j]
+      print ""
+    }
+    if (last_lessons > 0) {
+      ls_end = n
+      for (j = last_lessons + 1; j <= n; j++) {
+        if (!infence[j] && lines[j] ~ /^## /) { ls_end = j - 1; break }
+      }
+      for (j = last_lessons; j <= ls_end; j++) print lines[j]
       print ""
     }
     start_i = (rc > 2) ? rc - 1 : 1

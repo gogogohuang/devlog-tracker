@@ -281,6 +281,27 @@ if [ -n "$LAST_ROUND" ]; then
       echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
       exit 2
     fi
+
+    # --- 下一步 filler blacklist (docs/design/next-step-blacklist.md):
+    # non-semantic string match, not prose scoring. Only fires when the
+    # entire trimmed body is a single line that exactly equals one of a
+    # fixed set of known-empty phrases (a real 下一步 with extra content
+    # around one of these phrases always passes — see the design doc's
+    # Match rule). Deliberately scoped to 下一步 only, never Summary/
+    # 決策/現況.
+    NEXT_BODY_TRIMMED="$(handoff_subsection_body '^#### 下一步' \
+      | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
+      | grep -v '^$' || true)"
+    NEXT_LINE_COUNT="$(printf '%s\n' "$NEXT_BODY_TRIMMED" | grep -c '.' || true)"
+    if [ "$NEXT_LINE_COUNT" -eq 1 ]; then
+      NEXT_STRIPPED="$(printf '%s' "$NEXT_BODY_TRIMMED" | sed -e 's/[。.！!]*$//')"
+      case "$NEXT_STRIPPED" in
+        繼續完成|持續完成|持續優化|持續改進|之後再看|視情況調整|待確認|繼續|持續推進|繼續處理)
+          echo "「#### 下一步」目前只寫了「${NEXT_STRIPPED}」，這是空話，不算具體下一步。請寫清楚下一輪打開就能做的具體動作（路徑／指令／要載入的 skill）。" >&2
+          exit 2
+          ;;
+      esac
+    fi
   fi
 
   # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,

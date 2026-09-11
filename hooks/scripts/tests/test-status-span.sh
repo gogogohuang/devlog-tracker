@@ -21,8 +21,14 @@ DONE
 EOF
 OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
 case "$OUT" in *"ENABLED=yes"*) pass "enabled" ;; *) fail "enabled [$OUT]" ;; esac
+case "$OUT" in *"LESSONS=no"*) pass "lessons off by default" ;; *) fail "lessons off by default [$OUT]" ;; esac
 case "$OUT" in *"SPAN=closed"*) pass "span closed" ;; *) fail "span closed [$OUT]" ;; esac
 case "$OUT" in *"LAST_STATUS=DONE"*) pass "last status" ;; *) fail "last status [$OUT]" ;; esac
+
+touch "$TMP/.devlog/.lessons-enabled"
+OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
+case "$OUT" in *"LESSONS=yes"*) pass "lessons on when flag present" ;; *) fail "lessons on when flag present [$OUT]" ;; esac
+rm -f "$TMP/.devlog/.lessons-enabled"
 
 OUT="$(bash "$SCRIPT_DIR/span-open.sh")"
 [ "$OUT" = "OPENED=1" ] && pass "span opened" || fail "span open [$OUT]"

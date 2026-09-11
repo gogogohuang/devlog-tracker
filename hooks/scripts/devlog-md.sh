@@ -113,6 +113,31 @@ devlog_strip_kept_index() {
   ' > "$2"
 }
 
+devlog_lessons_index_lines() {
+  awk '
+    /^[ \t]*```/ { fence = !fence; next }
+    !fence && /^## Lessons 索引/ { grab = 1; found = 1; buf = ""; next }
+    !fence && grab && /^## / { grab = 0 }
+    grab { buf = buf $0 ORS }
+    END { if (found) printf "%s", buf }
+  ' "$1"
+}
+
+devlog_strip_lessons_index() {
+  # Same trailing-block assumption and blank-line-collapse behavior as
+  # devlog_strip_kept_index() above (docs/design/lessons-mode.md).
+  awk '
+    /^[ \t]*```/ { fence = !fence }
+    !fence && /^## Lessons 索引/ { grab = 1; next }
+    !fence && grab && /^## / { grab = 0 }
+    grab { next }
+    { print }
+  ' "$1" | awk '
+    /^[ \t]*$/ { pending = pending $0 ORS; next }
+    { printf "%s", pending; pending = ""; print }
+  ' > "$2"
+}
+
 devlog_round_workspace_body() {
   local nofence
   nofence="$(_devlog_fence_nofence "$1" "$2" "$3")"

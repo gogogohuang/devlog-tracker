@@ -231,6 +231,44 @@ else
   FAIL=1
 fi
 
+# --- devlog_strip_lessons_index: same blank-line regression check, for
+# "## Lessons 索引" (docs/design/lessons-mode.md) -----------------------
+cat > "$TMP_ROOT/lessons.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### Status
+DONE
+EOF
+for i in 1 2 3; do
+  STRIPPED="$TMP_ROOT/lessons-stripped-$i"
+  devlog_strip_lessons_index "$TMP_ROOT/lessons.md" "$STRIPPED"
+  {
+    cat "$STRIPPED"
+    printf '\n## Lessons 索引\n'
+    printf -- '- devlog.lessons.topic-%s.md\n' "$i"
+  } > "$TMP_ROOT/lessons.md"
+done
+HEADING_LINE="$(grep -n '^## Lessons 索引' "$TMP_ROOT/lessons.md" | head -1 | cut -d: -f1)"
+PREV_LINE="$(sed -n "$((HEADING_LINE - 1))p" "$TMP_ROOT/lessons.md")"
+PREV2_LINE="$(sed -n "$((HEADING_LINE - 2))p" "$TMP_ROOT/lessons.md")"
+if [ -z "$PREV_LINE" ] && [ -n "$PREV2_LINE" ]; then
+  echo "PASS: exactly one blank line separates content from ## Lessons 索引 after 3 rebuilds"
+else
+  echo "FAIL: expected exactly one blank line before ## Lessons 索引 after 3 rebuilds, got line $((HEADING_LINE - 1))=[$PREV_LINE] line $((HEADING_LINE - 2))=[$PREV2_LINE]"
+  FAIL=1
+fi
+
+# --- devlog_lessons_index_lines: reads back only the block body ------------
+LINES="$(devlog_lessons_index_lines "$TMP_ROOT/lessons.md")"
+case "$LINES" in
+  *"devlog.lessons.topic-3.md"*) echo "PASS: devlog_lessons_index_lines reads the rebuilt line" ;;
+  *) echo "FAIL: expected devlog.lessons.topic-3.md in lines, got: $LINES"; FAIL=1 ;;
+esac
+case "$LINES" in
+  *"## Lessons 索引"*) echo "FAIL: devlog_lessons_index_lines must not include the heading itself"; FAIL=1 ;;
+  *) echo "PASS: devlog_lessons_index_lines excludes the heading" ;;
+esac
+
 # --- last-round 工作區 body + claim state (no git needed for NO_CLAIM) ----
 cat > "$TMP_ROOT/claim.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
