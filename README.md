@@ -1,12 +1,14 @@
 # devlog-tracker
 
-**版本** 0.13.0
+**版本** 0.13.1
 
 在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
 ## 這是什麼
 
 把「這輪做了什麼、決定了什麼、下一步是什麼」寫進專案內的 `devlog.md`。Stop hook 保證每輪都寫完才放行；沒明確 `/devlog-tracker:start` 前不會建立或改動 `.devlog/`。
+
+`devlog.md` 只管**跨 session 的交接連續性**（決策軌跡、目前卡點、下一步），不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git，完整逐字過程的真相是對話 transcript（`/clear` 後不存在），設計決策的真相是 `docs/design/*.md`。這份檔案只是取代「終端機一 clear 就沒了」的缺口，讓工作可以隨時中斷、隨時接續。
 
 ## 安裝
 
@@ -93,6 +95,15 @@ sequenceDiagram
 每一輪固定四塊：`User Input`（貼近原話，常見 token 會遮罩）、`Summary`（給人掃）、`Handoff`（給下一輪 Claude：決策／檔案／工作區／現況／下一步）、`Status`（`DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`）。`工作區` 是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。Stop 會確認標題底下有內容、Status 是這四個值之一、進行中／卡住時有「下一步」且不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)），並機器核對「工作區」是否跟收尾當下的 git 狀態逐字相符（進行中／卡住一律核對，`DONE` 只在「檔案」非空時核對），避免「已 commit 完成」卻其實沒 commit 這類宣稱跟實際不符。細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md) 和 SKILL.md。`#### 檔案` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。細節見 [`docs/design/files-verify.md`](docs/design/files-verify.md)。
 
 ## Hook 會自動做的事
+
+正常規則是「一則使用者訊息 = 一輪，結束前一定要寫完 Summary／Handoff／Status」。下面四個機制各自放寬這條規則的不同一塊，彼此正交、可以同時存在：
+
+| 機制 | 放寬的是 | 解決的問題 |
+|---|---|---|
+| **Span Mode** | 「每次自動喚醒算不算一輪」 | `/loop`、Workflow 這類被自己排程反覆喚醒、不是使用者手動打字觸發的長任務，每個自動 tick 都強制寫完整 Round，會逼出大量沒意義的紀錄，甚至卡住整條自動化流程 |
+| **Checkpoint Mode** | 「有沒有跨輪的摘要路標」 | 一般互動對話每輪都正常寫，但輪數一多，翻閱的人要逐輪爬完才知道整體進度 |
+| **Reply Fold** | 「一問一答算不算兩輪」 | Claude 用純文字提問、下一則訊息其實是在回答時，預設邏輯（每個 `UserPromptSubmit` 開新 Round）會把這組問答硬拆成兩個不相關的 Round |
+| **Segment Watch** | 「一輪內部要不要留階段性痕跡」 | 一輪做很久（先探索、再決策、再實作、再驗證），憋到最後才寫一次，中途 crash 會把整個過程全部遺失 |
 
 - **自動接續**：`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，注入最後一個 Checkpoint（若有）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)。
 - **同輪工作區漂移偵測**：同一條對話送出下一則訊息時，`UserPromptSubmit` 會拿上一輪 Handoff 的「工作區」跟目前 git 狀態比對；不符就注入提示，並讓 `PreToolUse` 擋住非 devlog 工具，直到這一輪補上含實際快照的 `### 段落`（唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse` 不受影響，方便自行核對）。Span 安靜 tick、task-notification 與 `DONE` 不擋。細節見 [`docs/design/continue.md`](docs/design/continue.md) 與 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
