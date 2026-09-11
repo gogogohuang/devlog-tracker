@@ -337,6 +337,61 @@ INTERRUPTED
 EOF
 assert_eq "INTERRUPTED+reason with 工作區 is not DONE" "MISMATCH" "$(workspace_claim_state "$TMP_ROOT" "$TMP_ROOT/interrupted.md")"
 
+# --- fence parity bug: an unclosed ``` earlier in the round (e.g. pasted
+# code in User Input that forgot to close its fence) must not make the
+# real #### 工作區 further down invisible. enforce-devlog.sh guards this
+# exact class of bug with NOFENCE fail-open; devlog-md.sh's range-scoped
+# functions (used by workspace_claim_state / round-start.sh /
+# segment-watch.sh) must degrade the same way, not silently return empty. --
+cat > "$TMP_ROOT/unclosed-fence.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+使用者貼了一段忘記收尾的程式碼
+def foo():
+    pass
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+測試 fence parity bug
+
+### Status
+IN_PROGRESS
+EOF
+START="$(devlog_list_round_starts "$TMP_ROOT/unclosed-fence.md" | awk 'END { print $1 }')"
+END="$(devlog_block_end "$TMP_ROOT/unclosed-fence.md" "$START")"
+assert_eq "status survives unclosed fence" "IN_PROGRESS" "$(devlog_round_status "$TMP_ROOT/unclosed-fence.md" "$START" "$END")"
+assert_eq "workspace body survives unclosed fence" "main @ deadbeef，工作樹乾淨" "$(devlog_round_workspace_body "$TMP_ROOT/unclosed-fence.md" "$START" "$END")"
+# workspace_claim_state on a non-git dir: workspace_snapshot returns "非 git
+# 工作區", which differs from the claimed body above -> must be MISMATCH.
+# Before the fix this came back NO_CLAIM because the claimed body parsed
+# empty, silently defeating the whole drift-detection feature.
+NONGIT_DIR="$TMP_ROOT/nongit"
+mkdir -p "$NONGIT_DIR"
+assert_eq "unclosed fence still yields a claim (MISMATCH, not NO_CLAIM)" "MISMATCH" "$(workspace_claim_state "$NONGIT_DIR" "$TMP_ROOT/unclosed-fence.md")"
+
+cat > "$TMP_ROOT/unclosed-fence-segments.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+使用者貼了一段忘記收尾的程式碼
+def foo():
+    pass
+
+### 段落 1
+real segment content
+
+### Status
+IN_PROGRESS
+EOF
+SEG_START="$(devlog_list_round_starts "$TMP_ROOT/unclosed-fence-segments.md" | awk 'END { print $1 }')"
+SEG_END="$(devlog_block_end "$TMP_ROOT/unclosed-fence-segments.md" "$SEG_START")"
+assert_contains "segment body survives unclosed fence" "real segment content" "$(devlog_round_segments_body "$TMP_ROOT/unclosed-fence-segments.md" "$SEG_START" "$SEG_END")"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

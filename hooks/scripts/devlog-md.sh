@@ -2,6 +2,24 @@
 
 _DEVLOG_MD_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
 
+# NOFENCE 防呆（跟 enforce-devlog.sh 同一套邏輯）：如果 [start,end] 這個範圍
+# 內 ``` 記號數量是奇數，代表某處圍欄沒有正常收尾（例如 User Input 貼了一段
+# 忘記關閉 fence 的程式碼）——這是真的寫錯了，不是刻意的範例。此時呼叫端的
+# fence 變數若照常 toggle，會在剩下的內容裡卡在 1，把明明存在的 #### 工作區
+# / ### Status / ### 段落 誤判成「被吃掉、看起來是空的」，讓
+# workspace_claim_state 靜默回報 NO_CLAIM（本來該是 MISMATCH），整個漂移
+# 偵測形同虛設。回傳 1 時呼叫端要讓 fence 變數維持 0（退化回單純掃描），
+# 圍欄成雙成對（含 0 個）時回傳 0，fence-aware 行為不變。
+_devlog_fence_nofence() {
+  local file="$1" start="$2" end="$3" count
+  count="$(awk -v start="$start" -v end="$end" '
+    NR < start || NR > end { next }
+    /^[ \t]*```/ { c++ }
+    END { print c + 0 }
+  ' "$file")"
+  if [ $((count % 2)) -eq 0 ]; then printf '0\n'; else printf '1\n'; fi
+}
+
 devlog_list_round_starts() {
   awk '
     /^[ \t]*```/ { fence = !fence; next }
@@ -24,9 +42,11 @@ devlog_block_end() {
 }
 
 devlog_round_status() {
-  awk -v start="$2" -v end="$3" '
+  local nofence
+  nofence="$(_devlog_fence_nofence "$1" "$2" "$3")"
+  awk -v start="$2" -v end="$3" -v nofence="$nofence" '
     NR < start || NR > end { next }
-    /^[ \t]*```/ { fence = !fence; next }
+    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
     !fence && /^### Status[[:space:]]*$/ { status = 1; value = ""; next }
     !fence && /^### / && status { status = 0 }
     status && $0 !~ /^[[:space:]]*$/ { value = $0 }
@@ -94,9 +114,11 @@ devlog_strip_kept_index() {
 }
 
 devlog_round_workspace_body() {
-  awk -v start="$2" -v end="$3" '
+  local nofence
+  nofence="$(_devlog_fence_nofence "$1" "$2" "$3")"
+  awk -v start="$2" -v end="$3" -v nofence="$nofence" '
     NR < start || NR > end { next }
-    /^[ \t]*```/ { fence = !fence; next }
+    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
     !fence && /^#### 工作區[[:space:]]*$/ { grab = 1; next }
     grab && !fence && /^#### / { grab = 0 }
     grab && !fence && /^### / { grab = 0 }
@@ -106,11 +128,13 @@ devlog_round_workspace_body() {
 }
 
 devlog_round_segments_body() {
-  awk -v start="$2" -v end="$3" '
+  local nofence
+  nofence="$(_devlog_fence_nofence "$1" "$2" "$3")"
+  awk -v start="$2" -v end="$3" -v nofence="$nofence" '
     NR < start || NR > end { next }
     /^[ \t]*```/ {
       if (segment) print
-      fence = !fence
+      if (!nofence) fence = !fence
       next
     }
     !fence && /^### 段落 / { segment = 1; next }
