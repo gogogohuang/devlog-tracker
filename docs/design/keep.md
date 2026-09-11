@@ -311,6 +311,41 @@ project summary can only land in the one segment that ends up
 triggering full keep (see Execution order and full keep); every other
 named file's header carries only its own range.
 
+## Kept index
+
+Every `keep-move.sh` invocation, episode or full, leaves a discovery
+pointer behind in `devlog.md` — the point of `keep` is to get content
+*out* of the working log, but "which file did that topic go to" still
+needs to be findable without opening every `devlog.<name>.md`.
+
+After deleting the moved blocks, `keep-move.sh` strips any existing
+trailing `## Kept 索引` block from `devlog.md`, then re-appends it with
+one line added:
+
+```markdown
+## Kept 索引
+- `devlog.<name>.md`：Round <from>-<to>，kept_at <ISO 8601 timestamp>
+```
+
+- **Always rebuilt, never duplicated.** Each run strips the old block
+  and reprints every existing line plus the new one, so there is only
+  ever one `## Kept 索引` heading in `devlog.md`, always at the end,
+  in the order files were kept.
+- **One line per named file**, not per keep run — a batch that keeps
+  three files in one confirmation adds three lines.
+- **Not reconciled with the filesystem.** If a `devlog.<name>.md` is
+  later deleted by hand, its index line is not removed automatically —
+  a ghost row is a known limitation, not a bug to fix here.
+- **SessionStart surfaces this block, not the named files' content.**
+  `hooks/scripts/session-start-devlog.sh` includes the current
+  `## Kept 索引` in the startup/resume/compact/fork excerpt so the next
+  Claude knows a topic was kept and which file to `/devlog-tracker:resume`
+  it from, without ever auto-injecting a keep file's body.
+- **Full keep still gets an index line.** Even though a full keep
+  empties out the historical Rounds and renumbers the leftover open
+  Round to 1, the `## Kept 索引` block (rebuilt from the pre-move
+  content) is preserved on the new `## Round 1`, not dropped.
+
 ## Write order and failures
 
 For each confirmed segment, in order (see Execution order and full
@@ -388,8 +423,9 @@ Stop (`### Summary` / `### Handoff` / Status rules).
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
-| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm |
+| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` |
 | `hooks/scripts/test-keep-move.sh` | Self-check for `keep-move.sh` |
+| `hooks/scripts/session-start-devlog.sh` | Surfaces `## Kept 索引` in the startup/resume/compact/fork excerpt |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |

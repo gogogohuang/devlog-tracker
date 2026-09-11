@@ -212,7 +212,9 @@ not off `### Response`.
   `IN_PROGRESS` / `BLOCKED` also require `#### 工作區` to match a git
   snapshot the hook computes itself (`hooks/scripts/workspace-snapshot.sh`,
   `docs/design/devlog-as-ssot-assessment.md` Phase 1) — content-verified,
-  not just presence-checked. `DONE` / `INTERRUPTED` do not require it.
+  not just presence-checked. `DONE` requires it too when `#### 檔案` is
+  non-empty (a round claiming file changes); a trivial `DONE` with no
+  `#### 檔案`, and `INTERRUPTED`, do not require it.
   A non-empty `#### 檔案`, independent of Status, is likewise
   content-verified against git (`hooks/scripts/files-snapshot.sh`,
   `docs/design/files-verify.md`) — commit blocks exactly, the trailing
