@@ -73,11 +73,20 @@ devlog_kept_index_lines() {
 }
 
 devlog_strip_kept_index() {
+  # Pipe through a second pass that buffers blank lines and only emits them
+  # once a non-blank line follows. Kept 索引 is always the trailing section
+  # (keep-move.sh appends it last), so any blank line(s) left as its
+  # separator are always at true EOF here and get dropped instead of
+  # surviving into the caller's rebuild — this is what stops the separator
+  # from growing by one line on every keep-move.sh call.
   awk '
     /^[ \t]*```/ { fence = !fence }
     !fence && /^## Kept 索引/ { grab = 1; next }
     !fence && grab && /^## / { grab = 0 }
     grab { next }
     { print }
-  ' "$1" > "$2"
+  ' "$1" | awk '
+    /^[ \t]*$/ { pending = pending $0 ORS; next }
+    { printf "%s", pending; pending = ""; print }
+  ' > "$2"
 }

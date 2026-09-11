@@ -202,6 +202,35 @@ else
   echo "PASS: indented fence hides Round 99"
 fi
 
+# --- devlog_strip_kept_index: rebuilding ## Kept 索引 repeatedly must not
+# grow the blank-line separator in front of it (regression: the strip used
+# to preserve the pre-existing separator blank line while the rebuild step
+# in keep-move.sh unconditionally added another one on top of it) ----------
+cat > "$TMP_ROOT/kept.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### Status
+DONE
+EOF
+for i in 1 2 3; do
+  STRIPPED="$TMP_ROOT/kept-stripped-$i"
+  devlog_strip_kept_index "$TMP_ROOT/kept.md" "$STRIPPED"
+  {
+    cat "$STRIPPED"
+    printf '\n## Kept 索引\n'
+    printf -- '- devlog.topic-%s.md\n' "$i"
+  } > "$TMP_ROOT/kept.md"
+done
+HEADING_LINE="$(grep -n '^## Kept 索引' "$TMP_ROOT/kept.md" | head -1 | cut -d: -f1)"
+PREV_LINE="$(sed -n "$((HEADING_LINE - 1))p" "$TMP_ROOT/kept.md")"
+PREV2_LINE="$(sed -n "$((HEADING_LINE - 2))p" "$TMP_ROOT/kept.md")"
+if [ -z "$PREV_LINE" ] && [ -n "$PREV2_LINE" ]; then
+  echo "PASS: exactly one blank line separates content from ## Kept 索引 after 3 rebuilds"
+else
+  echo "FAIL: expected exactly one blank line before ## Kept 索引 after 3 rebuilds, got line $((HEADING_LINE - 1))=[$PREV_LINE] line $((HEADING_LINE - 2))=[$PREV2_LINE]"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
