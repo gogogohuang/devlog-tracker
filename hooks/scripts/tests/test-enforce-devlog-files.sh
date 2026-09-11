@@ -131,6 +131,55 @@ assert_exit "unclaimed extra dirty file (residue) -> still allowed" 0 $?
 rm -f "$TMP_ROOT/residue.txt"
 git -C "$TMP_ROOT" checkout -q -- a.txt
 
+# --- 尚未 commit, fabricated path against a genuinely clean tree -> blocked, not
+# a crash. Regression for Finding 1: path_in_list used to build a bash array
+# via `IFS=',' read -ra arr <<< "$haystack"`; on bash 3.2 (this suite's floor)
+# an empty haystack (clean tree) makes that a genuinely empty array, and
+# "${arr[@]}" on it is an unbound-variable error under `set -uo pipefail` —
+# the script died with exit 1 and a raw traceback instead of the intended
+# exit 2 block. A clean tree is exactly when ACTUAL_JOINED is empty, so this
+# is also the headline case the feature exists to catch (a false "still
+# uncommitted" claim).
+git -C "$TMP_ROOT" status --short --no-renames | grep -q . && {
+  echo "FIXTURE BUG: tree should be clean before the Finding-1 regression test" >&2
+  FAIL=1
+}
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "$(ws_clean)" "尚未 commit：
+修改：ghost.txt" "DONE"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "uncommitted claim against a clean tree -> blocked, not a crash" 2 $?
+case "$MSG" in
+  *"ghost.txt"*) echo "PASS: message names the fabricated path" ;;
+  *) echo "FAIL: message should name ghost.txt, got: $MSG"; FAIL=1 ;;
+esac
+case "$MSG" in
+  *"工作樹乾淨"*) echo "PASS: message shows the actual-dirty fallback text" ;;
+  *) echo "FAIL: message should show the clean-tree fallback text, got: $MSG"; FAIL=1 ;;
+esac
+
+# --- commit resolves but its outside-.devlog/ diff is empty -> must still be
+# compared (not silently fail-open); a fabricated claim against it is blocked.
+# Regression for Finding 2: files_snapshot returns empty stdout both when a
+# hash doesn't resolve and when it resolves but has nothing to report outside
+# .devlog/ — check_commit_block must tell these apart via its own rev-parse,
+# not infer "unresolvable" from empty output. Placed after every test above
+# that hardcodes `$HASH` against the current HEAD, since this test advances
+# HEAD with a new commit.
+echo devlog-only-change > "$TMP_ROOT/.devlog/marker.txt"
+git -C "$TMP_ROOT" add -f .devlog/marker.txt
+git -C "$TMP_ROOT" commit -q -m "devlog-only change"
+DEVLOG_ONLY_HASH="$(git -C "$TMP_ROOT" rev-parse --short HEAD)"
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "$(ws_clean)" "commit ${DEVLOG_ONLY_HASH}：
+新增：fabricated.ts" "DONE"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "commit with empty outside-.devlog diff + fabricated claim -> blocked" 2 $?
+case "$MSG" in
+  *"跟宣稱不符"*) echo "PASS: message reports the mismatch instead of silently passing" ;;
+  *) echo "FAIL: message should report a mismatch, got: $MSG"; FAIL=1 ;;
+esac
+
 # --- malformed 檔案 body -> blocked, format-violation message ------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 write_round "$(ws_clean)" "新增了一些東西，忘了寫成規定格式" "DONE"

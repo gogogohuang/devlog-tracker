@@ -341,6 +341,21 @@ if [ -n "$LAST_ROUND" ]; then
     CUR_HASH=""
     CUR_CLAIM=""
     UNCOMMITTED_CLAIM_PATHS=""
+    # Printed after a format-violation message so Claude has the exact
+    # grammar to correct against, same rigor #### 工作區 already gets on
+    # mismatch (it prints its own EXPECTED_WS). Category lines can be
+    # omitted per block for a category with nothing to report, same as
+    # files-snapshot.sh's own output.
+    FILES_GRAMMAR="正確格式（照這個結構寫，分類行可依實際情況省略沒有變更的類別）：
+commit <hash>：
+新增：<path>, <path>
+修改：<path>
+刪除：<path>
+
+尚未 commit：
+新增：<path>
+修改：<path>
+刪除：<path>"
 
     files_body_parse() {
       # Normalizes #### 檔案's body into tagged records, one per input
@@ -370,24 +385,44 @@ if [ -n "$LAST_ROUND" ]; then
     }
 
     check_commit_block() {
+      # files_snapshot returns empty stdout for two different reasons: the
+      # hash doesn't resolve at all, or it resolves fine but that commit's
+      # diff is entirely inside .devlog/ (or the commit is empty). Only the
+      # former is fail-open territory — a resolvable commit must still be
+      # compared even when its expected content is genuinely empty, or a
+      # claim naming fabricated paths against it would silently pass. So
+      # resolve the hash here, separately from computing $expected, instead
+      # of inferring "unresolvable" from empty output.
       local h="$1" claimed="$2" expected
+      git -C "$PROJECT_DIR" rev-parse --verify -q "${h}^{commit}" >/dev/null 2>&1 || return 0
       expected="$(files_snapshot "$PROJECT_DIR" "$h" 2>/dev/null || true)"
-      [ -n "$expected" ] || return 0
       if [ "$claimed" != "$expected" ]; then
-        FILES_ERR="commit ${h} 的內容跟宣稱不符。請把這個區塊換成以下逐字內容：
+        FILES_ERR="commit ${h} 的內容跟宣稱不符。請把這個區塊換成以下逐字內容："
+        if [ -n "$expected" ]; then
+          FILES_ERR="$FILES_ERR
 commit ${h}：
 ${expected}"
+        else
+          FILES_ERR="$FILES_ERR
+這個 commit 在 .devlog/ 以外沒有變更，「#### 檔案」裡不該有這個 commit 區塊（或整節省略，如果沒有其他 commit／尚未 commit 內容要報）。"
+        fi
       fi
     }
 
     path_in_list() {
-      local needle="$1" haystack="$2" item
-      local -a arr
-      IFS=',' read -ra arr <<< "$haystack"
-      for item in "${arr[@]}"; do
-        item="$(printf '%s' "$item" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
-        [ "$item" = "$needle" ] && return 0
-      done
+      # $1 = needle path (already trimmed by the caller), $2 = comma-space
+      # -joined haystack (may be empty — files_snapshot's join format, see
+      # files-snapshot.sh). Array-free on purpose: bash 3.2 (macOS's system
+      # bash, this suite's de-facto floor) makes "${arr[@]}" on a genuinely
+      # empty array an unbound-variable error under `set -uo pipefail`, and
+      # an empty haystack (clean tree) is exactly the case this check must
+      # not crash on. Padding both sides with ", " avoids matching a needle
+      # that is only a substring of a longer path (e.g. "a.txt" must not
+      # match "za.txt" or "a.txt2").
+      local needle="$1" haystack="$2"
+      case ", $haystack, " in
+        *", $needle, "*) return 0 ;;
+      esac
       return 1
     }
 
@@ -411,12 +446,16 @@ ${expected}"
               UNCOMMITTED_CLAIM_PATHS="${UNCOMMITTED_CLAIM_PATHS:+$UNCOMMITTED_CLAIM_PATHS, }${b}"
               ;;
             *)
-              FILES_ERR="#### 檔案 格式不對：分類行出現在任何 commit/尚未 commit 標頭之前。"
+              FILES_ERR="#### 檔案 格式不對：分類行出現在任何 commit/尚未 commit 標頭之前。
+
+${FILES_GRAMMAR}"
               ;;
           esac
           ;;
         ERR)
-          FILES_ERR="#### 檔案 格式不對，看不懂這一行：${a}"
+          FILES_ERR="#### 檔案 格式不對，看不懂這一行：${a}
+
+${FILES_GRAMMAR}"
           ;;
       esac
     done < <(printf '%s\n' "$FILES_BODY" | files_body_parse)
