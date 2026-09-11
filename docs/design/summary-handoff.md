@@ -224,7 +224,12 @@ not off `### Response`.
   決策/檔案/工作區/現況/下一步 are also checked; unrecognized `#### `
   headings are ignored. Prose quality elsewhere (Summary, 決策, 現況) is
   still on Claude — `#### 檔案` verification is path-level only, not a
-  check on 決策/現況/Summary narrative truthfulness.
+  check on 決策/現況/Summary narrative truthfulness. `#### 下一步` gets one
+  additional, non-semantic check: when its entire trimmed body is a
+  single line that exactly equals a known filler phrase ("繼續完成" etc.,
+  `docs/design/next-step-blacklist.md`), Stop blocks it. This is a literal
+  string match, not prose scoring — see that doc's "Relationship to 'no
+  scoring prose'".
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
   Acceptable: no plausible reason for those headings to appear except a

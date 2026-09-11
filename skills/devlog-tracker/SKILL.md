@@ -207,7 +207,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」且不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
 新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）

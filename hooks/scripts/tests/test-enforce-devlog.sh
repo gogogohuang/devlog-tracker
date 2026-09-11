@@ -839,6 +839,99 @@ EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "illegal Status -> blocked" 2 $?
 
+# --- Next-step blacklist Scenario 1: pure filler phrase -> blocked --------
+# (docs/design/next-step-blacklist.md)
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 94 — 2026-09-09T10:44:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 現況
+做到一半。
+#### 下一步
+繼續完成
+
+### Status
+IN_PROGRESS
+EOF
+BLACKLIST_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+assert_exit "下一步 is pure filler phrase '繼續完成' -> blocked" 2 $?
+case "$BLACKLIST_MSG" in
+  *"是空話"*) echo "PASS: filler-phrase message names it as 空話" ;;
+  *) echo "FAIL: expected filler-phrase message, got: $BLACKLIST_MSG"; FAIL=1 ;;
+esac
+
+# --- Next-step blacklist Scenario 2: filler phrase with trailing 。 --------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 95 — 2026-09-09T10:45:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 現況
+做到一半。
+#### 下一步
+持續優化。
+
+### Status
+BLOCKED
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "下一步 is '持續優化。' with trailing punctuation -> blocked (BLOCKED status too)" 2 $?
+
+# --- Next-step blacklist Scenario 3: phrase embedded in a longer sentence -
+# Must NOT block -- only an exact whole-body match is filler.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 96 — 2026-09-09T10:46:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 工作區
+非 git 工作區
+#### 現況
+做到一半。
+#### 下一步
+先繼續完成 foo.ts 的錯誤處理，再跑一次測試。
+
+### Status
+IN_PROGRESS
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "下一步 contains 繼續完成 inside a concrete sentence -> allowed" 0 $?
+
+# --- Next-step blacklist Scenario 4: multi-line body, one line is filler --
+# Must NOT block -- the blacklist only fires when the whole body is a
+# single line.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 97 — 2026-09-09T10:47:00+08:00
+
+### Summary
+還在做。
+
+### Handoff
+#### 工作區
+非 git 工作區
+#### 現況
+做到一半。
+#### 下一步
+繼續完成
+打開 bar.ts 補上測試。
+
+### Status
+IN_PROGRESS
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "下一步 multi-line body including a filler line -> allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
