@@ -53,9 +53,12 @@ No file paths, commit hashes, skill names, or stepwise commands.>
 if no choice was made.>
 
 #### 檔案
-<added / modified / deleted paths. If a commit happened, say so (hash or
-subject). If files changed but were not committed, say that. Omit the whole
-subsection if no files changed.>
+<machine-checked block grammar (`docs/design/files-verify.md`): zero or more
+`commit <hash>：` blocks in chronological order, each followed by up to
+three category lines (`新增：`/`修改：`/`刪除：`, comma-joined paths, omit a
+category with nothing to report), plus at most one trailing `尚未 commit：`
+block in the same shape for whatever is still dirty. Omit the whole
+subsection if no files changed outside `.devlog/`.>
 
 #### 工作區
 <git snapshot at close, for the next Claude to check against the real tree.
@@ -160,12 +163,15 @@ add the missing heading(s) to that last Round.
 
 Details:
 
-- **Presence plus a light structure check, plus one machine-verified
-  cache field.** The hook does not check that Summary is 2–4 sentences
-  or that 決策／現況／檔案 prose is accurate. Present Handoff subsections
+- **Presence plus a light structure check, plus two machine-verified
+  fields.** The hook does not check that Summary is 2–4 sentences
+  or that 決策／現況 prose is accurate. Present Handoff subsections
   among 決策/檔案/工作區/現況/下一步 must be in that order and not
   duplicated. `IN_PROGRESS` / `BLOCKED` `#### 工作區` is compared to a
-  snapshot the hook computes (`workspace-snapshot.sh`). Bodies must be
+  snapshot the hook computes (`workspace-snapshot.sh`); a non-empty
+  `#### 檔案` is compared to git via `files-snapshot.sh`
+  (`docs/design/files-verify.md`) — commit blocks exactly, the
+  uncommitted block as a one-directional subset check. Bodies must be
   non-empty.
 - **Last Round is the unit.** A turn that only appends a Checkpoint, or a
   Span budget-expiry one-liner, passes as long as the last Round already
@@ -207,9 +213,16 @@ not off `### Response`.
   snapshot the hook computes itself (`hooks/scripts/workspace-snapshot.sh`,
   `docs/design/devlog-as-ssot-assessment.md` Phase 1) — content-verified,
   not just presence-checked. `DONE` / `INTERRUPTED` do not require it.
-  Handoff subsection order and duplicates among 決策/檔案/工作區/現況/下一步
-  are also checked; unrecognized `#### ` headings are ignored. Prose
-  quality elsewhere (Summary, 決策, 現況) is still on Claude.
+  A non-empty `#### 檔案`, independent of Status, is likewise
+  content-verified against git (`hooks/scripts/files-snapshot.sh`,
+  `docs/design/files-verify.md`) — commit blocks exactly, the trailing
+  uncommitted block as a one-directional subset check; a body that
+  doesn't parse into the block grammar blocks the turn rather than
+  failing open. Handoff subsection order and duplicates among
+  決策/檔案/工作區/現況/下一步 are also checked; unrecognized `#### `
+  headings are ignored. Prose quality elsewhere (Summary, 決策, 現況) is
+  still on Claude — `#### 檔案` verification is path-level only, not a
+  check on 決策/現況/Summary narrative truthfulness.
 - **A heading written for other reasons still counts.** Quoting this spec
   into `devlog.md` under those exact heading lines would satisfy the hook.
   Acceptable: no plausible reason for those headings to appear except a
@@ -224,7 +237,8 @@ not off `### Response`.
 ## Out of scope
 
 - Rewriting or migrating historical Rounds that still use `### Response`.
-- Hook checks for `#### 決策` / `#### 檔案` / `#### 現況`, or scoring
-  Summary prose. (`#### 工作區` content is checked for `IN_PROGRESS` /
-  `BLOCKED`; see Known limitations.)
+- Hook checks for `#### 決策` / `#### 現況`, or scoring Summary prose.
+  (`#### 工作區` content is checked for `IN_PROGRESS` / `BLOCKED`, and a
+  non-empty `#### 檔案` is checked at the path level regardless of
+  Status; see Known limitations.)
 - Changing compact's retain rules.
