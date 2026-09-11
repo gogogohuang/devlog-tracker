@@ -196,7 +196,13 @@ assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recogniz
 # devlog-as-ssot-assessment.md flags as uncaught — machine-verify it the
 # same way IN_PROGRESS/BLOCKED already are. A trivial DONE round with no
 # #### 檔案 stays exempt (previous test above), matching SKILL.md's
-# "瑣碎輪只留現況一句（沒有工作區）" convention untouched. ------------------
+# "瑣碎輪只留現況一句（沒有工作區）" convention untouched.
+#
+# The #### 檔案 body below is just "尚未 commit：" with no claimed paths —
+# this suite only cares about triggering the 工作區 check via a non-empty
+# #### 檔案, not about 檔案 content itself (that's
+# test-enforce-devlog-files.sh's job, Phase 4). Any grammar-valid,
+# always-passing body works here. ------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 {
   echo "## Round 6 — 2026-09-10T00:25:00+08:00"
@@ -206,7 +212,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Handoff"
   echo "#### 檔案"
-  echo "新增 a.txt，已 commit"
+  echo "尚未 commit："
   echo "#### 現況"
   echo "fixture"
   echo ""
@@ -229,7 +235,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Handoff"
   echo "#### 檔案"
-  echo "新增 a.txt，已 commit"
+  echo "尚未 commit："
   echo "#### 工作區"
   echo "main @ 0000000，工作樹乾淨"
   echo "#### 現況"
@@ -250,7 +256,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Handoff"
   echo "#### 檔案"
-  echo "新增 a.txt，已 commit"
+  echo "尚未 commit："
   echo "#### 工作區"
   echo "main @ ${HASH}，工作樹乾淨"
   echo "#### 現況"
