@@ -1,6 +1,6 @@
 # devlog-tracker
 
-**版本** 0.13.1
+**版本** 0.13.2
 
 在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
@@ -113,6 +113,19 @@ sequenceDiagram
 - **Span Mode**：`/loop`、Workflow 這類自動續接的長任務，不必每個 tick 都寫完整 Round，用 tick 計數當安全閥；崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
 - **Reply Fold**：Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——提問前先手動記一段問題原文再跑 `await-open.sh` 標記，下一則訊息（答案）就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。連續多輪一問一答（例如 grilling）時，中途每題只記問題段落，不必每題重寫 Summary/Handoff/Status，等整場問答真正結束才收尾一次。跟 `AskUserQuestion` 工具無關（同一 turn 內問答，本來就不會產生第二個 Round）。背景 task-notification（子 agent 完成通知）也會自動走同一套折疊機制，不留原始 XML，只記精簡摘要。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
 - **Lessons Mode**（預設關閉，不自動）：開著時，Status 從 `BLOCKED` 解開或明顯繞路才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。完全不 hook 強制、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
+
+## 跟原版 agfnow/agentflow 的差異
+
+參考 agfnow/agentflow 的 devlog 基礎協定做的簡化版，只保留「逐輪對話紀錄」這一層：
+
+| | agentflow 原版 | 這個簡化版 |
+|---|---|---|
+| 涵蓋範圍 | devlog 協定 + 10 步驟 SDD pipeline | 只有 devlog 協定 |
+| 接續機制 | `godev` 關鍵字 + stop hook | `/devlog-tracker:start` 開開關；SessionStart 在 startup / resume / compact / fork 注入；`/clear` 後用 `/devlog-tracker:continue` |
+| 記錄機制 | 依 SDD 步驟完成度寫入 | 開關開著時 Stop hook 強制每輪都要更新，跟 plan 完成度無關 |
+| worker | 內建 subagent 或 external runner 外包 | 沒有，全部由當前 session 直接處理 |
+| 審查機制 | 對抗式審查、3ways 多模型辯論 | 沒有 |
+| 歸檔觸發 | 依大小自動判斷 | 使用者主動下 `/devlog-tracker:compact`；有主題要留名時用 `/devlog-tracker:keep` |
 
 ## 測試
 

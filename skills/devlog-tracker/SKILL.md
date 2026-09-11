@@ -264,262 +264,60 @@ Handoff 只留「現況」一句（沒有「工作區」），Status 多半 `DON
 
 ## Round Segments：單輪內的階段性記錄
 
-一輪如果包含好幾個明顯階段（先探索、再做決策、再實作、再驗證），不要全部
-憋到最後才寫一次 Summary／Handoff——那樣中途 crash 會整輪的過程全部遺失，事後也
-看不出中間走過的路。改成邊做邊在這輪底下追加階段性子區塊，插在 User Input 和
-收尾的 Summary／Handoff 之間：
+一輪如果有好幾個明顯階段（先探索、再決策、再實作、再驗證），不要憋到最後才寫
+一次 Summary／Handoff——中途 crash 會整個過程全部遺失。邊做邊在 User Input 和
+收尾的 Summary／Handoff 之間追加 `### 段落 N - HH:MM` 子區塊，跟判斷
+`Status: IN_PROGRESS` 同一套標準：「有意義的階段性結果」才寫，不是照時間或工具
+呼叫次數機械觸發。不要把段落內容再抄進 Summary 或 Handoff。
 
-`````markdown
-## Round 15 — 2026-09-09T09:00:00+08:00
+另有一道保底：同一輪連續約 10 分鐘（可用 `/devlog-tracker:segment-watch <時間長度>`
+調整）沒改 `devlog.md`，下一個工具會被 PreToolUse hook 擋住，先 Read 再用
+Edit／StrReplace 追加一段（**禁止**用 Write 覆寫整份檔）。
 
-### User Input
-幫我重構 XXX 模組
-
-### 段落 1 - 09:12
-讀完現有程式碼，發現三個地方耦合...
-
-### 段落 2 - 09:20
-決定拆成 A/B 兩個檔案，理由...
-
-### 段落 3 - 09:35
-完成拆分，跑測試全過
-
-### Summary
-把 XXX 模組拆成 A/B 兩個檔案，測試全過。
-
-### Handoff
-#### 決策
-拆成 A/B，理由是三處耦合都集中在同一個檔。
-#### 檔案
-新增 a.ts、b.ts；刪除 xxx.ts。尚未 commit。
-#### 現況
-拆分完成，測試全過。
-
-### Status
-DONE
-`````
-
-這個範例是 DONE 且沒有後續，所以沒有 `#### 工作區` 與 `#### 下一步`；這兩節只有 IN_PROGRESS／BLOCKED 才寫。
-
-**什麼時候該寫一個段落**：跟判斷 `Status: IN_PROGRESS` 用的同一套標準——「有意義的
-階段性結果」，不是照時間或工具呼叫次數機械觸發。短的、沒什麼階段可言的一輪，
-照舊只寫 Summary／Handoff 就好，不用硬湊段落。不要把段落內容再抄進 Summary 或 Handoff。
-
-主路徑仍是判斷何時寫段落，不是照時間機械切段。另外有一道保底：`/devlog-tracker:start`
-之後，同一輪若連續 10 分鐘（`max_silent_seconds`，預設 600）都沒改 `devlog.md`，
-下一個工具會被 PreToolUse hook 擋住。被擋時先 **Read** `.devlog/devlog.md`，再用
-Edit／StrReplace **追加**一段 `### 段落`（一行也可以）；**禁止**用 Write 覆寫整份檔。
-寫了任何內容計時就歸零。不要用 Bash 繞過。沒呼叫工具就不會響。Claude Code
-dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門會跳過（它們
-與主對話共用 `session_id`，不該被逼寫父輪段落）。門檻用
-`/devlog-tracker:segment-watch <時間長度>`（例如 `/devlog-tracker:segment-watch 5 分鐘`）
-調整，不用手改 `.devlog/.segment-state` 的 `max_silent_seconds`。
-
-收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
+完整格式範例、寫入細則、跟 dynamic workflow／subagent 的例外情況，見
+`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/round-segments.md`。
 
 ## Reply Fold：把「Claude 提問、user 回答」記成同一個 Round
 
 一輪如果是 Claude 用純文字結尾提出一個具體問題（不是用 `AskUserQuestion`
-工具、而是整個 turn 就在這句問題上結束），下一則使用者訊息通常就是答案，
-不是新話題。預設行為（每個 `UserPromptSubmit` 開一個新 `## Round`）會把這
-組問答拆成兩個不相關的 Round。Reply Fold 讓這種情況折進同一個 Round，記
-成一個 `### 段落`。
+工具），下一則使用者訊息通常是答案、不是新話題——預設行為（每個
+`UserPromptSubmit` 開新 `## Round`）會把這組問答硬拆成兩個不相關的 Round。
+Reply Fold 讓它折進同一個 Round。
 
-**跟 `AskUserQuestion` 工具的差異：** 用 `AskUserQuestion` 問問題時，問題
-跟答案都在同一個 turn 裡（呼叫工具、拿到結果，沒有中間的 Stop），根本不
-會產生第二個 Round，不需要也不該用 Reply Fold。Reply Fold 只處理「整個
-turn 已經結束、下一則訊息才拿到答案」這種情況。
+**提問前**（結束 turn 之前）：先用 Edit 在 `### Summary` 之前插入一段
+`### 段落（Claude 提問）` 記下問題原文，再跑
+`${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh` 標記「下一則訊息大概是在
+回答這個 Round」。使用者回答時 `round-start.sh` 會自動折成對應段落，不用手動
+處理。連續多輪一問一答（例如 grilling）時不必每題重寫 Summary／Handoff／
+Status，只有整場問答真正結束才收尾一次。
 
-**什麼時候該開：** 確定要用文字問題結束這個 turn 時，在結束 turn 之前：
-
-1. 先用 Edit 在這個 Round 的 `### Summary` 之前插入一個小段落，記下**這次
-   問的問題原文**（跟自動折入答案用同一種格式，方便前後對照）：
-
-   `````markdown
-   ### 段落 N - HH:MM（Claude 提問）
-   ```text
-   <問題原文，跟 User Input 一樣的截斷/遮罩規則>
-   ```
-   `````
-
-   這一步不能省——沒有它，devlog 裡只留得下使用者的回答（下一則訊息自動
-   折入的段落），問的是什麼反而不見了，事後只看檔案會看不懂答案在答什麼。
-2. 確保這一輪的 Summary／Handoff／Status 存在且有效（`Status` 常見是
-   `BLOCKED`，但 `IN_PROGRESS` 也可能）——**第一次**提問要完整寫；如果這已
-   經是同一個 Round 內連續第二題以後的提問，且工作區、決策都還沒變，不用
-   整段重寫，見下面「連續多輪一問一答」。
-3. 用 Bash 執行：
-
-```bash
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh"
-```
-
-這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
-Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
-
-**下一則訊息進來之後會自動發生什麼事：** `round-start.sh` 看到
-`.awaiting-reply` 且輪次跟目前最後一個 `## Round` 吻合，就不開新 Round，
-改成在那個 Round 的 `### Summary` 之前插入一個新段落：
-
-`````markdown
-### 段落 2 - 14:32（回覆上一輪的問題）
-```text
-<使用者這則訊息的原話，跟 User Input 一樣的截斷/遮罩規則>
-```
-`````
-
-`.devlog/.round-open` 會重新指向這個 Round，讓這輪如果又意外中斷，
-`INTERRUPTED` 一樣能正確蓋在同一個 Round 上。折入之後，如果問答到此結束、
-要往下做別的事了，Claude 照常編輯這個 Round 的 Summary／Handoff／Status，
-反映答案後的結果；如果答案帶出**下一個**問題（連續問答），見下面這段。
-
-**連續多輪一問一答（例如 grilling）：只在真正結束時完整收尾。** 一個 Round
-裡如果連續好幾輪都是「Claude 問一題、使用者答一題」，不要每題都重寫一次
-完整的 Summary／Handoff／Status——那樣每題都要跑一次大改動，會把使用者剛
-答完的內容跟 Claude 剛問的下一題擠開，變得很難照順序讀。改成：
-
-- 答案：下一則訊息進來時，Reply Fold 自動折入，不用手動處理。
-- 下一題：只做上面「什麼時候該開」的步驟 1（插入一個 `### 段落
-  （Claude 提問）` 記下問題原文）+ 步驟 3（`await-open.sh`），**不必**重寫
-  Summary／Handoff／Status——只要工作區、決策這些沒變，原本那份還有效。
-- 真正收尾（結束這整場問答、要換話題或往下做別的事）時，才完整改寫一次
-  Summary（總結整場問答得出的結論）與 Handoff（決策／現況／下一步，反映
-  最終結果），Status 改成當下該有的值。
-
-這樣一整場問答結束後，devlog 裡會依序留下每一題的原文段落與對應的回答
-段落，跟一份收尾時寫的總結——問題和答案都保留了，但中途不會被大段落
-的收尾內容打斷。
-
-**猜錯的處理：** hook 沒辦法驗證「下一則訊息真的是在回答」，只看
-`.awaiting-reply` 有沒有開著。如果開了之後使用者其實問了不相干的新問題，
-還是會被自動折進舊 Round 當一個段落。發現猜錯時，在那個段落裡說明「其實
-是新話題」，然後自己手動開一個新的 `## Round` 接手新請求——不用回頭改寫
-被誤折的段落。
-
-**背景 task-notification 也走同一套折疊，但完全自動：** 如果送進來的
-`prompt` 本身是一段 `<task-notification>…</task-notification>`（子 agent
-在背景完成的通知，不是使用者真的打字），`round-start.sh` 會自己偵測、不
-需要 Claude 先跑 `await-open.sh`。原始 XML 不會被記下來，只留一行精簡摘要
-（例如 `Agent "Fix wave" finished（status=completed, task-id=t1）`），折成
-`### 段落 N - HH:MM（背景任務通知）` 插進最後一個 Round；若當時 `devlog.md`
-還沒有任何 Round，才會退回開一個新 Round，但內容一樣是精簡摘要。
-
-這個標記檔也會跨 `/clear` 存活：如果開了之後中間發生過一次 `/clear`，
-下一則訊息進來時 Claude 早就不記得當初問的是什麼，卻還是會被折進那個
-已經沒有上下文的舊 Round。發現時的處理跟上面猜錯的情況一樣——在那個段落
-裡說清楚，再手動開一個新的 `## Round` 接手。
-
-**跟 Span Mode 的關係：** 兩者同時存在時（不常見），Span Mode 優先——這個
-tick 會被 Span Mode 安靜跳過，`.awaiting-reply` 照樣被消耗掉但不產生任何
-折入。
-
-**跟 checkpoint 計數的關係：** 折入的這個 tick 不算開新 Round，
-`rounds_since_checkpoint` 不會遞增，跟 Span Mode 跳過的 tick 待遇一致。
+完整步驟、折疊格式、猜錯的處理、跟 task-notification／Span Mode／checkpoint
+計數的關係，見 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/reply-fold.md`。
 
 ## Span Mode：橫跨多次自動續接的長任務
 
-`/loop` 動態模式、`Workflow`、或任何會讓 Claude 被自己排程（`ScheduleWakeup`、
-背景 agent 完成通知）反覆喚醒、而不是被使用者手動打字觸發的長任務，如果每次
-自動喚醒都被當成一輪、強制要求完整寫入 devlog.md，會逼出很多沒有意義的紀錄，
-或是卡住整個自動化流程。Span Mode 是這種情境下的例外機制。
+`/loop` 動態模式、`Workflow`、或任何被自己排程（`ScheduleWakeup`、背景 agent
+完成通知）反覆喚醒、不是使用者手動打字觸發的長任務，如果每個自動 tick 都當一
+輪強制寫，會逼出大量沒意義的紀錄或卡住整條自動化流程。只有**確定接下來會進入
+一連串自動續接**時才開（一般互動式對話不需要，也不應該開），用
+`/devlog-tracker:span` 建立 `.devlog/.span-open`，累積到門檻
+（`max_silent_ticks`）才強制寫一次；崩潰最多漏記固定數量的 tick，不是整段 span。
 
-### 什麼時候該開一個 span
-
-只有在**確定接下來會進入一連串自動續接**時才開（例如剛要開始跑 `/loop` 動態
-模式、或剛派出一個 `Workflow`），不是每輪隨便判斷。一般的互動式對話不需要，
-也不應該開 span。
-
-### 怎麼開一個 span
-
-寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，使用
-`/devlog-tracker:span`（或跑 `span-open.sh`）建立 `.devlog/.span-open`。
-除非腳本不可用，否則不要手寫 JSON。檔案格式如下：
-
-```json
-{
-  "round": 12,
-  "opened_at": "2026-09-08T21:40:00+08:00",
-  "ticks_since_checkin": 0,
-  "max_silent_ticks": 5
-}
-```
-
-- `round`：剛寫的那個 Round 的編號
-- `opened_at`：現在的 ISO 8601 時間戳
-- `ticks_since_checkin`：固定從 0 開始
-- `max_silent_ticks`：這個 span 容許連續幾次自動 tick 都不寫 devlog.md，自己
-  依任務性質挑一個合理值（沒有標準答案，抓 5 這類量級即可）
-
-### span 開著的時候會自動發生什麼事
-
-不用手動維護——`round-start.sh` 每次自動續接觸發時會自己把 `ticks_since_checkin`
-+1，`enforce-devlog.sh` 只要這個數字還沒到 `max_silent_ticks` 就直接放行，
-devlog.md 完全不用動。一旦累積到門檻，Stop hook 會退回正常模式，**這一輪就
-會被要求寫東西才能結束**——看到這種擋下來的訊息，代表這個 span 的「安靜額度」
-用完了，寫點輕量的進度（不用完整 Round，一行都可以）就能讓它繼續運作。
-前提是最後一個 Round 裡已經有 `### Summary` 與 `### Handoff`——一行是追加到那個 Round，不是新開一個缺標題的 Round。若這輪是新開的 Round，兩個標題都要有。
-
-### 怎麼關掉一個 span
-
-整個 Ask 真的做完時：**開一個新的 Round**（不要回頭改寫當初開 span 那個
-Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」；Summary 用 2–4 句
-給人看這段自動化的結論；Handoff 依小節總結整段期間做了什麼（決策／檔案／工作區／現況／
-下一步；`DONE` 省略工作區與下一步）；Status 正常寫 `DONE`／`IN_PROGRESS`／`BLOCKED`；然後刪掉 `.devlog/.span-open`。
-
-### 已知限制：分辨不出「這是自動續接還是真人插話」
-
-Claude Code 目前沒有任何 hook 欄位能分辨一個 tick 是自動排程觸發的，還是使用
-者真的手動打了新訊息——這兩種在 span 開著時會被一視同仁地當成一個 tick。如果
-span 開著時你發現進來的其實是一個跟自動任務無關的新請求，應該自己先關掉 span
-（刪除 `.span-open`、補寫收尾的 Round）再處理新請求，不要讓它悄悄被吞進正在
-開著的 span 裡。
-
-### 崩潰時的風險
-
-span 開著時 session 如果崩潰，最壞會漏記最近 `max_silent_ticks` 個 tick 的
-活動——不是整段 span，風險有明確上限。這是跟「回合進行到一半被砍斷」（見上面
-「需要誠實說明的邊界」）同一類、但用 tick 數量而不是單一回合為界的風險。
+JSON 格式、開關步驟、已知限制（分辨不出自動續接 vs 真人插話），見
+`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/span-mode.md`（設計動機
+見 `docs/design/span-mode.md`）。
 
 ## Checkpoint Mode：定期摘要
 
-跟 Span Mode 處理的是不同問題：Span Mode 管的是「一輪內部/自動續接期間要不要
-強制寫」，Checkpoint Mode 管的是「累積夠多輪之後，要不要在 devlog.md 裡插入一段
-橫跨多輪的摘要」，讓翻閱 devlog.md 的人不用逐輪爬完才知道整體進度。
+跟 Span Mode 不同：Span 管「一輪內部/自動續接期間要不要強制寫」，Checkpoint
+管「累積夠多輪之後，要不要插入一段橫跨多輪的摘要」，讓翻閱 devlog.md 的人不用
+逐輪爬完才知道整體進度。`/devlog-tracker:start` 後全自動運作，累積約 20 輪
+（可用 `/devlog-tracker:checkpoint <輪數>` 調整）沒寫 `## Checkpoint`，Stop
+hook 會要求補一段。
 
-### 怎麼運作（不用手動開關）
-
-`/devlog-tracker:start` 會自動建立 `.devlog/.checkpoint-state`，之後全程自動：
-
-- 每個互動輪次，`round-start.sh` 把裡面的 `rounds_since_checkpoint` +1
-  （Span Mode 的 span 開著、這個 tick 會被安靜放行時不算）
-- `enforce-devlog.sh` 每輪檢查一次：如果 `devlog.md` 裡 `## Checkpoint` 開頭的
-  標題數量比上次看到的多，代表這輪寫了新的 checkpoint，自動把計數器歸零；
-  否則如果 `rounds_since_checkpoint` 已經到 `max_silent_rounds`（預設 20），
-  就擋下這一輪，要求補寫一段摘要
-
-### 被要求補寫的時候該怎麼寫
-
-在 `devlog.md` 尾端追加：
-
-```markdown
-## Checkpoint（Round <X>-<Y> 摘要）
-這段期間完成了...、修了...、決定採用...
-```
-
-`X`-`Y` 是這段還沒被摘要過的 Round 範圍，內容對齊各輪 Summary 抓重點就好，不用逐輪複述、
-也不要變成各輪 Handoff 的合集——細節本來就還留在 Round 區塊裡，checkpoint 只是給翻閱時的路標，
-不替代每輪 Summary。寫完之後這一輪就會正常結束，不用再做任何事。
-
-### 調整門檻
-
-`max_silent_rounds` 預設 20，覺得這個專案的節奏不合適，用
-`/devlog-tracker:checkpoint <正整數輪數>` 調整（不要手改
-`.devlog/.checkpoint-state`，除非指令不可用）。
-
-### `/devlog-tracker:pause` 之後
-
-暫停強制記錄時 `.checkpoint-state` 不會被刪除，計數保留；之後重新
-`/devlog-tracker:start` 會接著原本的計數繼續，不會歸零重算。
+運作機制、補寫格式、`/devlog-tracker:pause` 之後的行為，見
+`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/checkpoint-mode.md`
+（設計動機見 `docs/design/checkpoint-mode.md`）。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
 
@@ -549,44 +347,18 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 ## Lessons Mode：開發歷程教訓（預設關閉，非架構知識庫）
 
-`docs/design/lessons-mode.md` 的完整設計。這裡只講操作規則。
+跟 Checkpoint／Span 不同，管的是「開發**過程**踩過的坑」，不是進度或架構——架構
+決策的 SSOT 永遠是 `docs/design/*.md`。預設關閉，隸屬主開關（沒下過
+`/devlog-tracker:start` 會被拒絕）。開著時只有兩種訊號考慮記一筆：這輪 `Status`
+從 `BLOCKED` 解開，或你自行判斷這輪明顯繞了一圈——完全不 hook 強制，寫不寫都不
+影響這一輪能不能收尾。
 
-跟 Checkpoint／Span 不同，Lessons Mode 管的是「開發**過程**踩過的坑」，不是進度或架構——
-架構/設計決策的 SSOT 永遠是 `docs/design/*.md`，這個模式不取代它。**預設關閉**，隸屬主開關：
-`/devlog-tracker:lessons-on` 若沒下過 `/devlog-tracker:start`（`.enabled` 不存在）會直接拒絕，
-因為沒有 Round/Status 歷史可判斷「BLOCKED→解開」這個訊號。`/devlog-tracker:lessons-off` 只刪
-`.lessons-enabled`，不動任何已寫的 `devlog.lessons.*.md` 或索引。
-
-**開著的時候，只有兩種訊號會讓你考慮記一筆**：這一輪的 `### Status` 從 `BLOCKED` 變成別的值
-（機器可判斷，但不因此強制），或你自行判斷這輪明顯繞了一圈才找到對的做法。**完全不 hook
-強制**——寫不寫都不影響這一輪能不能收尾，跟「`#### 決策` 沒有就整節省略」同一種精神，不要
-自己加壓力覺得每輪都要交一份。
-
-**寫法**：跑（`PLUGIN_ROOT` 同其他指令）：
-
-```bash
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/lessons-append.sh" \
-  --topic "<主題 kebab-case slug，跟 keep 的 <name> 同一套正規化規則>" \
-  --text "<自由散文，一段就好：卡在哪、怎麼解開、下次怎麼避免>"
-```
-
-同一個主題重複呼叫會累加進同一個 `devlog.lessons.<topic>.md`；不同主題各自成檔。內容不用固定
-子欄位，跟 `#### 決策` 一樣是敘事性的，不要硬套模板。腳本會自動重建 `devlog.md` 尾端的
-`## Lessons 索引`（每個主題檔一行：則數、最新一則的標題、更新時間），SessionStart 只注入這個
-索引，不會注入任何 `devlog.lessons.*.md` 的全文。要看全文用 `/devlog-tracker:lessons [<topic>]`
-（沒給 topic 就只印索引）——這是純讀取，不像 `resume` 會核對工作區或等使用者確認才動手。
+寫法、per-topic 存檔規則、索引重建，見
+`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
+設計見 `docs/design/lessons-mode.md`）。
 
 ## 無條件清空：`/devlog-tracker:clean`
 
 把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下，重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。
 
-## 跟原版 agentflow 的差異
-
-| | agentflow 原版 | 這個簡化版 |
-|---|---|---|
-| 涵蓋範圍 | devlog 協定 + 10 步驟 SDD pipeline | 只有 devlog 協定 |
-| 接續機制 | `godev` 關鍵字 + stop hook | `/devlog-tracker:start` 開開關；SessionStart 在 startup / resume / compact / fork 注入；`/clear` 後用 `/devlog-tracker:continue` |
-| 記錄機制 | 依 SDD 步驟完成度寫入 | 開關開著時 Stop hook 強制每輪都要更新，跟 plan 完成度無關 |
-| worker | 內建 subagent 或 external runner 外包 | 沒有，全部由當前 session 直接處理 |
-| 審查機制 | 對抗式審查、3ways 多模型辯論 | 沒有 |
-| 歸檔觸發 | 依大小自動判斷 | 使用者主動下 `/devlog-tracker:compact`；有主題要留名時用 `/devlog-tracker:keep` |
+跟原版 agfnow/agentflow 的差異見 README.md。
