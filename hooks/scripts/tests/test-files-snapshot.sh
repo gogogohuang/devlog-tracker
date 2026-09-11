@@ -113,6 +113,22 @@ HASH2="$(git -C "$REPO" rev-parse --short HEAD)"
 OUT="$(files_snapshot "$REPO" "$HASH2")"
 assert_eq ".devlog/ excluded (committed branch)" "新增：e.txt" "$OUT"
 
+# --- root commit with --root flag (should show files, not empty) ------------------
+ROOTREPO="$TMP_ROOT/root"
+mkdir -p "$ROOTREPO/.devlog"
+git -C "$ROOTREPO" init -q -b main
+git -C "$ROOTREPO" config user.email test@example.com
+git -C "$ROOTREPO" config user.name test
+echo file1 > "$ROOTREPO/file1.txt"
+echo file2 > "$ROOTREPO/file2.txt"
+echo bookkeeping > "$ROOTREPO/.devlog/devlog.md"
+git -C "$ROOTREPO" add file1.txt file2.txt .devlog/devlog.md
+git -C "$ROOTREPO" commit -q -m "initial root commit"
+ROOT_HASH="$(git -C "$ROOTREPO" rev-parse --short HEAD)"
+OUT="$(files_snapshot "$ROOTREPO" "$ROOT_HASH")"
+EXPECTED="新增：file1.txt, file2.txt"
+assert_eq "root commit with multiple files (--root)" "$EXPECTED" "$OUT"
+
 # --- unresolvable hash -> empty (fail-open) ---------------------------------------
 OUT="$(files_snapshot "$REPO" "0000000")"
 assert_eq "unresolvable hash -> empty" "" "$OUT"

@@ -34,7 +34,7 @@ files_snapshot() {
   local raw
   if [ -n "$hash" ]; then
     git -C "$dir" rev-parse --verify -q "${hash}^{commit}" >/dev/null 2>&1 || return 0
-    raw="$(git -C "$dir" diff-tree --no-commit-id --name-status -r "$hash" 2>/dev/null || true)"
+    raw="$(git -C "$dir" diff-tree --no-commit-id --name-status -r --root "$hash" 2>/dev/null || true)"
   else
     raw="$(git -C "$dir" status --short --no-renames 2>/dev/null || true)"
   fi
