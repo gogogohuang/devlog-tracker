@@ -8,7 +8,7 @@
       "name": "devlog-tracker",
       "source": "./",
       "description": "在專案中維護 .devlog/devlog.md 逐輪對話紀錄；用 /devlog-tracker:start 明確開啟強制記錄，Stop hook 保證每輪都寫入並核對工作區跟 git 是否相符（含 DONE 若動過檔案），檔案區塊本身也逐筆核對是否符合 git 實際變動（commit 精確核對、未 commit 單向核對），#### 下一步也擋純黑名單空話（字串比對、非語意評分）；/devlog-tracker:pause 暫停、/devlog-tracker:compact 壓縮歸檔、/devlog-tracker:keep 把有主題的一段具名搬走、/devlog-tracker:clean 在使用者確認後無條件清空、/devlog-tracker:continue 在 /clear 之後讀檔接續；用 /devlog-tracker:status 查看狀態、/devlog-tracker:span 管理 Span Mode、/devlog-tracker:segment-watch 調整段落沉默門檻；/devlog-tracker:lessons-on 開啟預設關閉的 Lessons Mode，記錄開發歷程教訓（BLOCKED 解開或明顯繞路時，不強制），per-topic 存成 devlog.lessons.<topic>.md，用 /devlog-tracker:lessons 查詢；開新 session 時自動讀檔補齊進度，/clear 不注入；同一輪內工作區跟 git 不符會擋住工具直到補上實際快照（唯讀 git 指令不受影響）；長任務有 Span Mode、長對話有 Checkpoint Mode 定期摘要。",
-      "version": "0.12.0"
+      "version": "0.12.1"
     }
   ]
 }
