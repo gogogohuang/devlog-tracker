@@ -27,6 +27,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-lock.sh"
 # shellcheck source=workspace-snapshot.sh
 . "$SCRIPT_DIR/workspace-snapshot.sh"
+# shellcheck source=files-snapshot.sh
+. "$SCRIPT_DIR/files-snapshot.sh"
 
 # Extracts the last "## Round N ..." block from $1 (fence-aware: a line
 # starting with ``` — optionally indented — toggles in/out of a code
@@ -314,6 +316,172 @@ if [ -n "$LAST_ROUND" ]; then
         printf '%s\n' "$EXPECTED_WS" >&2
         exit 2
       fi
+    fi
+  fi
+
+  # --- 檔案 machine-verify (docs/design/files-verify.md, devlog ssot
+  # Phase 4): #### 檔案 must describe real git changes. Runs whenever this
+  # round's Handoff has a non-empty #### 檔案, independent of Status — a
+  # trivial round with no #### 檔案 (the 瑣碎輪 convention) is unaffected.
+  #
+  # Grammar: zero or more "commit <hash>：" blocks (checked exactly,
+  # category-precise, against files_snapshot $PROJECT_DIR $hash) followed
+  # by at most one "尚未 commit：" block (checked one-directionally: every
+  # claimed path must be in files_snapshot $PROJECT_DIR's current dirty
+  # set; extra unclaimed dirty paths are not an error — cross-round
+  # residue, see docs/design/files-verify.md Decision 4). A line that
+  # isn't a recognized header or category line is a format violation and
+  # blocks (not fail-open — Claude is expected to produce this grammar,
+  # same as #### 工作區's seven formats). git unavailable, or a commit
+  # hash that doesn't resolve, skips just that check (fail-open).
+  FILES_BODY="$(handoff_subsection_body '^#### 檔案')"
+  if printf '%s\n' "$FILES_BODY" | grep -q '[^[:space:]]' && command -v git >/dev/null 2>&1; then
+    FILES_ERR=""
+    CUR_KIND=""
+    CUR_HASH=""
+    CUR_CLAIM=""
+    UNCOMMITTED_CLAIM_PATHS=""
+    # Printed after a format-violation message so Claude has the exact
+    # grammar to correct against, same rigor #### 工作區 already gets on
+    # mismatch (it prints its own EXPECTED_WS). Category lines can be
+    # omitted per block for a category with nothing to report, same as
+    # files-snapshot.sh's own output.
+    FILES_GRAMMAR="正確格式（照這個結構寫，分類行可依實際情況省略沒有變更的類別）：
+commit <hash>：
+新增：<path>, <path>
+修改：<path>
+刪除：<path>
+
+尚未 commit：
+新增：<path>
+修改：<path>
+刪除：<path>"
+
+    files_body_parse() {
+      # Normalizes #### 檔案's body into tagged records, one per input
+      # line (blank/whitespace-only lines dropped):
+      #   HDR\tcommit\t<hash>
+      #   HDR\tuncommitted
+      #   CAT\t<新增|修改|刪除>\t<comma-space-joined paths>
+      #   ERR\t<original line>   (anything else non-blank)
+      awk '
+        function trim(s) { gsub(/^[ \t]+|[ \t]+$/, "", s); return s }
+        {
+          line = $0
+          if (trim(line) == "") next
+          if (line ~ /^commit [0-9a-f]+：$/) {
+            hash = line
+            sub(/^commit /, "", hash); sub(/：$/, "", hash)
+            print "HDR\tcommit\t" hash
+            next
+          }
+          if (line ~ /^尚未 commit：$/) { print "HDR\tuncommitted"; next }
+          if (line ~ /^新增：/) { rest = line; sub(/^新增：/, "", rest); print "CAT\t新增\t" rest; next }
+          if (line ~ /^修改：/) { rest = line; sub(/^修改：/, "", rest); print "CAT\t修改\t" rest; next }
+          if (line ~ /^刪除：/) { rest = line; sub(/^刪除：/, "", rest); print "CAT\t刪除\t" rest; next }
+          print "ERR\t" line
+        }
+      '
+    }
+
+    check_commit_block() {
+      # files_snapshot returns empty stdout for two different reasons: the
+      # hash doesn't resolve at all, or it resolves fine but that commit's
+      # diff is entirely inside .devlog/ (or the commit is empty). Only the
+      # former is fail-open territory — a resolvable commit must still be
+      # compared even when its expected content is genuinely empty, or a
+      # claim naming fabricated paths against it would silently pass. So
+      # resolve the hash here, separately from computing $expected, instead
+      # of inferring "unresolvable" from empty output.
+      local h="$1" claimed="$2" expected
+      git -C "$PROJECT_DIR" rev-parse --verify -q "${h}^{commit}" >/dev/null 2>&1 || return 0
+      expected="$(files_snapshot "$PROJECT_DIR" "$h" 2>/dev/null || true)"
+      if [ "$claimed" != "$expected" ]; then
+        FILES_ERR="commit ${h} 的內容跟宣稱不符。請把這個區塊換成以下逐字內容："
+        if [ -n "$expected" ]; then
+          FILES_ERR="$FILES_ERR
+commit ${h}：
+${expected}"
+        else
+          FILES_ERR="$FILES_ERR
+這個 commit 在 .devlog/ 以外沒有變更，「#### 檔案」裡不該有這個 commit 區塊（或整節省略，如果沒有其他 commit／尚未 commit 內容要報）。"
+        fi
+      fi
+    }
+
+    path_in_list() {
+      # $1 = needle path (already trimmed by the caller), $2 = comma-space
+      # -joined haystack (may be empty — files_snapshot's join format, see
+      # files-snapshot.sh). Array-free on purpose: bash 3.2 (macOS's system
+      # bash, this suite's de-facto floor) makes "${arr[@]}" on a genuinely
+      # empty array an unbound-variable error under `set -uo pipefail`, and
+      # an empty haystack (clean tree) is exactly the case this check must
+      # not crash on. Padding both sides with ", " avoids matching a needle
+      # that is only a substring of a longer path (e.g. "a.txt" must not
+      # match "za.txt" or "a.txt2").
+      local needle="$1" haystack="$2"
+      case ", $haystack, " in
+        *", $needle, "*) return 0 ;;
+      esac
+      return 1
+    }
+
+    while IFS=$'\t' read -r tag a b; do
+      [ -z "$FILES_ERR" ] || break
+      case "$tag" in
+        HDR)
+          if [ "$CUR_KIND" = "commit" ]; then
+            check_commit_block "$CUR_HASH" "$CUR_CLAIM"
+          fi
+          CUR_CLAIM=""
+          CUR_KIND="$a"
+          CUR_HASH="$b"
+          ;;
+        CAT)
+          case "$CUR_KIND" in
+            commit)
+              CUR_CLAIM="${CUR_CLAIM:+$CUR_CLAIM$'\n'}${a}：${b}"
+              ;;
+            uncommitted)
+              UNCOMMITTED_CLAIM_PATHS="${UNCOMMITTED_CLAIM_PATHS:+$UNCOMMITTED_CLAIM_PATHS, }${b}"
+              ;;
+            *)
+              FILES_ERR="#### 檔案 格式不對：分類行出現在任何 commit/尚未 commit 標頭之前。
+
+${FILES_GRAMMAR}"
+              ;;
+          esac
+          ;;
+        ERR)
+          FILES_ERR="#### 檔案 格式不對，看不懂這一行：${a}
+
+${FILES_GRAMMAR}"
+          ;;
+      esac
+    done < <(printf '%s\n' "$FILES_BODY" | files_body_parse)
+
+    if [ -z "$FILES_ERR" ] && [ "$CUR_KIND" = "commit" ]; then
+      check_commit_block "$CUR_HASH" "$CUR_CLAIM"
+    fi
+
+    if [ -z "$FILES_ERR" ] && [ -n "$UNCOMMITTED_CLAIM_PATHS" ]; then
+      ACTUAL_DIRTY="$(files_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+      ACTUAL_JOINED="$(printf '%s\n' "$ACTUAL_DIRTY" | sed -E 's/^(新增|修改|刪除)：//' | awk 'BEGIN{ORS=""} NF{print (out?", ":"") $0; out=1}')"
+      IFS=',' read -ra _CLAIMED_ARR <<< "$UNCOMMITTED_CLAIM_PATHS"
+      for _p in "${_CLAIMED_ARR[@]}"; do
+        _p="$(printf '%s' "$_p" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+        [ -n "$_p" ] || continue
+        if ! path_in_list "$_p" "$ACTUAL_JOINED"; then
+          FILES_ERR="#### 檔案 的「尚未 commit」宣稱了 ${_p}，但它目前不在實際變更的檔案裡。目前實際的未提交變更是：
+${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
+          break
+        fi
+      done
+    fi
+
+    if [ -n "$FILES_ERR" ]; then
+      echo "$FILES_ERR" >&2
+      exit 2
     fi
   fi
 fi

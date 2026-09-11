@@ -133,7 +133,9 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 <影響後續方向的選擇與理由。沒做選擇就整節省略>
 
 #### 檔案
-<新增／修改／刪除的路徑；有 commit 就寫 hash 或說明沒 commit。沒動檔就整節省略>
+<機器可核對格式，見下方「檔案 machine-verify」：零個以上 `commit <hash>：` 區塊（依時間序），
+加上最多一個 `尚未 commit：` 區塊，各自帶 `新增：`/`修改：`/`刪除：` 分類行（無則省略該行）。
+沒動檔就整節省略>
 
 #### 工作區
 <IN_PROGRESS／BLOCKED 必寫；DONE 若上面「檔案」有內容（宣稱動過／commit 過檔案）也必寫，
@@ -178,6 +180,15 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`hooks/scripts/workspace-snapshot.sh`，
   docs/design/devlog-as-ssot-assessment.md Phase 1）——`DONE`／`INTERRUPTED` 不受影響。
   接手跑 `workspace-snapshot.sh`（`PLUGIN_ROOT` 同其他指令），stdout 就是要對的快照，不要手編（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。腳本找不到才退回上面七種格式手編。
+- **`檔案` 是機器可核對的區塊格式（devlog ssot Phase 4）。** 零個以上 `commit <hash>：` 區塊
+  （commit 短 hash，依時間序），每個後面接最多三行分類（`新增：`/`修改：`/`刪除：`，逗號分隔路徑，
+  沒有就省略那行）；最多一個 `尚未 commit：` 區塊，格式相同。一輪可以先 commit 一部分、後面
+  繼續改，兩種區塊可以並存。Stop hook 對 `commit` 區塊做逐字精確核對（含分類），對
+  `尚未 commit` 區塊只核對「宣稱的路徑是否真的在目前髒檔清單裡」（不核對分類，也不要求
+  涵蓋所有髒檔——跨輪殘留、還沒 commit 的舊檔案不算這輪漏列）。Rename 一律回報成
+  刪除+新增，不是第四類。`.devlog/` 路徑不算進比對。看不懂的行（沒有照這個格式寫）會被擋下來，
+  不是 fail-open——這是 Claude 該產生的格式，不是可有可無的宣告。細節見
+  `docs/design/files-verify.md`（`hooks/scripts/files-snapshot.sh`）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -195,7 +206,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
 新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）

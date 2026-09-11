@@ -60,7 +60,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 write_round "#### 決策
 d
 #### 檔案
-f
+尚未 commit：
 #### 工作區
 main @ ${HASH}，工作樹乾淨
 #### 現況
