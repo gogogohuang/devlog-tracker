@@ -12,7 +12,7 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 
 devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步）的 single source of truth，
 不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git（`#### 工作區` 是收尾當下的已核對快取：
-`IN_PROGRESS`／`BLOCKED` 時 Stop hook 會對過 live git；接手時樹可能已變，`continue`／`resume`
+`IN_PROGRESS`／`BLOCKED` 時 Stop hook 一律對過 live git，`DONE` 若「檔案」有內容也對過；接手時樹可能已變，`continue`／`resume`
 仍以實際工作樹為準，見 `docs/design/continue.md`）；完整逐字過程的真相是對話 transcript（`/clear` 後不存在）；設計
 決策的真相是 `docs/design/*.md`。使用者在裡面許願、Claude 也在裡面回報進度與結果——取代「終端機
 一 clear 就沒了」的對話記錄，讓工作可以隨時中斷、隨時接續。
@@ -112,7 +112,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
-同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 不核對。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。
+同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。
 不要自動觸發。`/devlog-tracker:start` 只對進度，不開工、不核對。
 
 ## 每一輪的紀錄格式
@@ -136,7 +136,8 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 <新增／修改／刪除的路徑；有 commit 就寫 hash 或說明沒 commit。沒動檔就整節省略>
 
 #### 工作區
-<IN_PROGRESS／BLOCKED 必寫；DONE 且沒有後續就整節省略。收尾前跑 git 再寫，見下方格式>
+<IN_PROGRESS／BLOCKED 必寫；DONE 若上面「檔案」有內容（宣稱動過／commit 過檔案）也必寫，
+Stop hook 會機器核對；DONE 且「檔案」整節省略時，工作區才能跟著省略。收尾前跑 git 再寫，見下方格式>
 
 #### 現況
 <任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有>
@@ -160,7 +161,9 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 - **兩個讀者拆開：** `Summary` 只給人掃；`Handoff` 只給下一輪 Claude 接手。同一件事不要兩邊複述。
 - Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步），Stop hook 會檢查已出現的小節
   順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整節省略，不要寫「無」。
-  `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略。
+  `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
+  但 `DONE` 若 `檔案` 有內容（宣稱動過／commit 過檔案），`工作區` 一樣必寫且會被 Stop hook 機器核對，
+  避免「已 commit 完成」卻其實沒 commit 這種宣稱跟實際不符沒人發現。
   `下一步` 要具體到下一輪打開就能做，寫「繼續完成」不算完成。
 - **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式；`rev-parse --short HEAD` 失敗但 `git symbolic-ref --short HEAD` 抓得到分支名（尚無 commit，例如剛 `git init`）用 unborn 格式；兩者都失敗才是非 git。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
   - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
@@ -192,7 +195,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」，且 `#### 工作區` 跟 hook 算出的 git 快照相符。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）。
 新開的 Round 兩個標題都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）

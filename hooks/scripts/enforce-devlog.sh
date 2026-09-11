@@ -279,22 +279,40 @@ if [ -n "$LAST_ROUND" ]; then
       echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
       exit 2
     fi
+  fi
 
-    # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,
-    # Phase 1): #### 工作區 must match a freshly computed git snapshot
-    # exactly. Turns it from an unverified claim into a write-time fact
-    # instead of something only continue/resume catch on the next turn.
-    # git unavailable -> fail-open, skip this check like every other one here.
-    if command -v git >/dev/null 2>&1; then
-      EXPECTED_WS="$(workspace_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
-      if [ -n "$EXPECTED_WS" ]; then
-        ACTUAL_WS="$(handoff_subsection_body '^#### 工作區' | sed -e '/^[[:space:]]*$/d')"
-        if [ "$ACTUAL_WS" != "$EXPECTED_WS" ]; then
-          echo "#### 工作區 跟目前 git 狀態不符（或缺漏）。請把這一節內容換成以下逐字內容：" >&2
-          echo "" >&2
-          printf '%s\n' "$EXPECTED_WS" >&2
-          exit 2
-        fi
+  # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,
+  # Phase 1 + DONE-with-檔案 extension): #### 工作區 must match a freshly
+  # computed git snapshot exactly. Turns it from an unverified claim into a
+  # write-time fact instead of something only continue/resume catch on the
+  # next turn.
+  #
+  # Required for IN_PROGRESS/BLOCKED (unchanged from Phase 1) and for DONE
+  # only when this round's Handoff has a non-empty #### 檔案 — i.e. it
+  # claims to have touched/committed files. Without this, "已 commit 完成，
+  # Status: DONE" was never checked against live git: the single most
+  # common false-completion claim, and one prose-quality checks elsewhere
+  # in this file explicitly leave unverified. A trivial DONE round with no
+  # #### 檔案 still omits 工作區 entirely per SKILL.md's 瑣碎輪 convention —
+  # unaffected.
+  #
+  # git unavailable -> fail-open, skip this check like every other one here.
+  NEEDS_WORKSPACE_CHECK=0
+  case "$STATUS_VAL" in
+    IN_PROGRESS|BLOCKED) NEEDS_WORKSPACE_CHECK=1 ;;
+    DONE)
+      handoff_subsection_body '^#### 檔案' | grep -q '[^[:space:]]' && NEEDS_WORKSPACE_CHECK=1
+      ;;
+  esac
+  if [ "$NEEDS_WORKSPACE_CHECK" -eq 1 ] && command -v git >/dev/null 2>&1; then
+    EXPECTED_WS="$(workspace_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+    if [ -n "$EXPECTED_WS" ]; then
+      ACTUAL_WS="$(handoff_subsection_body '^#### 工作區' | sed -e '/^[[:space:]]*$/d')"
+      if [ "$ACTUAL_WS" != "$EXPECTED_WS" ]; then
+        echo "#### 工作區 跟目前 git 狀態不符（或缺漏）。請把這一節內容換成以下逐字內容：" >&2
+        echo "" >&2
+        printf '%s\n' "$EXPECTED_WS" >&2
+        exit 2
       fi
     fi
   fi

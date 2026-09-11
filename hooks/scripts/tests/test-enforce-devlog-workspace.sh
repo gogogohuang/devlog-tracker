@@ -190,6 +190,78 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
 
+# --- DONE with a non-empty #### 檔案 (claims files were touched/committed)
+# IS now checked: a DONE round that reports file changes but has no/wrong
+# #### 工作區 is exactly the "已 commit 完成" false-claim case
+# devlog-as-ssot-assessment.md flags as uncaught — machine-verify it the
+# same way IN_PROGRESS/BLOCKED already are. A trivial DONE round with no
+# #### 檔案 stays exempt (previous test above), matching SKILL.md's
+# "瑣碎輪只留現況一句（沒有工作區）" convention untouched. ------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+MSG_DONE="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "DONE with #### 檔案 but no #### 工作區 -> blocked" 2 $?
+case "$MSG_DONE" in
+  *"main @ ${HASH}，工作樹乾淨"*) echo "PASS: DONE block message includes exact expected snapshot" ;;
+  *) echo "FAIL: DONE block message should include exact expected snapshot, got: $MSG_DONE"; FAIL=1 ;;
+esac
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 工作區"
+  echo "main @ 0000000，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with #### 檔案 and stale 工作區 hash -> blocked" 2 $?
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with #### 檔案 and matching 工作區 -> allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

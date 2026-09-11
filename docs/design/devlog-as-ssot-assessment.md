@@ -33,6 +33,26 @@ truth. Write-time verification (Phase 1) makes the cache honest at
 `T_close`. Read-time verification (`continue` / `resume`) still has to
 run, because the tree can change after close.
 
+## Review (2026-09-11): DONE-with-檔案 extension
+
+Phase 1 originally only machine-verified `#### 工作區` for `IN_PROGRESS` /
+`BLOCKED` (the table below's "Does not buy" column named this: "check on
+`DONE` / `INTERRUPTED`"). That left the single most common false-completion
+claim uncaught: a round says "已 commit 完成，Status: DONE" but the tree is
+still dirty — `DONE` never carried a `#### 工作區` at all by convention
+(SKILL.md's 瑣碎輪 rule), so there was nothing to check against.
+
+`enforce-devlog.sh` now also requires and machine-verifies `#### 工作區` on
+`DONE` when that round's `#### 檔案` is non-empty — i.e. the round itself
+claims to have touched or committed files. A trivial `DONE` round with no
+`#### 檔案` is unaffected and still omits `工作區` entirely, so the 瑣碎輪
+convention (Summary one line, no 工作區/下一步) is untouched.
+
+This narrows, but does not close, gap #1 the same way Phase 1 did for
+`IN_PROGRESS`/`BLOCKED`: it is still a write-time cache-honesty check, not
+SSOT for live git. `INTERRUPTED` stays unchecked (by design — those stubs
+never carry `#### 工作區`, see `docs/design/summary-handoff.md`).
+
 ## What holds up (HEAD)
 
 - **Enforced writing.** The Stop hook (`enforce-devlog.sh`) blocks a turn
@@ -59,7 +79,7 @@ run, because the tree can change after close.
 
 | Phase | Status | Buys | Does not buy |
 |---|---|---|---|
-| 1. Machine-verify `#### 工作區` at Stop | ✅ in HEAD | Write-time honesty of the git cache for `IN_PROGRESS` / `BLOCKED` | SSOT for current git state (#1); check on `DONE` / `INTERRUPTED` |
+| 1. Machine-verify `#### 工作區` at Stop | ✅ in HEAD | Write-time honesty of the git cache for `IN_PROGRESS` / `BLOCKED`, and for `DONE` when `#### 檔案` is non-empty (2026-09-11) | SSOT for current git state (#1); check on trivial `DONE` (no `#### 檔案`) / `INTERRUPTED` |
 | 2. Handoff subsection order + duplicates | ✅ in HEAD | Cheap structure on the five recognized `#### ` names. `下一步` non-empty is already in HEAD | Semantic quality of Summary / 決策 / 現況 / 檔案 |
 | 3. `## Kept 索引` in `devlog.md`, surfaced by SessionStart | ✅ in HEAD | Discoverability of keep *files* without injecting their content | A literally single file; auto-injection of keep content; an archive index |
 

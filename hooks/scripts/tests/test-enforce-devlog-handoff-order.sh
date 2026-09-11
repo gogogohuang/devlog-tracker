@@ -13,6 +13,20 @@ DEVLOG_DIR="$TMP_ROOT/.devlog"
 mkdir -p "$DEVLOG_DIR"
 touch "$DEVLOG_DIR/.enabled"
 
+# A real (if minimal) git repo, only so the "full canonical order" fixture's
+# #### 檔案 + #### 工作區 pair below can carry a #### 工作區 that actually
+# matches live git — DONE rounds with a non-empty #### 檔案 are now
+# machine-verified too (enforce-devlog.sh's workspace check, extended past
+# Phase 1's IN_PROGRESS/BLOCKED). Every other fixture in this file keeps
+# Status DONE with no #### 檔案, so it stays decoupled from this check.
+git -C "$TMP_ROOT" init -q -b main
+git -C "$TMP_ROOT" config user.email test@example.com
+git -C "$TMP_ROOT" config user.name test
+echo '.devlog/' > "$TMP_ROOT/.gitignore"
+git -C "$TMP_ROOT" add .gitignore
+git -C "$TMP_ROOT" commit -q -m init
+HASH="$(git -C "$TMP_ROOT" rev-parse --short HEAD)"
+
 FAIL=0
 assert_exit() {
   local desc="$1" expected="$2" actual="$3"
@@ -48,7 +62,7 @@ d
 #### 檔案
 f
 #### 工作區
-main @ abc123，工作樹乾淨
+main @ ${HASH}，工作樹乾淨
 #### 現況
 c
 #### 下一步
