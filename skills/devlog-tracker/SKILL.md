@@ -178,7 +178,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   （七種格式的機器生產者只有 `hooks/scripts/workspace-snapshot.sh`。寫入照上面手寫；Stop 用同一 function 核對。改格式時改 SKILL 與該腳本，不要在 continue.md 再抄一份。）
   `INTERRUPTED` stub 不寫這一節。`IN_PROGRESS`／`BLOCKED` 收尾時，Stop hook 會自己算一次
   即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`hooks/scripts/workspace-snapshot.sh`，
-  docs/design/devlog-as-ssot-assessment.md Phase 1）——`DONE`／`INTERRUPTED` 不受影響。
+  docs/design/devlog-as-ssot-assessment.md Phase 1）；`DONE` 若「檔案」有內容一樣核對——只有
+  沒動檔的 `DONE` 與 `INTERRUPTED` 不受影響。
   接手跑 `workspace-snapshot.sh`（`PLUGIN_ROOT` 同其他指令），stdout 就是要對的快照，不要手編（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。腳本找不到才退回上面七種格式手編。
 - **`檔案` 是機器可核對的區塊格式（devlog ssot Phase 4）。** 零個以上 `commit <hash>：` 區塊
   （commit 短 hash，依時間序），每個後面接最多三行分類（`新增：`/`修改：`/`刪除：`，逗號分隔路徑，
