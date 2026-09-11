@@ -78,6 +78,10 @@ grep -q '第一次卡在 keep-move.sh' "$TARGET" && echo "PASS: entry text prese
 # --- devlog.<name>.md / .md normalization on --topic input ------------------
 OUT2="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "devlog.lessons.keep-move-bug.md" --text "第二筆，測試正規化。")"
 assert_exit "prefixed/suffixed topic input normalizes to the same file -> 0" 0 $?
+case "$OUT2" in
+  *"PATH=.devlog/devlog.lessons.keep-move-bug.md"*) echo "PASS: normalized-input call reports the same PATH" ;;
+  *) echo "FAIL: expected PATH=.devlog/devlog.lessons.keep-move-bug.md, got: $OUT2"; FAIL=1 ;;
+esac
 ENTRY_COUNT="$(grep -c '^## ' "$TARGET")"
 if [ "$ENTRY_COUNT" = "2" ]; then
   echo "PASS: second call appended to the SAME file (normalization collapsed devlog.lessons.<x>.md to <x>)"
