@@ -159,12 +159,17 @@ if [ -n "$LAST_ROUND" ]; then
     exit 2
   fi
 
+  # Fence-aware like last_round_block() above: a heading-looking line inside
+  # a ``` fence (e.g. a markdown example quoting #### 決策 / #### 現況) must
+  # not be mistaken for a real heading, but its fenced content is still part
+  # of the body once grab has started.
   section_body() {
     local heading="$1"
     printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
-      $0 ~ h { grab=1; next }
-      grab && /^### / { exit }
-      grab && /^## / { exit }
+      /^[ \t]*```/ { fence = !fence; if (grab) print; next }
+      !fence && $0 ~ h { grab=1; next }
+      grab && !fence && /^### / { exit }
+      grab && !fence && /^## / { exit }
       grab { print }
     '
   }
@@ -172,10 +177,11 @@ if [ -n "$LAST_ROUND" ]; then
   handoff_subsection_body() {
     local heading="$1"
     printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
-      $0 ~ h { grab=1; next }
-      grab && /^#### / { exit }
-      grab && /^### / { exit }
-      grab && /^## / { exit }
+      /^[ \t]*```/ { fence = !fence; if (grab) print; next }
+      !fence && $0 ~ h { grab=1; next }
+      grab && !fence && /^#### / { exit }
+      grab && !fence && /^### / { exit }
+      grab && !fence && /^## / { exit }
       grab { print }
     '
   }
@@ -206,6 +212,8 @@ if [ -n "$LAST_ROUND" ]; then
       order["現況"] = 4; order["下一步"] = 5
       last = 0; prev_name = ""
     }
+    /^[ \t]*```/ { fence = !fence; next }
+    fence { next }
     /^#### / {
       name = $0
       sub(/^#### [ \t]*/, "", name)

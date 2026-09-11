@@ -130,6 +130,36 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with no workspace section -> allowed (check does not apply)" 0 $?
 
+# --- fenced example quoting #### 工作區 before the real section -> ignored,
+# extractor still finds the real (unfenced) 工作區 body -------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 4 — 2026-09-10T00:15:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 決策"
+  echo "範例格式："
+  echo '```markdown'
+  echo "#### 工作區"
+  echo "main @ 0000000，工作樹乾淨"
+  echo '```'
+  echo "真正決策內容"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo "#### 下一步"
+  echo "fixture next step"
+  echo ""
+  echo "### Status"
+  echo "IN_PROGRESS"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

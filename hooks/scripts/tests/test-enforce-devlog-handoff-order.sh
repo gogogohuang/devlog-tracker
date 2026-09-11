@@ -102,6 +102,36 @@ c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unrecognized #### heading interleaved -> ignored, allowed" 0 $?
 
+# --- fenced example reordering subsection headings -> ignored, allowed -----
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "#### 決策
+說明格式時可以貼一段範例：
+\`\`\`markdown
+#### 現況
+c
+#### 決策
+d
+\`\`\`
+真正決定
+#### 現況
+c"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "fenced example reordering subsection headings -> ignored, allowed" 0 $?
+
+# --- fenced example duplicating a heading already used -> ignored, allowed -
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "#### 決策
+真正決策
+說明格式時再貼一次範例：
+\`\`\`markdown
+#### 決策
+d2
+\`\`\`
+#### 現況
+c"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "fenced example duplicating a used heading -> ignored, allowed" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
