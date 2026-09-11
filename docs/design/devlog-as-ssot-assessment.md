@@ -53,6 +53,21 @@ This narrows, but does not close, gap #1 the same way Phase 1 did for
 SSOT for live git. `INTERRUPTED` stays unchecked (by design — those stubs
 never carry `#### 工作區`, see `docs/design/summary-handoff.md`).
 
+## Review (2026-09-11): Phase 4, `#### 檔案`
+
+Phase 2 named this explicitly as something the roadmap did not buy:
+"Semantic quality of Summary / 決策 / 現況 / 檔案." Phase 4 narrows that
+gap's `檔案` slice the same way Phase 1 narrowed `工作區`'s: a claimed
+path is now checked against something computed from git, not trusted as
+prose. `決策` / `現況` / `Summary` stay unverified — that remains a
+judgment call, not a git diff.
+
+Same scoping caveat as every phase here: this is write-time cache honesty
+at `T_close`, not SSOT for the live tree. `continue` / `resume` do not
+re-derive a `檔案` claim the way they re-derive `工作區`, because `檔案`
+is a historical statement about what a specific round changed, not a
+live-state cache meant to be re-checked later — nothing to add there.
+
 ## What holds up (HEAD)
 
 - **Enforced writing.** The Stop hook (`enforce-devlog.sh`) blocks a turn
@@ -75,13 +90,14 @@ never carry `#### 工作區`, see `docs/design/summary-handoff.md`).
   evidence *for* honesty of the scoped claim, and *against* treating
   `devlog.md` as SSOT for git.
 
-## What the three phases buy
+## What the four phases buy
 
 | Phase | Status | Buys | Does not buy |
 |---|---|---|---|
 | 1. Machine-verify `#### 工作區` at Stop | ✅ in HEAD | Write-time honesty of the git cache for `IN_PROGRESS` / `BLOCKED`, and for `DONE` when `#### 檔案` is non-empty (2026-09-11) | SSOT for current git state (#1); check on trivial `DONE` (no `#### 檔案`) / `INTERRUPTED` |
 | 2. Handoff subsection order + duplicates | ✅ in HEAD | Cheap structure on the five recognized `#### ` names. `下一步` non-empty is already in HEAD | Semantic quality of Summary / 決策 / 現況 / 檔案 |
 | 3. `## Kept 索引` in `devlog.md`, surfaced by SessionStart | ✅ in HEAD | Discoverability of keep *files* without injecting their content | A literally single file; auto-injection of keep content; an archive index |
+| 4. Machine-verify `#### 檔案` at Stop | ✅ in HEAD | Write-time honesty of the `檔案` cache: committed paths checked exactly against the commit, uncommitted paths checked one-directionally against the live dirty set (`docs/design/files-verify.md`) | Semantic quality of Summary / 決策 / 現況 (still unchecked prose); SSOT for current git state (#1) |
 
 After Phase 1, verify-before-act splits into two moments: Stop already
 matched the snapshot at close; `continue` / `resume` re-check because
