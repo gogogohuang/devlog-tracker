@@ -8,9 +8,9 @@
 # Usage (sourced): workspace_snapshot "$PROJECT_DIR"
 # Usage (executed): bash workspace-snapshot.sh [dir]
 #   dir defaults to ${CLAUDE_PROJECT_DIR:-.}
-# Echoes 1 line (clean / non-git / detached-clean) or 2 lines (dirty /
-# detached-dirty). Never fails: any git command error degrades toward
-# "非 git 工作區", matching this hook suite's fail-open design.
+# Echoes 1 line (clean / non-git / detached-clean / unborn-clean) or 2 lines
+# (dirty / detached-dirty / unborn-dirty). Never fails: any git command error
+# degrades toward "非 git 工作區", matching this hook suite's fail-open design.
 #
 # Known limitation: a dirty file path containing a space is not exactly
 # reversible from `git status --short`'s last-field extraction below — same

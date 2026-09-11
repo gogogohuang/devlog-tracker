@@ -77,6 +77,10 @@ printf '# project\n\n' > "$INDEX/.devlog/devlog.md"
 make_round "$INDEX/.devlog/devlog.md" 1 DONE
 make_round "$INDEX/.devlog/devlog.md" 2 DONE
 make_round "$INDEX/.devlog/devlog.md" 3 DONE
+# Keep an open round so the 3rd keep below (--from 3 --to 3) stays a *partial*
+# keep — a full keep drops everything before the first round, which would
+# leave ## Kept 索引 at line 1 and silently stop testing the blank-line
+# separator regression checked below.
 make_round "$INDEX/.devlog/devlog.md" 4 IN_PROGRESS
 printf '%s\n' '{"round": 4, "opened_at": "now"}' > "$INDEX/.devlog/.round-open"
 bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name topic-a >/dev/null

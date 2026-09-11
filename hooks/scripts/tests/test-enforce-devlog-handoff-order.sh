@@ -132,6 +132,45 @@ c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example duplicating a used heading -> ignored, allowed" 0 $?
 
+# --- unterminated fence inside #### 決策 -> fail-open, not a false block
+# (final-review Fix 1). A ``` fence that never closes (odd fence-marker
+# count) must never make a present #### 現況 register as missing/malformed.
+# Status DONE so 下一步/工作區 (Phase 1) stay out of the picture — this only
+# exercises section_body()/ORDER_ERR's own fence handling.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "#### 決策
+一段沒收尾的範例：
+\`\`\`markdown
+沒收尾內容，一路吃到 Handoff 結尾
+#### 現況
+c"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "unterminated fence in 決策, real 現況 after it -> fail-open, allowed" 0 $?
+
+# --- same unterminated fence, but hiding a real duplicate below it --------
+# ORDER_ERR re-scans the extracted Handoff body with its own fence tracking;
+# pre-fix the same stuck-fence bug hid every #### heading after the broken
+# fence from ORDER_ERR too — including a genuine duplicate "#### 決策" that
+# should be rejected. NOFENCE degrades ORDER_ERR back to a plain scan for
+# this round, so the duplicate check reaches it again. (This is the mirror
+# image of the false-block case above: here the pre-fix bug wrongly *allowed*
+# something; the point is the same root cause, fixed the same way.)
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "#### 決策
+一段沒收尾的範例：
+\`\`\`markdown
+沒收尾內容
+#### 現況
+c
+#### 決策
+d2（應該被判定為重複）"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "unterminated fence no longer hides a real duplicate -> blocked" 2 $?
+case "$MSG" in
+  *"出現超過一次"*) echo "PASS: duplicate-subsection message despite unterminated fence" ;;
+  *) echo "FAIL: expected 出現超過一次 message, got: $MSG"; FAIL=1 ;;
+esac
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

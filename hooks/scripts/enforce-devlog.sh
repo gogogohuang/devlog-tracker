@@ -163,10 +163,23 @@ if [ -n "$LAST_ROUND" ]; then
   # a ``` fence (e.g. a markdown example quoting #### 決策 / #### 現況) must
   # not be mistaken for a real heading, but its fenced content is still part
   # of the body once grab has started.
+  #
+  # NOFENCE 防呆：如果這個 Round 裡 ``` 記號的數量是奇數（代表圍欄沒有正常
+  # 收尾——真的寫錯了，不是刻意的範例），fence 變數會在這輪剩下的內容裡卡在
+  # 1，導致下面三段 fence-aware awk 把明明存在的內容誤判成「被吃掉、看起來
+  # 是空的」而擋下使用者（exit 2、訊息卻說「是空的」）。這違反本專案的
+  # fail-open 原則，也重現了 Task 1 想解決的那種卡死。NOFENCE=1 時強制
+  # fence 變數維持 0，讓這三段退化回 Task 1 之前的單純掃描行為——退化後
+  # 「卡住的圍欄」不可能吃掉內容，是 fail-open 安全的；圍欄成雙成對（含 0
+  # 個）時，NOFENCE=0，Task 1 加入的 fence-aware 行為完全不變。
+  FENCE_MARKER_COUNT="$(printf '%s\n' "$LAST_ROUND" | grep -c '^[ \t]*```')"
+  NOFENCE=0
+  [ $((FENCE_MARKER_COUNT % 2)) -eq 0 ] || NOFENCE=1
+
   section_body() {
     local heading="$1"
-    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
-      /^[ \t]*```/ { fence = !fence; if (grab) print; next }
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; if (grab) print; next }
       !fence && $0 ~ h { grab=1; next }
       grab && !fence && /^### / { exit }
       grab && !fence && /^## / { exit }
@@ -176,8 +189,8 @@ if [ -n "$LAST_ROUND" ]; then
 
   handoff_subsection_body() {
     local heading="$1"
-    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
-      /^[ \t]*```/ { fence = !fence; if (grab) print; next }
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; if (grab) print; next }
       !fence && $0 ~ h { grab=1; next }
       grab && !fence && /^#### / { exit }
       grab && !fence && /^### / { exit }
@@ -206,13 +219,13 @@ if [ -n "$LAST_ROUND" ]; then
   # are ignored — this only tightens what SKILL.md already promises, it does
   # not invent a new rule.
   HANDOFF_BODY="$(section_body '^### Handoff')"
-  ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk '
+  ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk -v nofence="$NOFENCE" '
     BEGIN {
       order["決策"] = 1; order["檔案"] = 2; order["工作區"] = 3
       order["現況"] = 4; order["下一步"] = 5
       last = 0; prev_name = ""
     }
-    /^[ \t]*```/ { fence = !fence; next }
+    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
     fence { next }
     /^#### / {
       name = $0

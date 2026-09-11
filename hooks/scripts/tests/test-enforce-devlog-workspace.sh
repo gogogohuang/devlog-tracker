@@ -160,6 +160,36 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
 
+# --- unterminated fence in an earlier subsection -> fail-open, not a false
+# block (final-review Fix 1). A ``` fence that never closes (odd fence-marker
+# count) must never make a present, filled-in #### 下一步 register as missing.
+# Pre-fix, the odd fence opened by #### 現況's (malformed) example got
+# `fence` stuck at 1 for the rest of the round, so handoff_subsection_body()
+# could no longer even find the "#### 下一步" heading — even though #### 工作區
+# above it is exactly correct and #### 下一步 below it has real content.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 5 — 2026-09-10T00:20:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "一段沒收尾的範例："
+  echo '```markdown'
+  echo "沒收尾內容，一路吃到這個 Round 結尾"
+  echo "#### 下一步"
+  echo "fixture next step"
+  echo ""
+  echo "### Status"
+  echo "IN_PROGRESS"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
