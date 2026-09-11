@@ -9,6 +9,7 @@ DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
 [ -d "$DEVLOG_DIR" ] || { echo "NOT_STARTED"; exit 0; }
 
 [ -f "$DEVLOG_DIR/.enabled" ] && echo "ENABLED=yes" || echo "ENABLED=no"
+[ -f "$DEVLOG_DIR/.lessons-enabled" ] && echo "LESSONS=yes" || echo "LESSONS=no"
 if [ -f "$DEVLOG_DIR/.span-open" ]; then
   r="$(json_int_get "$DEVLOG_DIR/.span-open" round)"
   opened="$(json_str_get "$DEVLOG_DIR/.span-open" opened_at)"

@@ -408,6 +408,39 @@ else
   FAIL=1
 fi
 
+# --- Scenario: Lessons 索引 block is surfaced in the injected excerpt ------
+# (docs/design/lessons-mode.md「## Lessons 索引」)
+: > "$DEVLOG_DIR/devlog.md"
+write_round 1 DONE
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+
+## Lessons 索引
+- `devlog.lessons.span-mode-detour.md`：1 則，最新一則「先卡住了。」（updated_at 2026-09-12T00:00:00+08:00）
+EOF
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "startup excerpt includes Lessons 索引 heading" "## Lessons 索引" "$OUTPUT"
+assert_contains "startup excerpt includes the lessons-file line" "devlog.lessons.span-mode-detour.md" "$OUTPUT"
+
+# --- Scenario: no Lessons 索引 block -> excerpt omits the heading entirely -
+: > "$DEVLOG_DIR/devlog.md"
+write_round 1 DONE
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_not_contains "no Lessons 索引 block -> excerpt has no such heading" "## Lessons 索引" "$OUTPUT"
+
+# --- Scenario: source=clear still prints nothing, even with a Lessons 索引 -
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+
+## Lessons 索引
+- `devlog.lessons.span-mode-detour.md`：1 則，最新一則「先卡住了。」（updated_at 2026-09-12T00:00:00+08:00）
+EOF
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then
+  echo "PASS: source=clear stays silent even with a Lessons 索引 block present"
+else
+  echo "FAIL: source=clear must not inject anything, got: $OUTPUT"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

@@ -11,4 +11,4 @@ PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
 CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/status-devlog.sh"
 ```
 ```
-把 stdout 翻譯成給人看的幾行。不要改任何檔。`NOT_STARTED` 就說還沒 `/devlog-tracker:start`。
+把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態）。不要改任何檔。`NOT_STARTED` 就說還沒 `/devlog-tracker:start`。
