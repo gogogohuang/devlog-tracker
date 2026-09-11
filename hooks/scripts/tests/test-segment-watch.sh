@@ -334,6 +334,32 @@ printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
 assert_exit "mismatch recorded in 段落 -> Bash allowed" 0 $?
 [ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: marker removed after 段落" || { echo "FAIL: marker remains"; FAIL=1; }
 
+# two-line dirty snapshot (branch @ hash + 未提交) recorded in 段落 -> marker cleared
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+keep going
+```
+
+### 段落 1
+feat/foo @ abc1234
+未提交：a.txt
+
+### Status
+IN_PROGRESS
+EOF
+cat > "$DEVLOG_DIR/.workspace-mismatch" <<'EOF'
+feat/foo @ abc1234
+未提交：a.txt
+EOF
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "two-line dirty snapshot in 段落 -> Bash allowed" 0 $?
+[ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: two-line marker removed after 段落" || { echo "FAIL: two-line marker remains"; FAIL=1; }
+
 # Same string outside a 段落 must not clear the marker
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00

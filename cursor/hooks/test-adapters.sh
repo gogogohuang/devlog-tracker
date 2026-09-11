@@ -184,5 +184,24 @@ else
   echo "FAIL: nojq session_id missing (got [$SEG_SID])"; FAIL=1
 fi
 
+# --- no-jq PreToolUse deny must emit a single-line JSON object --------------
+# segment-watch deny stderr is multiline; without newline escaping, bash 3.2
+# prints unparseable JSON and Cursor fail-opens (valve vanishes).
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Bash","tool_input":{},"session_id":"cursor-mismatch"}' "$MIS" \
+  | env PATH="$CLEAN_PATH" bash "$SCRIPT_DIR/on-pre-tool.sh")"
+case "$OUT" in *'"permission":"deny"'*) echo "PASS: nojq mismatch preTool denies" ;; *) echo "FAIL: nojq mismatch preTool [$OUT]"; FAIL=1 ;; esac
+assert_single_json "nojq mismatch preTool deny single json" "$OUT"
+case "$OUT" in
+  *$'\n'*$'\n'*) echo "FAIL: nojq deny JSON contains raw newlines [$OUT]"; FAIL=1 ;;
+  *) echo "PASS: nojq deny JSON has no raw newlines inside the string" ;;
+esac
+if command -v python3 >/dev/null 2>&1; then
+  if printf '%s' "$OUT" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    echo "PASS: nojq deny JSON is parseable"
+  else
+    echo "FAIL: nojq deny JSON is not parseable [$OUT]"; FAIL=1
+  fi
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

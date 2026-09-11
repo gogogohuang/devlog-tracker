@@ -15,7 +15,7 @@ if [ "$RESULT" -eq 2 ]; then
   if command -v jq >/dev/null 2>&1; then
     jq -n --arg m "$MESSAGE" '{permission:"deny",user_message:$m}'
   else
-    esc="$(printf '%s' "$MESSAGE" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+    esc="$(printf '%s' "$MESSAGE" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | awk '{printf "%s\\n", $0}' | sed '$ s/\\n$//')"
     printf '{"permission":"deny","user_message":"%s"}\n' "$esc"
   fi
 else

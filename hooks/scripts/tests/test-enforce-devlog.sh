@@ -567,12 +567,19 @@ assert_exit "older Round still uses ### Response, complete last Round -> allowed
 rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.interrupted"
 : > "$DEVLOG_DIR/devlog.md"
 printf '%s' '{"prompt":"block me"}' | bash "$SCRIPT_DIR/round-start.sh"
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "skeleton only (hash equal after submit write) -> blocked" 2 $?
 if [ -f "$DEVLOG_DIR/.round-open" ]; then
   echo "PASS: .round-open remains after hash-miss block"
 else
   echo "FAIL: .round-open should remain when Stop blocks"
+  FAIL=1
+fi
+if [ -f "$DEVLOG_DIR/.workspace-mismatch" ]; then
+  echo "PASS: .workspace-mismatch remains after hash-miss block"
+else
+  echo "FAIL: .workspace-mismatch should remain when Stop blocks"
   FAIL=1
 fi
 
@@ -596,6 +603,7 @@ done
 DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
 cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
 # Hash equal would block — simulate Claude's edit by appending a newline after snapshot:
 printf '\n' >> "$DEVLOG_DIR/devlog.md"
@@ -606,6 +614,12 @@ if [ -f "$DEVLOG_DIR/.round-open" ]; then
   FAIL=1
 else
   echo "PASS: .round-open deleted after successful close"
+fi
+if [ -f "$DEVLOG_DIR/.workspace-mismatch" ]; then
+  echo "FAIL: .workspace-mismatch should be deleted on successful Stop"
+  FAIL=1
+else
+  echo "PASS: .workspace-mismatch deleted after successful close"
 fi
 
 # --- Recording moments: .interrupted stamps and does not block -------------

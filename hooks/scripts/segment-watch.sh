@@ -67,6 +67,7 @@ if [ -f "$MISMATCH_FILE" ]; then
     fi
     segments_flat="$(printf '%s' "$SEGMENTS" | tr '\n' '\036')"
     mark_flat="$(printf '%s' "$LIVE_MARK" | tr '\n' '\036')"
+    # "$mark_flat" is quoted so it is literal; dirty paths with *?[ do not glob.
     case "$segments_flat" in
       *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
       *)
