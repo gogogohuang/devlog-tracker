@@ -330,9 +330,25 @@ dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門�
 會產生第二個 Round，不需要也不該用 Reply Fold。Reply Fold 只處理「整個
 turn 已經結束、下一則訊息才拿到答案」這種情況。
 
-**什麼時候該開：** 這一輪的 Summary／Handoff／Status 寫完、確定要用文字
-問題結束這個 turn（Status 常見是 `BLOCKED`，但 `IN_PROGRESS` 也可能）時，
-在結束 turn 之前用 Bash 執行：
+**什麼時候該開：** 確定要用文字問題結束這個 turn 時，在結束 turn 之前：
+
+1. 先用 Edit 在這個 Round 的 `### Summary` 之前插入一個小段落，記下**這次
+   問的問題原文**（跟自動折入答案用同一種格式，方便前後對照）：
+
+   `````markdown
+   ### 段落 N - HH:MM（Claude 提問）
+   ```text
+   <問題原文，跟 User Input 一樣的截斷/遮罩規則>
+   ```
+   `````
+
+   這一步不能省——沒有它，devlog 裡只留得下使用者的回答（下一則訊息自動
+   折入的段落），問的是什麼反而不見了，事後只看檔案會看不懂答案在答什麼。
+2. 確保這一輪的 Summary／Handoff／Status 存在且有效（`Status` 常見是
+   `BLOCKED`，但 `IN_PROGRESS` 也可能）——**第一次**提問要完整寫；如果這已
+   經是同一個 Round 內連續第二題以後的提問，且工作區、決策都還沒變，不用
+   整段重寫，見下面「連續多輪一問一答」。
+3. 用 Bash 執行：
 
 ```bash
 CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh"
@@ -353,8 +369,26 @@ Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 `````
 
 `.devlog/.round-open` 會重新指向這個 Round，讓這輪如果又意外中斷，
-`INTERRUPTED` 一樣能正確蓋在同一個 Round 上。折入之後 Claude 照常編輯
-這個 Round 的 Summary／Handoff／Status，反映答案後的結果。
+`INTERRUPTED` 一樣能正確蓋在同一個 Round 上。折入之後，如果問答到此結束、
+要往下做別的事了，Claude 照常編輯這個 Round 的 Summary／Handoff／Status，
+反映答案後的結果；如果答案帶出**下一個**問題（連續問答），見下面這段。
+
+**連續多輪一問一答（例如 grilling）：只在真正結束時完整收尾。** 一個 Round
+裡如果連續好幾輪都是「Claude 問一題、使用者答一題」，不要每題都重寫一次
+完整的 Summary／Handoff／Status——那樣每題都要跑一次大改動，會把使用者剛
+答完的內容跟 Claude 剛問的下一題擠開，變得很難照順序讀。改成：
+
+- 答案：下一則訊息進來時，Reply Fold 自動折入，不用手動處理。
+- 下一題：只做上面「什麼時候該開」的步驟 1（插入一個 `### 段落
+  （Claude 提問）` 記下問題原文）+ 步驟 3（`await-open.sh`），**不必**重寫
+  Summary／Handoff／Status——只要工作區、決策這些沒變，原本那份還有效。
+- 真正收尾（結束這整場問答、要換話題或往下做別的事）時，才完整改寫一次
+  Summary（總結整場問答得出的結論）與 Handoff（決策／現況／下一步，反映
+  最終結果），Status 改成當下該有的值。
+
+這樣一整場問答結束後，devlog 裡會依序留下每一題的原文段落與對應的回答
+段落，跟一份收尾時寫的總結——問題和答案都保留了，但中途不會被大段落
+的收尾內容打斷。
 
 **猜錯的處理：** hook 沒辦法驗證「下一則訊息真的是在回答」，只看
 `.awaiting-reply` 有沒有開著。如果開了之後使用者其實問了不相干的新問題，
