@@ -18,6 +18,11 @@ else
   # Escape only what we embed; prompts with quotes remain a known no-jq limitation.
   PAYLOAD="$(printf '{"prompt":"%s","session_id":"%s"}' "$PROMPT" "$SESSION_ID")"
 fi
-printf '%s' "$PAYLOAD" | bash "$PLUGIN_SCRIPTS/round-start.sh" >/dev/null 2>&1 || true
-printf '{"continue":true}\n'
+NOTE="$(printf '%s' "$PAYLOAD" | bash "$PLUGIN_SCRIPTS/round-start.sh" 2>/dev/null || true)"
+if command -v jq >/dev/null 2>&1; then
+  jq -cn --arg n "$NOTE" '{continue:true, additional_context:$n}'
+else
+  esc="$(printf '%s' "$NOTE" | sed 's/\\/\\\\/g; s/"/\\"/g; s/	/\\t/g' | awk '{printf "%s\\n", $0}' | sed '$ s/\\n$//')"
+  printf '{"continue":true,"additional_context":"%s"}\n' "$esc"
+fi
 exit 0

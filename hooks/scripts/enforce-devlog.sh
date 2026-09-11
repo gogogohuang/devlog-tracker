@@ -301,6 +301,7 @@ if [ -n "$LAST_ROUND" ]; then
 fi
 
 rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。

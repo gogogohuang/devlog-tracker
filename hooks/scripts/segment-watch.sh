@@ -14,22 +14,79 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$SCRIPT_DIR/json-field.sh"
+# shellcheck source=devlog-md.sh
+. "$SCRIPT_DIR/devlog-md.sh"
 
 [ -f "$ENABLED_FLAG" ] || exit 0
-[ -f "$SEGMENT_FILE" ] || exit 0
 
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
 
-STORED="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
-INCOMING="$(json_str_field "$INPUT" session_id)"
-if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
-  exit 0
+TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
+FILE_PATH=""
+if command -v jq >/dev/null 2>&1; then
+  FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || echo '')"
+  [ "$FILE_PATH" = "null" ] && FILE_PATH=""
+else
+  FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+  if [ -z "$FILE_PATH" ]; then
+    FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
+  fi
 fi
+
+is_devlog_tool_allowed() {
+  case "$1" in
+    Write|Edit|StrReplace|Read|Grep)
+      case "$2" in
+        .devlog/devlog.md|*/.devlog/devlog.md) return 0 ;;
+      esac
+      ;;
+  esac
+  return 1
+}
 
 AGENT_ID="$(json_str_field "$INPUT" agent_id)"
 [ "$AGENT_ID" = "null" ] && AGENT_ID=""
 if [ -n "$AGENT_ID" ]; then
+  exit 0
+fi
+
+MISMATCH_FILE="$DEVLOG_DIR/.workspace-mismatch"
+if [ -f "$MISMATCH_FILE" ]; then
+  LIVE_MARK="$(cat "$MISMATCH_FILE" 2>/dev/null || true)"
+  if [ -z "$LIVE_MARK" ]; then
+    rm -f "$MISMATCH_FILE" 2>/dev/null || true
+  else
+    SEGMENTS=""
+    if [ -f "$DEVLOG_FILE" ]; then
+      LAST_START="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $1 }')"
+      if [ -n "$LAST_START" ]; then
+        LAST_END="$(devlog_block_end "$DEVLOG_FILE" "$LAST_START")"
+        SEGMENTS="$(devlog_round_segments_body "$DEVLOG_FILE" "$LAST_START" "$LAST_END")"
+      fi
+    fi
+    segments_flat="$(printf '%s' "$SEGMENTS" | tr '\n' '\036')"
+    mark_flat="$(printf '%s' "$LIVE_MARK" | tr '\n' '\036')"
+    case "$segments_flat" in
+      *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
+      *)
+        if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH"; then
+          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/devlog.md，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。" >&2
+          echo "" >&2
+          echo "實際：" >&2
+          printf '%s\n' "$LIVE_MARK" >&2
+          exit 2
+        fi
+        ;;
+    esac
+  fi
+fi
+
+[ -f "$SEGMENT_FILE" ] || exit 0
+
+STORED="$(json_str_get "$SEGMENT_FILE" session_id 2>/dev/null || true)"
+INCOMING="$(json_str_field "$INPUT" session_id)"
+if [ -n "$STORED" ] && [ -n "$INCOMING" ] && [ "$STORED" != "$INCOMING" ]; then
   exit 0
 fi
 
@@ -93,26 +150,11 @@ if [ "$CURRENT" != "$SEG_SUM" ]; then
   exit 0
 fi
 
-TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
-FILE_PATH=""
-if command -v jq >/dev/null 2>&1; then
-  FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || echo '')"
-  [ "$FILE_PATH" = "null" ] && FILE_PATH=""
-else
-  FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
-  if [ -z "$FILE_PATH" ]; then
-    FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
-  fi
-fi
 [ -n "$TOOL_NAME" ] || exit 0
 
-case "$TOOL_NAME" in
-  Write|Edit|StrReplace|Read|Grep)
-    case "$FILE_PATH" in
-      .devlog/devlog.md|*/.devlog/devlog.md) exit 0 ;;
-    esac
-    ;;
-esac
+if is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH"; then
+  exit 0
+fi
 
 ELAPSED=$((NOW - SEG_EPOCH))
 if [ "$ELAPSED" -ge "$SEG_MAX" ]; then

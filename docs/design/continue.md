@@ -75,6 +75,15 @@ itself a test command. Do not ask 「上次做到哪」.
     and wait. A matching or mismatching `工作區` does not prove the
     input arrived.
 
+Same-session next user message (not `/clear`, not a new session) goes
+through `round-start.sh` + PreToolUse: mismatch writes
+`.devlog/.workspace-mismatch` and blocks non-devlog tools until this
+Round records the live snapshot in a `### 段落`. Continue.md step 5
+remains the explicit continue path; this gate is for the message that
+never invoked continue. Span ticks and `DONE` last rounds skip it.
+A turn that uses no tools never hits PreToolUse; the stdout /
+`additional_context` note is the only hint on that path.
+
 `/devlog-tracker:resume` runs the same git check (`commands/continue.md`
 steps 5.1–5.2, not this doc's own step numbering above) and
 writes a `### 段落` on mismatch, then still waits for confirmation

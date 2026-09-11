@@ -201,6 +201,13 @@ worth picking off if the format starts to drift:
   SKILL.md remains the write-time format contract; the script is the
   only machine producer. `continue` / `resume` still re-check because
   the cache may be stale — they no longer re-encode by hand.
+- **Same-session next message.** Narrowed by
+  `docs/superpowers/plans/2026-09-11-same-session-workspace-verify.md`.
+  UserPromptSubmit compares the last Round's `#### 工作區` to live git;
+  mismatch injects a note and PreToolUse blocks non-devlog tools until
+  a `### 段落` records the live snapshot. Still no check if the turn
+  uses no tools; SessionStart still does not inject git; concurrent
+  sessions still share one log without a lock.
 - **Ghost keep-index rows.** Phase 3 never reconciles the index with
   files on disk.
 - **Archive index.** Out of scope — compact is GC, not handoff.
@@ -217,3 +224,4 @@ worth picking off if the format starts to drift:
 | `docs/superpowers/plans/2026-09-10-devlog-ssot-phase1-workspace-verify.md` | Phase 1 plan |
 | `docs/superpowers/plans/2026-09-10-devlog-ssot-phase2-handoff-order.md` | Phase 2 plan |
 | `docs/superpowers/plans/2026-09-10-devlog-ssot-phase3-kept-index.md` | Phase 3 plan |
+| `docs/superpowers/plans/2026-09-11-same-session-workspace-verify.md` | Same-session workspace verification plan |
