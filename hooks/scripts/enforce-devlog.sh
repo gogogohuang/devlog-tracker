@@ -25,6 +25,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/json-field.sh"
 # shellcheck source=devlog-lock.sh
 . "$SCRIPT_DIR/devlog-lock.sh"
+# shellcheck source=workspace-snapshot.sh
+. "$SCRIPT_DIR/workspace-snapshot.sh"
 
 # Extracts the last "## Round N ..." block from $1 (fence-aware: a line
 # starting with ``` — optionally indented — toggles in/out of a code
@@ -157,12 +159,42 @@ if [ -n "$LAST_ROUND" ]; then
     exit 2
   fi
 
+  # Fence-aware like last_round_block() above: a heading-looking line inside
+  # a ``` fence (e.g. a markdown example quoting #### 決策 / #### 現況) must
+  # not be mistaken for a real heading, but its fenced content is still part
+  # of the body once grab has started.
+  #
+  # NOFENCE 防呆：如果這個 Round 裡 ``` 記號的數量是奇數（代表圍欄沒有正常
+  # 收尾——真的寫錯了，不是刻意的範例），fence 變數會在這輪剩下的內容裡卡在
+  # 1，導致下面三段 fence-aware awk 把明明存在的內容誤判成「被吃掉、看起來
+  # 是空的」而擋下使用者（exit 2、訊息卻說「是空的」）。這違反本專案的
+  # fail-open 原則，也重現了 Task 1 想解決的那種卡死。NOFENCE=1 時強制
+  # fence 變數維持 0，讓這三段退化回 Task 1 之前的單純掃描行為——退化後
+  # 「卡住的圍欄」不可能吃掉內容，是 fail-open 安全的；圍欄成雙成對（含 0
+  # 個）時，NOFENCE=0，Task 1 加入的 fence-aware 行為完全不變。
+  FENCE_MARKER_COUNT="$(printf '%s\n' "$LAST_ROUND" | grep -c '^[ \t]*```')"
+  NOFENCE=0
+  [ $((FENCE_MARKER_COUNT % 2)) -eq 0 ] || NOFENCE=1
+
   section_body() {
     local heading="$1"
-    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" '
-      $0 ~ h { grab=1; next }
-      grab && /^### / { exit }
-      grab && /^## / { exit }
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; if (grab) print; next }
+      !fence && $0 ~ h { grab=1; next }
+      grab && !fence && /^### / { exit }
+      grab && !fence && /^## / { exit }
+      grab { print }
+    '
+  }
+
+  handoff_subsection_body() {
+    local heading="$1"
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; if (grab) print; next }
+      !fence && $0 ~ h { grab=1; next }
+      grab && !fence && /^#### / { exit }
+      grab && !fence && /^### / { exit }
+      grab && !fence && /^## / { exit }
       grab { print }
     '
   }
@@ -177,6 +209,47 @@ if [ -n "$LAST_ROUND" ]; then
   nonempty_body '^### Handoff' && HAN_BODY_OK=1
   if [ "$SUM_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
     echo "最後一個 Round 的 ### Summary 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    exit 2
+  fi
+
+  # --- Handoff subsection order check (docs/design/devlog-as-ssot-assessment.md,
+  # Phase 2). 決策 → 檔案 → 工作區 → 現況 → 下一步 is a fixed order (SKILL.md
+  # writing rule, docs/design/summary-handoff.md rule 3). Detect a present-but
+  # -reordered or duplicated recognized subsection. Unrecognized #### headings
+  # are ignored — this only tightens what SKILL.md already promises, it does
+  # not invent a new rule.
+  HANDOFF_BODY="$(section_body '^### Handoff')"
+  ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk -v nofence="$NOFENCE" '
+    BEGIN {
+      order["決策"] = 1; order["檔案"] = 2; order["工作區"] = 3
+      order["現況"] = 4; order["下一步"] = 5
+      last = 0; prev_name = ""
+    }
+    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
+    fence { next }
+    /^#### / {
+      name = $0
+      sub(/^#### [ \t]*/, "", name)
+      sub(/[ \t]+$/, "", name)
+      if (!(name in order)) next
+      idx = order[name]
+      if (seen[name]) { print "duplicate:" name; exit }
+      seen[name] = 1
+      if (idx < last) { print "order:" prev_name ">" name; exit }
+      last = idx
+      prev_name = name
+    }
+  ')"
+  if [ -n "$ORDER_ERR" ]; then
+    case "$ORDER_ERR" in
+      duplicate:*)
+        DUP_NAME="${ORDER_ERR#duplicate:}"
+        echo "Handoff 的「#### ${DUP_NAME}」出現超過一次。請合併成一節。" >&2
+        ;;
+      order:*)
+        echo "Handoff 小節順序錯了（應該是 決策 → 檔案 → 工作區 → 現況 → 下一步）：${ORDER_ERR#order:}" >&2
+        ;;
+    esac
     exit 2
   fi
 
@@ -200,22 +273,53 @@ if [ -n "$LAST_ROUND" ]; then
     printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
     NEXT_OK=0
     if [ "$HAS_NEXT" -eq 1 ]; then
-      printf '%s\n' "$LAST_ROUND" | awk '
-        /^#### 下一步/ { grab=1; next }
-        grab && /^#### / { exit }
-        grab && /^### / { exit }
-        grab && /^## / { exit }
-        grab { print }
-      ' | grep -q '[^[:space:]]' && NEXT_OK=1
+      handoff_subsection_body '^#### 下一步' | grep -q '[^[:space:]]' && NEXT_OK=1
     fi
     if [ "$NEXT_OK" -eq 0 ]; then
       echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
       exit 2
     fi
   fi
+
+  # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,
+  # Phase 1 + DONE-with-檔案 extension): #### 工作區 must match a freshly
+  # computed git snapshot exactly. Turns it from an unverified claim into a
+  # write-time fact instead of something only continue/resume catch on the
+  # next turn.
+  #
+  # Required for IN_PROGRESS/BLOCKED (unchanged from Phase 1) and for DONE
+  # only when this round's Handoff has a non-empty #### 檔案 — i.e. it
+  # claims to have touched/committed files. Without this, "已 commit 完成，
+  # Status: DONE" was never checked against live git: the single most
+  # common false-completion claim, and one prose-quality checks elsewhere
+  # in this file explicitly leave unverified. A trivial DONE round with no
+  # #### 檔案 still omits 工作區 entirely per SKILL.md's 瑣碎輪 convention —
+  # unaffected.
+  #
+  # git unavailable -> fail-open, skip this check like every other one here.
+  NEEDS_WORKSPACE_CHECK=0
+  case "$STATUS_VAL" in
+    IN_PROGRESS|BLOCKED) NEEDS_WORKSPACE_CHECK=1 ;;
+    DONE)
+      handoff_subsection_body '^#### 檔案' | grep -q '[^[:space:]]' && NEEDS_WORKSPACE_CHECK=1
+      ;;
+  esac
+  if [ "$NEEDS_WORKSPACE_CHECK" -eq 1 ] && command -v git >/dev/null 2>&1; then
+    EXPECTED_WS="$(workspace_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+    if [ -n "$EXPECTED_WS" ]; then
+      ACTUAL_WS="$(handoff_subsection_body '^#### 工作區' | sed -e '/^[[:space:]]*$/d')"
+      if [ "$ACTUAL_WS" != "$EXPECTED_WS" ]; then
+        echo "#### 工作區 跟目前 git 狀態不符（或缺漏）。請把這一節內容換成以下逐字內容：" >&2
+        echo "" >&2
+        printf '%s\n' "$EXPECTED_WS" >&2
+        exit 2
+      fi
+    fi
+  fi
 fi
 
 rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。

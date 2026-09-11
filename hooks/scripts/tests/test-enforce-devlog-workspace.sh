@@ -1,0 +1,271 @@
+#!/usr/bin/env bash
+# Self-check for enforce-devlog.sh's #### 工作區 machine-verify (Phase 1,
+# docs/design/devlog-as-ssot-assessment.md). Separate file from
+# test-enforce-devlog.sh to avoid growing that suite further; still
+# auto-discovered by run-tests.sh's tests/test-*.sh glob.
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+TMP_ROOT="$(mktemp -d)"
+trap 'rm -rf "$TMP_ROOT"' EXIT
+
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+DEVLOG_DIR="$TMP_ROOT/.devlog"
+mkdir -p "$DEVLOG_DIR"
+touch "$DEVLOG_DIR/.enabled"
+
+git -C "$TMP_ROOT" init -q -b main
+git -C "$TMP_ROOT" config user.email test@example.com
+git -C "$TMP_ROOT" config user.name test
+echo '.devlog/' > "$TMP_ROOT/.gitignore"
+git -C "$TMP_ROOT" add .gitignore
+git -C "$TMP_ROOT" commit -q -m init
+HASH="$(git -C "$TMP_ROOT" rev-parse --short HEAD)"
+
+FAIL=0
+assert_exit() {
+  local desc="$1" expected="$2" actual="$3"
+  if [ "$actual" -eq "$expected" ]; then
+    echo "PASS: $desc"
+  else
+    echo "FAIL: $desc (expected exit $expected, got $actual)"
+    FAIL=1
+  fi
+}
+
+write_round() {
+  # $1 = workspace body (multi-line ok); empty string omits the section.
+  local ws="$1"
+  {
+    echo "## Round 1 — 2026-09-10T00:00:00+08:00"
+    echo ""
+    echo "### Summary"
+    echo "fixture"
+    echo ""
+    echo "### Handoff"
+    if [ -n "$ws" ]; then
+      echo "#### 工作區"
+      printf '%s\n' "$ws"
+    fi
+    echo "#### 現況"
+    echo "fixture"
+    echo "#### 下一步"
+    echo "fixture next step"
+    echo ""
+    echo "### Status"
+    echo "IN_PROGRESS"
+  } > "$DEVLOG_DIR/devlog.md"
+}
+
+# --- exact match -> allowed --------------------------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "main @ ${HASH}，工作樹乾淨"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "workspace matches live clean git state -> allowed" 0 $?
+
+# --- missing section -> blocked, message shows exact expected text ----------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round ""
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "workspace section missing on IN_PROGRESS -> blocked" 2 $?
+case "$MSG" in
+  *"跟目前 git 狀態不符"*) echo "PASS: message explains the mismatch" ;;
+  *) echo "FAIL: message should explain the mismatch, got: $MSG"; FAIL=1 ;;
+esac
+case "$MSG" in
+  *"main @ ${HASH}，工作樹乾淨"*) echo "PASS: message includes the exact expected snapshot" ;;
+  *) echo "FAIL: message should include the exact expected snapshot, got: $MSG"; FAIL=1 ;;
+esac
+
+# --- stale hash -> blocked ---------------------------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "main @ 0000000，工作樹乾淨"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "workspace with stale hash -> blocked" 2 $?
+
+# --- dirty tree, exact two-line match -> allowed -----------------------------
+echo change >> "$TMP_ROOT/a.txt"
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "main @ ${HASH}
+未提交：a.txt"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "dirty tree, exact two-line workspace -> allowed" 0 $?
+git -C "$TMP_ROOT" checkout -q -- a.txt 2>/dev/null || rm -f "$TMP_ROOT/a.txt"
+
+# --- BLOCKED status is also enforced -----------------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 2 — 2026-09-10T00:05:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 現況"
+  echo "fixture"
+  echo "#### 下一步"
+  echo "fixture next step"
+  echo ""
+  echo "### Status"
+  echo "BLOCKED"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "BLOCKED with missing workspace -> blocked" 2 $?
+
+# --- DONE is unaffected (check only applies to IN_PROGRESS/BLOCKED) ---------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 3 — 2026-09-10T00:10:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with no workspace section -> allowed (check does not apply)" 0 $?
+
+# --- fenced example quoting #### 工作區 before the real section -> ignored,
+# extractor still finds the real (unfenced) 工作區 body -------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 4 — 2026-09-10T00:15:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 決策"
+  echo "範例格式："
+  echo '```markdown'
+  echo "#### 工作區"
+  echo "main @ 0000000，工作樹乾淨"
+  echo '```'
+  echo "真正決策內容"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo "#### 下一步"
+  echo "fixture next step"
+  echo ""
+  echo "### Status"
+  echo "IN_PROGRESS"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
+
+# --- unterminated fence in an earlier subsection -> fail-open, not a false
+# block (final-review Fix 1). A ``` fence that never closes (odd fence-marker
+# count) must never make a present, filled-in #### 下一步 register as missing.
+# Pre-fix, the odd fence opened by #### 現況's (malformed) example got
+# `fence` stuck at 1 for the rest of the round, so handoff_subsection_body()
+# could no longer even find the "#### 下一步" heading — even though #### 工作區
+# above it is exactly correct and #### 下一步 below it has real content.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 5 — 2026-09-10T00:20:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "一段沒收尾的範例："
+  echo '```markdown'
+  echo "沒收尾內容，一路吃到這個 Round 結尾"
+  echo "#### 下一步"
+  echo "fixture next step"
+  echo ""
+  echo "### Status"
+  echo "IN_PROGRESS"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
+
+# --- DONE with a non-empty #### 檔案 (claims files were touched/committed)
+# IS now checked: a DONE round that reports file changes but has no/wrong
+# #### 工作區 is exactly the "已 commit 完成" false-claim case
+# devlog-as-ssot-assessment.md flags as uncaught — machine-verify it the
+# same way IN_PROGRESS/BLOCKED already are. A trivial DONE round with no
+# #### 檔案 stays exempt (previous test above), matching SKILL.md's
+# "瑣碎輪只留現況一句（沒有工作區）" convention untouched. ------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+MSG_DONE="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "DONE with #### 檔案 but no #### 工作區 -> blocked" 2 $?
+case "$MSG_DONE" in
+  *"main @ ${HASH}，工作樹乾淨"*) echo "PASS: DONE block message includes exact expected snapshot" ;;
+  *) echo "FAIL: DONE block message should include exact expected snapshot, got: $MSG_DONE"; FAIL=1 ;;
+esac
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 工作區"
+  echo "main @ 0000000，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with #### 檔案 and stale 工作區 hash -> blocked" 2 $?
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+{
+  echo "## Round 6 — 2026-09-10T00:25:00+08:00"
+  echo ""
+  echo "### Summary"
+  echo "fixture"
+  echo ""
+  echo "### Handoff"
+  echo "#### 檔案"
+  echo "新增 a.txt，已 commit"
+  echo "#### 工作區"
+  echo "main @ ${HASH}，工作樹乾淨"
+  echo "#### 現況"
+  echo "fixture"
+  echo ""
+  echo "### Status"
+  echo "DONE"
+} > "$DEVLOG_DIR/devlog.md"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "DONE with #### 檔案 and matching 工作區 -> allowed" 0 $?
+
+if [ "$FAIL" -eq 0 ]; then
+  echo "All checks passed."
+  exit 0
+else
+  echo "Some checks FAILED."
+  exit 1
+fi

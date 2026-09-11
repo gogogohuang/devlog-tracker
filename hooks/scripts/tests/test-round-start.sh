@@ -502,6 +502,107 @@ fi
 assert_file_absent "task-notification during open span: no .round-open" "$DEVLOG_DIR/.round-open"
 rm -f "$DEVLOG_DIR/.span-open"
 
+# --- workspace claim on next prompt ----------------------------------------
+WS="$TMP_ROOT/ws"
+mkdir -p "$WS/.devlog"
+export CLAUDE_PROJECT_DIR="$WS"
+touch "$WS/.devlog/.enabled"
+git -C "$WS" init -q -b main
+git -C "$WS" config user.email test@example.com
+git -C "$WS" config user.name test
+echo hello > "$WS/a.txt"
+git -C "$WS" add a.txt
+git -C "$WS" commit -q -m init
+LIVE="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$WS")"
+cat > "$WS/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Handoff
+#### 工作區
+${LIVE}
+#### 現況
+going
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+[ -z "$OUT" ] && echo "PASS: matching 工作區 prints nothing" || { echo "FAIL: match stdout [$OUT]"; FAIL=1; }
+[ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: matching 工作區 writes no marker" || { echo "FAIL: marker on match"; FAIL=1; }
+grep -q '^## Round 2' "$WS/.devlog/devlog.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
+
+cat > "$WS/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+going
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "mismatch stdout names 工作區" "#### 工作區" "$OUT"
+assert_contains "mismatch stdout has 宣稱" "宣稱：" "$OUT"
+assert_contains "mismatch stdout has 實際" "實際：" "$OUT"
+assert_contains "mismatch stdout has live snapshot" "$LIVE" "$OUT"
+[ -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: mismatch writes marker" || { echo "FAIL: no marker"; FAIL=1; }
+MARKER="$(cat "$WS/.devlog/.workspace-mismatch")"
+[ "$MARKER" = "$LIVE" ] && echo "PASS: marker is live snapshot" || { echo "FAIL: marker [$MARKER]"; FAIL=1; }
+
+cat > "$WS/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+
+### Status
+DONE
+EOF
+rm -f "$WS/.devlog/.workspace-mismatch"
+OUT="$(printf '%s' '{"prompt":"new topic"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+[ -z "$OUT" ] && echo "PASS: DONE prints nothing" || { echo "FAIL: DONE stdout [$OUT]"; FAIL=1; }
+[ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: DONE writes no marker" || { echo "FAIL: DONE marker"; FAIL=1; }
+
+cat > "$WS/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+going
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "ticks_since_checkin": 0, "max_silent_ticks": 5}' > "$WS/.devlog/.span-open"
+rm -f "$WS/.devlog/.workspace-mismatch"
+printf '%s' '{"prompt":"tick"}' | bash "$SCRIPT_DIR/round-start.sh" >/dev/null
+[ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: span skip writes no marker" || { echo "FAIL: span marker"; FAIL=1; }
+rm -f "$WS/.devlog/.span-open"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

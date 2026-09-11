@@ -70,6 +70,18 @@ assert_contains "block message names 門檻 900" "門檻 900 秒" "$ERR"
 assert_contains "block message starts 這一輪已經" "這一輪已經" "$ERR"
 assert_contains "block message ends 寫完再繼續呼叫其他工具" "寫完再繼續呼叫其他工具" "$ERR"
 
+# --- Scenario 3a: expired silence valve also allows read-only git inspection,
+# same allowlist as the workspace-mismatch block above ----------------------
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git log -5"}}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired silence + read-only git log -> allowed" 0 $?
+
+write_state "$EXPIRED" "$SEED_CKSUM" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status && echo done"}}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "expired silence + chained command -> still blocked" 2 $?
+
 # --- Scenario 3b: only the parent session uses this valve -------------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' '{"tool_name":"Bash","session_id":"aaa"}' | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
@@ -291,6 +303,144 @@ printf '{"last_change_epoch": %s, "last_seen_cksum": "stale-sum", "max_silent_se
   "$EXPIRED" > "$DEVLOG_DIR/.segment-state"
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "missing identity + hash change -> allowed" 0 $?
+
+# --- workspace mismatch marker blocks non-devlog tools ----------------------
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+keep going
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + Bash -> blocked" 2 $?
+
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/devlog.md"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + Read devlog -> allowed" 0 $?
+
+ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
+case "$ERR" in
+  *實際*deadbeef*) echo "PASS: mismatch stderr includes live snapshot" ;;
+  *) echo "FAIL: mismatch stderr [$ERR]"; FAIL=1 ;;
+esac
+
+# last Round contains the live snapshot -> marker cleared, Bash allowed
+# (fresh clock so the silence valve does not also fire)
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+### 段落 1
+宣稱 vs 實際
+main @ deadbeef，工作樹乾淨
+EOF
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch recorded in 段落 -> Bash allowed" 0 $?
+[ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: marker removed after 段落" || { echo "FAIL: marker remains"; FAIL=1; }
+
+# two-line dirty snapshot (branch @ hash + 未提交) recorded in 段落 -> marker cleared
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+keep going
+```
+
+### 段落 1
+feat/foo @ abc1234
+未提交：a.txt
+
+### Status
+IN_PROGRESS
+EOF
+cat > "$DEVLOG_DIR/.workspace-mismatch" <<'EOF'
+feat/foo @ abc1234
+未提交：a.txt
+EOF
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "two-line dirty snapshot in 段落 -> Bash allowed" 0 $?
+[ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: two-line marker removed after 段落" || { echo "FAIL: two-line marker remains"; FAIL=1; }
+
+# Same string outside a 段落 must not clear the marker
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+main @ deadbeef，工作樹乾淨
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "snapshot in User Input only -> still blocked" 2 $?
+
+# --- read-only git inspection commands stay allowed while blocked ----------
+# The whole point of the mismatch block is to force a look at live git
+# before acting — but Bash itself is blocked, so there was no way to run
+# `git status`/`git diff` to see what actually changed. A small allowlist of
+# unconditionally non-mutating git subcommands stays open; anything with
+# shell metacharacters (chaining/redirection/substitution) or a mutating
+# subcommand (commit, branch -d, etc.) stays blocked.
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+```text
+keep going
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status --short"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + read-only git status -> allowed" 0 $?
+[ -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: read-only git inspection does not clear the marker" || { echo "FAIL: marker cleared by mere inspection"; FAIL=1; }
+
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git diff"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + read-only git diff -> allowed" 0 $?
+
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status; rm -rf /tmp/whatever"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + chained command after git status -> still blocked" 2 $?
+
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git commit -am oops"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + git commit -> still blocked" 2 $?
+
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git branch -d main"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + git branch -d (mutating, not allowlisted) -> still blocked" 2 $?
+
+# marker works even without .segment-state (today that file missing exits 0)
+rm -f "$DEVLOG_DIR/.segment-state"
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker without segment-state + Bash -> blocked" 2 $?
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

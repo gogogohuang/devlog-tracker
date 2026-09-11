@@ -1,7 +1,8 @@
 # Continue (explicit resume after empty context)
 
 `/devlog-tracker:continue` reads `.devlog/devlog.md` and resumes from
-the last Round's Handoff. It is the only resume path after `/clear`.
+the last Round's Handoff after checking `#### 工作區` against the live
+tree. It is the only resume path after `/clear`.
 
 `/clear` still wipes the conversation. SessionStart (`source=clear`)
 may stamp a dangling open Round `INTERRUPTED`, but it prints nothing
@@ -19,7 +20,7 @@ reload it.
 
 `/devlog-tracker:start` is the wrong resume button: it enables
 enforcement and confirms progress. Continue actually does the next
-step.
+step, after the cheap git check below.
 
 ## SessionStart
 
@@ -37,11 +38,59 @@ pick up old work. Only continue (or start, which only summarises).
 1. Missing `devlog.md` → say there is nothing to continue; write nothing.
 2. Open `.span-open` → mention it; continue the span unless the user
    asked to close it.
-3. Act on the last **historical** Round (not the continue-turn skeleton):
-   - `IN_PROGRESS` / `INTERRUPTED` → do Handoff `下一步` immediately.
-   - `BLOCKED` → state the missing input; wait.
-   - `DONE` → say the previous ask finished; wait for a new ask.
-4. Close this turn on the open Round as usual (Summary / Handoff / Status).
+3. Read recent rounds (and the last Checkpoint if any). Do not read
+   archive or keep files unless `下一步` names them.
+4. Last **historical** Round (not the continue-turn skeleton):
+   - `DONE` → say the previous ask finished; wait. No git check.
+   - `IN_PROGRESS` / `INTERRUPTED` / `BLOCKED` → **verify, then act**.
+5. Close this turn on the open Round as usual (Summary / Handoff /
+   Status, including `#### 工作區` when the new Status is `IN_PROGRESS`
+   or `BLOCKED`). Do not edit the historical Round.
+
+## Verify before acting
+
+Handoff `#### 工作區` is a claim. It becomes a fact only after this
+turn's encoded snapshot matches it (or after a mismatch is recorded).
+
+Run `hooks/scripts/workspace-snapshot.sh` the same way `commands/continue.md`
+step 5.1 does (`PLUGIN_ROOT` + `CLAUDE_PROJECT_DIR`). stdout is the live
+snapshot — the only machine encoding of the five formats in
+`skills/devlog-tracker/SKILL.md` (`#### 工作區`). Do not re-run git or
+re-spell those formats here. Compare stdout to the historical Round's
+`#### 工作區` body. Do not re-run the test suite unless `下一步` is
+itself a test command. Do not ask 「上次做到哪」.
+
+- **Missing subsection** (older rounds, `INTERRUPTED` stubs) → no
+  snapshot, so there is no claim to compare. Do not append a `### 段落`;
+  the encoded live snapshot is simply the fact.
+- **Present but mismatched** → append a `### 段落` on *this* round
+  (claim vs live; live is the script stdout, same format set).
+- **Present and matching** → no `### 段落` needed.
+- **Then act from the live tree**, not from the claimed `工作區` /
+  `現況` wording:
+  - `IN_PROGRESS` / `INTERRUPTED`: do `下一步` (or derive it from 現況
+    + live tree if `下一步` is absent).
+  - `BLOCKED`: whether the missing external input is now present is
+    independent of the git check. If present, proceed; else state it
+    and wait. A matching or mismatching `工作區` does not prove the
+    input arrived.
+
+Same-session next user message (not `/clear`, not a new session) goes
+through `round-start.sh` + PreToolUse: mismatch writes
+`.devlog/.workspace-mismatch` and blocks non-devlog tools until this
+Round records the live snapshot in a `### 段落`. Continue.md step 5
+remains the explicit continue path; this gate is for the message that
+never invoked continue. Span ticks and `DONE` last rounds skip it.
+A turn that uses no tools never hits PreToolUse; the stdout /
+`additional_context` note is the only hint on that path.
+
+`/devlog-tracker:resume` runs the same git check (`commands/continue.md`
+steps 5.1–5.2, not this doc's own step numbering above) and
+writes a `### 段落` on mismatch, then still waits for confirmation
+before doing `下一步`. It must not follow continue's immediate-act
+step (5.3). SessionStart still does not inject git; if the injected
+excerpt leads Claude to act on `下一步`, it must run this check first.
+`/devlog-tracker:start` only summarises; no check.
 
 ## Files
 
@@ -49,6 +98,7 @@ pick up old work. Only continue (or start, which only summarises).
 |---|---|
 | `hooks/scripts/session-start-devlog.sh` | `source=clear` heals then exits without stdout |
 | `hooks/scripts/test-session-start-devlog.sh` | silent clear; resume still injects |
-| `commands/continue.md` | Authoring instructions |
-| `skills/devlog-tracker/SKILL.md` | Clear is empty; continue is the resume path |
+| `commands/continue.md` | Authoring instructions, including verify-then-act |
+| `commands/resume.md` | Same verify, then wait for confirm |
+| `skills/devlog-tracker/SKILL.md` | Clear is empty; continue is the resume path; fallback also verifies |
 | `docs/design/continue.md` | This spec |

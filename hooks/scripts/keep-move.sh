@@ -124,6 +124,17 @@ awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v 
 ' "$MAIN" > "$NEW_MAIN" || exit 1
 mv "$NEW_MAIN" "$MAIN" || exit 1
 
+KEPT_LINE="- \`devlog.${NAME}.md\`：Round ${FROM}-${TO}，kept_at ${KEPT_AT}"
+KEPT_STRIPPED="$TMP/kept-stripped"
+devlog_strip_kept_index "$MAIN" "$KEPT_STRIPPED"
+EXISTING_KEPT_LINES="$(devlog_kept_index_lines "$MAIN")"
+{
+  cat "$KEPT_STRIPPED"
+  printf '\n## Kept 索引\n'
+  [ -n "$EXISTING_KEPT_LINES" ] && printf '%s\n' "$EXISTING_KEPT_LINES"
+  printf '%s\n' "$KEPT_LINE"
+} > "$KEPT_STRIPPED.new" && mv "$KEPT_STRIPPED.new" "$MAIN" || exit 1
+
 if [ "$FULL" -eq 1 ]; then
   rm -f "$DEVLOG_DIR/.span-open"
   [ ! -f "$DEVLOG_DIR/.round-open" ] || json_int_set "$DEVLOG_DIR/.round-open" round 1

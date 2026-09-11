@@ -65,6 +65,36 @@ grep -q 'hello' "$SUBMIT/.devlog/devlog.md" && echo "PASS: submit writes round" 
 ROUNDS="$(grep -c '^## Round ' "$SUBMIT/.devlog/devlog.md" || true)"
 if [ "$ROUNDS" -eq 1 ]; then echo "PASS: submit writes one round"; else echo "FAIL: submit round count [$ROUNDS]"; FAIL=1; fi
 
+# submit prompt with stale 工作區 forwards additional_context
+MIS="$TMP/mismatch-submit"
+mkdir -p "$MIS/.devlog"
+touch "$MIS/.devlog/.enabled"
+git -C "$MIS" init -q -b main
+git -C "$MIS" config user.email test@example.com
+git -C "$MIS" config user.name test
+echo hello > "$MIS/a.txt"
+git -C "$MIS" add a.txt
+git -C "$MIS" commit -q -m init
+cat > "$MIS/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+going
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+OUT="$(printf '{"workspace_roots":["%s"],"prompt":"keep going","session_id":"cursor-mismatch"}' "$MIS" | bash "$SCRIPT_DIR/on-submit-prompt.sh")"
+case "$OUT" in *'"continue":true'*) echo "PASS: mismatch submit continues" ;; *) echo "FAIL: mismatch submit [$OUT]"; FAIL=1 ;; esac
+case "$OUT" in *'"additional_context"'*工作區*) echo "PASS: mismatch submit additional_context" ;; *) echo "FAIL: mismatch context [$OUT]"; FAIL=1 ;; esac
+assert_single_json "mismatch submit single json" "$OUT"
+[ -f "$MIS/.devlog/.workspace-mismatch" ] && echo "PASS: mismatch submit writes marker" || { echo "FAIL: no cursor marker"; FAIL=1; }
+
 # preToolUse allowlists writes to the devlog and denies expired other tools
 NOW="$(date +%s)"
 OLD=$((NOW - 1000))
@@ -152,6 +182,25 @@ if [ "$SEG_SID" = "cursor-nojq" ]; then
   echo "PASS: nojq session_id stored in segment-state"
 else
   echo "FAIL: nojq session_id missing (got [$SEG_SID])"; FAIL=1
+fi
+
+# --- no-jq PreToolUse deny must emit a single-line JSON object --------------
+# segment-watch deny stderr is multiline; without newline escaping, bash 3.2
+# prints unparseable JSON and Cursor fail-opens (valve vanishes).
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Bash","tool_input":{},"session_id":"cursor-mismatch"}' "$MIS" \
+  | env PATH="$CLEAN_PATH" bash "$SCRIPT_DIR/on-pre-tool.sh")"
+case "$OUT" in *'"permission":"deny"'*) echo "PASS: nojq mismatch preTool denies" ;; *) echo "FAIL: nojq mismatch preTool [$OUT]"; FAIL=1 ;; esac
+assert_single_json "nojq mismatch preTool deny single json" "$OUT"
+case "$OUT" in
+  *$'\n'*$'\n'*) echo "FAIL: nojq deny JSON contains raw newlines [$OUT]"; FAIL=1 ;;
+  *) echo "PASS: nojq deny JSON has no raw newlines inside the string" ;;
+esac
+if command -v python3 >/dev/null 2>&1; then
+  if printf '%s' "$OUT" | python3 -c 'import json,sys; json.load(sys.stdin)' >/dev/null 2>&1; then
+    echo "PASS: nojq deny JSON is parseable"
+  else
+    echo "FAIL: nojq deny JSON is not parseable [$OUT]"; FAIL=1
+  fi
 fi
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0

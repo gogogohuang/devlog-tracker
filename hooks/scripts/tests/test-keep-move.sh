@@ -67,5 +67,43 @@ grep -q '"rounds_since_checkpoint": 0' "$FULL/.devlog/.checkpoint-state" && echo
 grep -q '"max_silent_rounds": 20' "$FULL/.devlog/.checkpoint-state" && echo "PASS: checkpoint max kept" || { echo "FAIL: checkpoint max"; FAIL=1; }
 [ ! -e "$FULL/.devlog/.span-open" ] && echo "PASS: span removed" || { echo "FAIL: span remains"; FAIL=1; }
 
+grep -q '^## Kept 索引' "$FULL/.devlog/devlog.md" && echo "PASS: full keep wrote a Kept 索引 block" || { echo "FAIL: full keep should write a Kept 索引 block"; FAIL=1; }
+grep -q 'devlog.episode.md' "$FULL/.devlog/devlog.md" && echo "PASS: full keep index line names devlog.episode.md" || { echo "FAIL: full keep index line missing devlog.episode.md"; FAIL=1; }
+
+INDEX="$TMP/index"
+mkdir -p "$INDEX/.devlog"
+export CLAUDE_PROJECT_DIR="$INDEX"
+printf '# project\n\n' > "$INDEX/.devlog/devlog.md"
+make_round "$INDEX/.devlog/devlog.md" 1 DONE
+make_round "$INDEX/.devlog/devlog.md" 2 DONE
+make_round "$INDEX/.devlog/devlog.md" 3 DONE
+# Keep an open round so the 3rd keep below (--from 3 --to 3) stays a *partial*
+# keep — a full keep drops everything before the first round, which would
+# leave ## Kept 索引 at line 1 and silently stop testing the blank-line
+# separator regression checked below.
+make_round "$INDEX/.devlog/devlog.md" 4 IN_PROGRESS
+printf '%s\n' '{"round": 4, "opened_at": "now"}' > "$INDEX/.devlog/.round-open"
+bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name topic-a >/dev/null
+KEPT_COUNT_1="$(grep -c '^- ' "$INDEX/.devlog/devlog.md")"
+[ "$KEPT_COUNT_1" -eq 1 ] && echo "PASS: first partial keep adds exactly one index line" || { echo "FAIL: expected 1 index line, got $KEPT_COUNT_1"; FAIL=1; }
+bash "$SCRIPT_DIR/keep-move.sh" --from 2 --to 2 --name topic-b >/dev/null
+KEPT_COUNT_2="$(grep -c '^- ' "$INDEX/.devlog/devlog.md")"
+[ "$KEPT_COUNT_2" -eq 2 ] && echo "PASS: second partial keep accumulates to two index lines" || { echo "FAIL: expected 2 index lines, got $KEPT_COUNT_2"; FAIL=1; }
+KEPT_BLOCKS="$(grep -c '^## Kept 索引' "$INDEX/.devlog/devlog.md")"
+[ "$KEPT_BLOCKS" -eq 1 ] && echo "PASS: exactly one Kept 索引 heading after two keeps" || { echo "FAIL: expected exactly 1 Kept 索引 heading, got $KEPT_BLOCKS"; FAIL=1; }
+grep -q 'devlog.topic-a.md' "$INDEX/.devlog/devlog.md" && echo "PASS: first line survives the second keep's rewrite" || { echo "FAIL: devlog.topic-a.md line lost after second keep"; FAIL=1; }
+bash "$SCRIPT_DIR/keep-move.sh" --from 3 --to 3 --name topic-c >/dev/null
+KEPT_COUNT_3="$(grep -c '^- ' "$INDEX/.devlog/devlog.md")"
+[ "$KEPT_COUNT_3" -eq 3 ] && echo "PASS: third partial keep accumulates to three index lines" || { echo "FAIL: expected 3 index lines, got $KEPT_COUNT_3"; FAIL=1; }
+HEADING_LINE="$(grep -n '^## Kept 索引' "$INDEX/.devlog/devlog.md" | head -1 | cut -d: -f1)"
+PREV_LINE="$(sed -n "$((HEADING_LINE - 1))p" "$INDEX/.devlog/devlog.md")"
+PREV2_LINE="$(sed -n "$((HEADING_LINE - 2))p" "$INDEX/.devlog/devlog.md")"
+if [ -z "$PREV_LINE" ] && [ -n "$PREV2_LINE" ]; then
+  echo "PASS: exactly one blank line separates content from ## Kept 索引 after three keep-move.sh calls"
+else
+  echo "FAIL: expected exactly one blank line before ## Kept 索引 after three keep-move.sh calls, got [$PREV_LINE] then [$PREV2_LINE]"
+  FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
