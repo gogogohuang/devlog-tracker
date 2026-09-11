@@ -24,15 +24,43 @@ INPUT="$(cat 2>/dev/null || true)"
 
 TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
 FILE_PATH=""
+COMMAND=""
 if command -v jq >/dev/null 2>&1; then
   FILE_PATH="$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty' 2>/dev/null || echo '')"
   [ "$FILE_PATH" = "null" ] && FILE_PATH=""
+  COMMAND="$(printf '%s' "$INPUT" | jq -r '.tool_input.command // empty' 2>/dev/null || echo '')"
+  [ "$COMMAND" = "null" ] && COMMAND=""
 else
   FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"file_path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
   if [ -z "$FILE_PATH" ]; then
     FILE_PATH="$(printf '%s' "$INPUT" | grep -o '"path"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
   fi
+  COMMAND="$(printf '%s' "$INPUT" | grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"command"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo '')"
 fi
+
+# Blocked-and-stuck recovery: Bash itself is denied while blocked, so there
+# was no way to run `git status`/`git diff` to see what actually changed —
+# exactly the thing both valves below are asking Claude to reconcile against.
+# Allow a small allowlist of git subcommands that are non-mutating in every
+# documented invocation form (no flag combination writes). Reject anything
+# with shell metacharacters first — chaining/redirection/substitution could
+# otherwise smuggle a second, unrelated command past the git-prefix match.
+is_safe_readonly_git_command() {
+  local cmd
+  cmd="$(printf '%s' "$1" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  [ -n "$cmd" ] || return 1
+  case "$cmd" in
+    *';'*|*'&'*|*'|'*|*'`'*|*'$('*|*'>'*|*'<'*|*$'\n'*) return 1 ;;
+  esac
+  case "$cmd" in
+    git\ status|git\ status\ *) return 0 ;;
+    git\ diff|git\ diff\ *) return 0 ;;
+    git\ log|git\ log\ *) return 0 ;;
+    git\ show|git\ show\ *) return 0 ;;
+    git\ rev-parse|git\ rev-parse\ *) return 0 ;;
+  esac
+  return 1
+}
 
 is_devlog_tool_allowed() {
   case "$1" in
@@ -40,6 +68,9 @@ is_devlog_tool_allowed() {
       case "$2" in
         .devlog/devlog.md|*/.devlog/devlog.md) return 0 ;;
       esac
+      ;;
+    Bash)
+      is_safe_readonly_git_command "$3" && return 0
       ;;
   esac
   return 1
@@ -71,8 +102,8 @@ if [ -f "$MISMATCH_FILE" ]; then
     case "$segments_flat" in
       *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
       *)
-        if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH"; then
-          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/devlog.md，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。" >&2
+        if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH" "$COMMAND"; then
+          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/devlog.md，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
           echo "" >&2
           echo "實際：" >&2
           printf '%s\n' "$LIVE_MARK" >&2
@@ -153,13 +184,13 @@ fi
 
 [ -n "$TOOL_NAME" ] || exit 0
 
-if is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH"; then
+if is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH" "$COMMAND"; then
   exit 0
 fi
 
 ELAPSED=$((NOW - SEG_EPOCH))
 if [ "$ELAPSED" -ge "$SEG_MAX" ]; then
-  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/devlog.md（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/devlog.md，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。" >&2
+  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/devlog.md（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/devlog.md，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。（唯讀的 git status／diff／log／show／rev-parse 仍可執行。）" >&2
   exit 2
 fi
 

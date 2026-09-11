@@ -203,6 +203,20 @@ to open or close a watch.
   `.devlog/devlog.md`, then Edit/StrReplace to append. Full-file Write
   overwrite remains technically allowlisted for legacy paths but SKILL
   and stderr forbid it — prefer append.
+- **Read-only git inspection stays open while blocked (2026-09-11).** Both
+  this valve and the workspace-mismatch valve (`docs/design/continue.md`)
+  deny `Bash` by default, which used to leave no way to run `git
+  status`/`git diff` to see what actually changed before writing the
+  required `### 段落`. `is_safe_readonly_git_command()` in
+  `segment-watch.sh` allows `git status` / `diff` / `log` / `show` /
+  `rev-parse` in any flag form — all unconditionally non-mutating — and
+  rejects the command outright if it contains any shell metacharacter
+  (`;`, `&`, `|`, backtick, `$(`, `>`, `<`, newline) that could chain,
+  redirect, or substitute in a second command. `git branch` is
+  deliberately excluded (its `-d`/`-D` forms mutate). Passing this check
+  never clears a marker or resets the silence clock — it only lets the
+  inspection command itself through; the actual `### 段落` still has to be
+  written before other tools unblock.
 
 ## Files
 

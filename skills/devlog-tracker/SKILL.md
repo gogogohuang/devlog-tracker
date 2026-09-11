@@ -112,7 +112,7 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
-同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。
+同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。擋著的時候，唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse`（不含任何 shell 串接符號）仍可執行，方便自行核對「宣稱 vs 實際」再動手寫段落。
 不要自動觸發。`/devlog-tracker:start` 只對進度，不開工、不核對。
 
 ## 每一輪的紀錄格式
