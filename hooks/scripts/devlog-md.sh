@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+_DEVLOG_MD_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+
 devlog_list_round_starts() {
   awk '
     /^[ \t]*```/ { fence = !fence; next }
@@ -89,4 +91,55 @@ devlog_strip_kept_index() {
     /^[ \t]*$/ { pending = pending $0 ORS; next }
     { printf "%s", pending; pending = ""; print }
   ' > "$2"
+}
+
+devlog_round_workspace_body() {
+  awk -v start="$2" -v end="$3" '
+    NR < start || NR > end { next }
+    /^[ \t]*```/ { fence = !fence; next }
+    !fence && /^#### 工作區[[:space:]]*$/ { grab = 1; next }
+    grab && !fence && /^#### / { grab = 0 }
+    grab && !fence && /^### / { grab = 0 }
+    grab && !fence && /^## / { grab = 0 }
+    grab { print }
+  ' "$1" | sed -e '/^[[:space:]]*$/d'
+}
+
+devlog_round_segments_body() {
+  awk -v start="$2" -v end="$3" '
+    NR < start || NR > end { next }
+    /^[ \t]*```/ {
+      if (segment) print
+      fence = !fence
+      next
+    }
+    !fence && /^### 段落 / { segment = 1; next }
+    segment && !fence && /^### / { segment = 0 }
+    segment && !fence && /^## / { segment = 0 }
+    segment { print }
+  ' "$1"
+}
+
+workspace_claim_state() {
+  local dir="$1" file="$2" start end status claimed live
+  if ! type workspace_snapshot >/dev/null 2>&1; then
+    # shellcheck source=workspace-snapshot.sh
+    . "$_DEVLOG_MD_DIR/workspace-snapshot.sh"
+  fi
+  start="$(devlog_list_round_starts "$file" | awk 'END { print $1 }')"
+  [ -n "$start" ] || { printf 'NO_CLAIM\n'; return 0; }
+  end="$(devlog_block_end "$file" "$start")"
+  status="$(devlog_round_status "$file" "$start" "$end")"
+  case "$status" in
+    '[reason:'*) status=INTERRUPTED ;;
+  esac
+  case "$status" in
+    IN_PROGRESS|BLOCKED|INTERRUPTED) ;;
+    *) printf 'NO_CLAIM\n'; return 0 ;;
+  esac
+  claimed="$(devlog_round_workspace_body "$file" "$start" "$end")"
+  [ -n "$claimed" ] || { printf 'NO_CLAIM\n'; return 0; }
+  live="$(workspace_snapshot "$dir")"
+  [ -n "$live" ] || { printf 'NO_CLAIM\n'; return 0; }
+  if [ "$claimed" = "$live" ]; then printf 'MATCH\n'; else printf 'MISMATCH\n'; fi
 }

@@ -231,6 +231,112 @@ else
   FAIL=1
 fi
 
+# --- last-round 工作區 body + claim state (no git needed for NO_CLAIM) ----
+cat > "$TMP_ROOT/claim.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+old
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+still going
+
+### Status
+IN_PROGRESS
+
+## Round 2 — 2026-09-11T00:01:00+08:00
+
+### Summary
+newer
+
+### Handoff
+#### 工作區
+feat/foo @ abc1234
+未提交：a.txt
+#### 現況
+x
+
+### Status
+BLOCKED
+EOF
+START="$(devlog_list_round_starts "$TMP_ROOT/claim.md" | awk 'END { print $1 }')"
+END="$(devlog_block_end "$TMP_ROOT/claim.md" "$START")"
+assert_eq "last round is 2" "2" "$(devlog_list_round_starts "$TMP_ROOT/claim.md" | awk 'END { print $2 }')"
+assert_eq "last-round status BLOCKED" "BLOCKED" "$(devlog_round_status "$TMP_ROOT/claim.md" "$START" "$END")"
+WS_BODY="$(devlog_round_workspace_body "$TMP_ROOT/claim.md" "$START" "$END")"
+EXPECTED_BODY='feat/foo @ abc1234
+未提交：a.txt'
+assert_eq "workspace body two lines" "$EXPECTED_BODY" "$WS_BODY"
+
+cat > "$TMP_ROOT/segments.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### User Input
+main @ user-input-only，工作樹乾淨
+
+### 段落 1
+first
+```text
+main @ live123，工作樹乾淨
+```
+
+### Summary
+main @ summary-only，工作樹乾淨
+
+### 段落 2
+second
+EOF
+SEG_START="$(devlog_list_round_starts "$TMP_ROOT/segments.md" | awk 'END { print $1 }')"
+SEG_END="$(devlog_block_end "$TMP_ROOT/segments.md" "$SEG_START")"
+SEG_BODY="$(devlog_round_segments_body "$TMP_ROOT/segments.md" "$SEG_START" "$SEG_END")"
+assert_contains "segment bodies include first segment" "first" "$SEG_BODY"
+assert_contains "segment bodies include fenced snapshot" "main @ live123，工作樹乾淨" "$SEG_BODY"
+assert_contains "segment bodies include second segment" "second" "$SEG_BODY"
+case "$SEG_BODY" in
+  *user-input-only*|*summary-only*) echo "FAIL: non-segment text leaked"; FAIL=1 ;;
+  *) echo "PASS: non-segment text excluded" ;;
+esac
+
+cat > "$TMP_ROOT/done.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+
+### Status
+DONE
+EOF
+assert_eq "DONE is NO_CLAIM" "NO_CLAIM" "$(workspace_claim_state "$TMP_ROOT" "$TMP_ROOT/done.md")"
+
+cat > "$TMP_ROOT/empty-ws.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 現況
+x
+
+### Status
+IN_PROGRESS
+EOF
+assert_eq "missing 工作區 is NO_CLAIM" "NO_CLAIM" "$(workspace_claim_state "$TMP_ROOT" "$TMP_ROOT/empty-ws.md")"
+
+cat > "$TMP_ROOT/interrupted.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+
+### Status
+INTERRUPTED
+[reason: dangling:next_prompt]
+EOF
+assert_eq "INTERRUPTED+reason with 工作區 is not DONE" "MISMATCH" "$(workspace_claim_state "$TMP_ROOT" "$TMP_ROOT/interrupted.md")"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

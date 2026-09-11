@@ -6,6 +6,7 @@ set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$SCRIPT_DIR/workspace-snapshot.sh"
+. "$SCRIPT_DIR/devlog-md.sh"
 
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
@@ -94,6 +95,31 @@ DEFAULT_DIR="$TMP_ROOT/default-dir"
 mkdir -p "$DEFAULT_DIR"
 CLI_DEFAULT="$(CLAUDE_PROJECT_DIR="$DEFAULT_DIR" bash "$SCRIPT_DIR/workspace-snapshot.sh")"
 assert_eq "cli default dir is CLAUDE_PROJECT_DIR" "非 git 工作區" "$CLI_DEFAULT"
+
+# --- claim state vs live snapshot ------------------------------------------
+LIVE_NOW="$(workspace_snapshot "$REPO")"
+cat > "$TMP_ROOT/round.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+${LIVE_NOW}
+
+### Status
+IN_PROGRESS
+EOF
+assert_eq "claim MATCH on live snapshot" "MATCH" "$(workspace_claim_state "$REPO" "$TMP_ROOT/round.md")"
+cat > "$TMP_ROOT/stale.md" <<'EOF'
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+
+### Status
+IN_PROGRESS
+EOF
+assert_eq "claim MISMATCH on stale hash" "MISMATCH" "$(workspace_claim_state "$REPO" "$TMP_ROOT/stale.md")"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
