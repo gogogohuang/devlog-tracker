@@ -9,12 +9,12 @@ description: 讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區�
 3. 讀最近的 Round（不夠再往前讀；有 `## Checkpoint` 就一併看最後一個）。不要讀 `devlog.archive.md` 或 `devlog.<name>.md`，除非 Handoff 下一步明確指向它們。
 4. 依**最後一個歷史 Round**（不是這一輪 continue 自己的 skeleton）的 Status 行動。`DONE`：告訴使用者上一題已經結束，等新需求。不要核對、不要自己找下一件工作。
 5. `IN_PROGRESS`、`INTERRUPTED`、`BLOCKED`：先核對，再行動。不要先問「上次做到哪」。不要改歷史 Round。
-   1. 跑與寫「工作區」相同的生產者，不要自己跑 git、不要手編成 SKILL 的五種格式。先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+   1. 跑與寫「工作區」相同的生產者，不要自己跑 git、不要手編成 SKILL 的七種格式。先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
       ```bash
       PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
       CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/workspace-snapshot.sh"
       ```
-      stdout 就是實際快照（1 行或 2 行）。腳本檔找不到時才退回 `skills/devlog-tracker/SKILL.md` `#### 工作區` 的五種格式手編。不要重跑測試套件，除非「下一步」本身就是跑測試。
+      stdout 就是實際快照（1 行或 2 行）。腳本檔找不到時才退回 `skills/devlog-tracker/SKILL.md` `#### 工作區` 的七種格式手編。不要重跑測試套件，除非「下一步」本身就是跑測試。
    2. 把編成的實際快照對照該歷史 Round 的 `#### 工作區` 正文。
       - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才編成的實際快照為準。
       - 有這一節但跟編成的實際快照不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（用剛才腳本的 stdout 當實際快照）。

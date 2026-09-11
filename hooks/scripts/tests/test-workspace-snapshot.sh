@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-check for workspace-snapshot.sh's workspace_snapshot(), covering the
-# five canonical `#### 工作區` formats from skills/devlog-tracker/SKILL.md.
+# seven canonical `#### 工作區` formats from skills/devlog-tracker/SKILL.md.
 # No framework — plain assert-and-exit, matching this repo's existing style.
 set -uo pipefail
 
@@ -63,6 +63,24 @@ OUT="$(workspace_snapshot "$REPO")"
 EXPECTED="HEAD detached @ ${HASH}
 未提交：a.txt"
 assert_eq "detached, dirty" "$EXPECTED" "$OUT"
+
+# --- unborn branch (git init, zero commits), clean --------------------------
+UNBORN="$TMP_ROOT/unborn"
+mkdir -p "$UNBORN"
+git -C "$UNBORN" init -q -b main
+OUT="$(workspace_snapshot "$UNBORN")"
+assert_eq "unborn branch, clean" "main @ (尚無 commit)，工作樹乾淨" "$OUT"
+
+# --- unborn branch, dirty (untracked file, still no commits) ----------------
+echo new > "$UNBORN/c.txt"
+OUT="$(workspace_snapshot "$UNBORN")"
+EXPECTED_UNBORN="main @ (尚無 commit)
+未提交：c.txt"
+assert_eq "unborn branch, dirty" "$EXPECTED_UNBORN" "$OUT"
+
+CLI_UNBORN="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$UNBORN")"
+FUNC_UNBORN="$(workspace_snapshot "$UNBORN")"
+assert_eq "cli matches function (unborn dirty)" "$FUNC_UNBORN" "$CLI_UNBORN"
 
 # --- executable entry matches the sourced function --------------------------
 CLI_NONGIT="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$NONGIT")"
