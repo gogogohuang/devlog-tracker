@@ -44,6 +44,15 @@ if [ ! -f "$ROUND_OPEN" ]; then
   exit 0
 fi
 
+ROUND_OPEN_FILE="$(json_str_get "$ROUND_OPEN" file 2>/dev/null || true)"
+if [ -n "$ROUND_OPEN_FILE" ] && [ "$ROUND_OPEN_FILE" != "${DEVLOG_FILE##*/}" ]; then
+  # This marker belongs to a different branch's devlog file (e.g. the user
+  # switched branches between round-start and now). Leave it untouched —
+  # whichever branch it actually belongs to will resolve and close it
+  # correctly when that branch is current again.
+  exit 0
+fi
+
 OPEN_ROUND="$(json_int_get "$ROUND_OPEN" round)"
 case "$OPEN_ROUND" in
   ''|*[!0-9]*) drop_markers; exit 0 ;;

@@ -27,7 +27,7 @@ devlog_resolve_paths() {
   DEVLOG_DIR="$dir/.devlog"
   DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 
-  local branch name
+  local branch raw name
   branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 
   case "$branch" in
@@ -35,18 +35,33 @@ devlog_resolve_paths() {
       return 0
       ;;
     HEAD)
-      name="$(basename "$(cd "$dir" 2>/dev/null && pwd)" 2>/dev/null || echo '')"
+      raw="$(basename "$(cd "$dir" 2>/dev/null && pwd)" 2>/dev/null || echo '')"
       ;;
     *)
-      name="$branch"
+      raw="$branch"
       ;;
   esac
+  [ -n "$raw" ] || return 0
 
-  name="$(_devlog_sanitize_name "$name")"
-  [ -n "$name" ] || return 0
+  name="$(_devlog_sanitize_name "$raw")"
+  if [ -z "$name" ]; then
+    # Sanitizing stripped every character (e.g. an all-CJK branch name).
+    # Falling back to the shared devlog.md here would silently defeat this
+    # whole feature for exactly the case it's most likely to hit in a
+    # Chinese-language project. Derive a short, stable, ASCII-safe name
+    # from the original string instead.
+    name="b-$(printf '%s' "$raw" | cksum | awk '{print $1}')"
+  fi
+
+  # Reserved namespace: devlog.archive.md and devlog.lessons.*.md already
+  # mean something else in this plugin. A branch name that sanitizes to
+  # one of these shares the plain devlog.md instead of colliding with them.
+  case "$name" in
+    archive|lessons.*) return 0 ;;
+  esac
 
   local resolved="$DEVLOG_DIR/devlog.$name.md"
-  if [ ! -f "$resolved" ] && [ -f "$DEVLOG_FILE" ]; then
+  if [ -f "$DEVLOG_DIR/.enabled" ] && [ ! -f "$resolved" ] && [ -f "$DEVLOG_FILE" ]; then
     devlog_lock_acquire
     mv "$DEVLOG_FILE" "$resolved" 2>/dev/null || true
     devlog_lock_release

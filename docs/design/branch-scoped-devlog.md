@@ -148,6 +148,20 @@ needs to know branch logic exists.
   `/devlog-tracker:lessons`**: unaffected, continue to operate on
   whichever file `DEVLOG_FILE` currently resolves to as their "source"
   (`MAIN`), same as today.
+- **`.devlog/.round-open`**: now carries a `file` field naming the
+  branch-scoped file it belongs to. `close-open-round.sh` ignores (leaves
+  untouched) a `.round-open` whose `file` doesn't match the currently
+  resolved `DEVLOG_FILE`, so switching branches between `round-start.sh`
+  opening a round and the round closing can no longer stamp
+  `INTERRUPTED` onto an already-finished Round in a different branch's
+  file. A `.round-open` written before this guard existed (no `file`
+  field) is treated leniently, same as before.
+- **One-time migration** now only fires while `.devlog/.enabled` is
+  present, so read-only/informational commands (e.g.
+  `/devlog-tracker:status`, `/devlog-tracker:lessons`) can no longer
+  trigger the `devlog.md` → `devlog.<name>.md` rename on a project that
+  was never `/devlog-tracker:start`-ed, or one that's currently
+  `/devlog-tracker:pause`-d.
 
 ## Known Limitations
 
@@ -157,7 +171,17 @@ needs to know branch logic exists.
   branch first triggers migration.
 - Sanitized name collisions (two branches, or a branch and a manually
   `/keep`-saved name, mapping to the same `devlog.<name>.md`) share one
-  file. Not detected or warned about.
+  file. Not detected or warned about — except for the two names this
+  plugin already reserves for other purposes, `archive` and any name
+  starting with `lessons.`, which fall back to the shared `devlog.md`
+  instead of colliding with `devlog.archive.md` / `devlog.lessons.*.md`.
 - Branch rename (`git branch -m old new`) is not tracked — old content
   stays under `devlog.old.md`; there's no automatic move on rename, only
   on first-use-with-no-file-yet.
+- A branch name that sanitizes to an empty string (e.g. one made
+  entirely of non-ASCII characters such as CJK) no longer silently
+  shares `devlog.md`: it gets a stable, ASCII-safe `devlog.b-<hash>.md`
+  derived from a checksum of the original name instead. The hash-derived
+  filename isn't human-readable, so mapping it back to the branch it
+  belongs to requires re-deriving the hash rather than reading it off
+  the filename.

@@ -14,11 +14,10 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-path.sh"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+[ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
-
-[ -f "$ENABLED_FLAG" ] || exit 0
 
 INPUT="$(cat 2>/dev/null || true)"
 [ -n "$INPUT" ] || exit 0
@@ -105,7 +104,7 @@ if [ -f "$MISMATCH_FILE" ]; then
       *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
       *)
         if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH" "$COMMAND"; then
-          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/devlog.md，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
+          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/${DEVLOG_FILE##*/}，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
           echo "" >&2
           echo "實際：" >&2
           printf '%s\n' "$LIVE_MARK" >&2
@@ -192,7 +191,7 @@ fi
 
 ELAPSED=$((NOW - SEG_EPOCH))
 if [ "$ELAPSED" -ge "$SEG_MAX" ]; then
-  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/devlog.md（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/devlog.md，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。（唯讀的 git status／diff／log／show／rev-parse 仍可執行。）" >&2
+  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/${DEVLOG_FILE##*/}（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/${DEVLOG_FILE##*/}，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。（唯讀的 git status／diff／log／show／rev-parse 仍可執行。）" >&2
   exit 2
 fi
 

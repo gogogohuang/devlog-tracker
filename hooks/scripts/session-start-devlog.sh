@@ -62,7 +62,7 @@ fi
 
 [ -f "$DEVLOG_FILE" ] || exit 0
 
-echo "以下是本專案 .devlog/devlog.md 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
+echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
 echo ""
 awk '
   /^[ \t]*```/ { fence = !fence }

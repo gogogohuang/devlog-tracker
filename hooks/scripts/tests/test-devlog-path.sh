@@ -72,6 +72,7 @@ devlog_resolve_paths "$DETACHEDREPO"
 # --- migration: existing devlog.md content moves to branch file ----------
 MIGREPO="$TMP/migrepo"
 mkdir -p "$MIGREPO/.devlog"
+: > "$MIGREPO/.devlog/.enabled"
 git_setup "$MIGREPO"
 git -C "$MIGREPO" checkout -q -b feature-y
 echo "## Round 1 existing content" > "$MIGREPO/.devlog/devlog.md"
@@ -94,6 +95,22 @@ if [ "$DEVLOG_FILE" = "$MIGREPO/.devlog/devlog.feature-y.md" ] \
   echo "PASS: second resolve is a no-op, content preserved"
 else
   echo "FAIL: second resolve altered state, got $DEVLOG_FILE"
+  FAIL=1
+fi
+
+# --- migration does NOT fire when .devlog/.enabled is absent (Fix 6) -----
+NOENABLEDREPO="$TMP/noenabledrepo"
+mkdir -p "$NOENABLEDREPO/.devlog"
+git_setup "$NOENABLEDREPO"
+git -C "$NOENABLEDREPO" checkout -q -b feature-z
+echo "## Round 1 existing content" > "$NOENABLEDREPO/.devlog/devlog.md"
+devlog_resolve_paths "$NOENABLEDREPO"
+if [ "$DEVLOG_FILE" = "$NOENABLEDREPO/.devlog/devlog.feature-z.md" ] \
+  && [ ! -f "$DEVLOG_FILE" ] \
+  && [ -f "$NOENABLEDREPO/.devlog/devlog.md" ]; then
+  echo "PASS: migration does not fire when .enabled is absent, old devlog.md left untouched"
+else
+  echo "FAIL: no-.enabled migration file=$DEVLOG_FILE resolved_exists=$([ -f "$DEVLOG_FILE" ] && echo y || echo n) old_exists=$([ -f "$NOENABLEDREPO/.devlog/devlog.md" ] && echo y || echo n)"
   FAIL=1
 fi
 
