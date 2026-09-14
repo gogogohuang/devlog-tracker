@@ -57,7 +57,6 @@ else
 fi
 
 # --- enforce-devlog.sh: Stop hook checks the branch-scoped file's hash ----
-CKSUM_BEFORE="$(cksum < "$BRANCH_FILE")"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 ENFORCE_RC=$?
 if [ "$ENFORCE_RC" -eq 2 ]; then

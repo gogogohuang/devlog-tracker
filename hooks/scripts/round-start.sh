@@ -27,7 +27,6 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"

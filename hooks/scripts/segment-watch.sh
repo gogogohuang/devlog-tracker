@@ -16,7 +16,6 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 
 INPUT="$(cat 2>/dev/null || true)"
