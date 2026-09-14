@@ -4,8 +4,9 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/json-field.sh"
 . "$SCRIPT_DIR/devlog-md.sh"
+. "$SCRIPT_DIR/devlog-path.sh"
 
-DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
 [ -d "$DEVLOG_DIR" ] || { echo "NOT_STARTED"; exit 0; }
 
 [ -f "$DEVLOG_DIR/.enabled" ] && echo "ENABLED=yes" || echo "ENABLED=no"
@@ -26,11 +27,11 @@ seconds="$(json_int_get "$DEVLOG_DIR/.segment-state" max_silent_seconds)"
 printf 'SEGMENT=max_silent_seconds=%s\n' "${seconds:-600}"
 
 status="none"
-if [ -f "$DEVLOG_DIR/devlog.md" ]; then
-  last="$(devlog_list_round_starts "$DEVLOG_DIR/devlog.md" | awk 'END { print $1 }')"
+if [ -f "$DEVLOG_FILE" ]; then
+  last="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $1 }')"
   if [ -n "$last" ]; then
-    end="$(devlog_block_end "$DEVLOG_DIR/devlog.md" "$last")"
-    found="$(devlog_round_status "$DEVLOG_DIR/devlog.md" "$last" "$end")"
+    end="$(devlog_block_end "$DEVLOG_FILE" "$last")"
+    found="$(devlog_round_status "$DEVLOG_FILE" "$last" "$end")"
     [ -z "$found" ] || status="$found"
   fi
 fi
