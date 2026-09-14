@@ -59,6 +59,11 @@ IN_PROGRESS，因為背景任務還在跑）。等它跑完我會回報結果並
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
 
+本文件與各 `commands/*.md`、`references/*.md` 提到「devlog.md」或「主檔」時，
+若專案目前不在 `main`／`master` 分支，指的實際上是該分支對應的
+`devlog.<branch>.md`（規則見上）——這些文件不會逐一改寫成分支中立的說法，
+以此為準即可。
+
 ## 用 `/devlog-tracker:start` 明確開啟強制記錄（不用猜這輪有沒有呼叫到 skill）
 
 Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有沒有呼叫到某個 skill」，
