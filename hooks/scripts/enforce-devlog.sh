@@ -57,8 +57,9 @@ last_round_block() {
 INPUT="$(cat 2>/dev/null || true)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
+devlog_resolve_paths "$PROJECT_DIR"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
   rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
@@ -87,7 +88,6 @@ fi
 # --- 開關檢查 -----------------------------------------------------------
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 TURN_MARKER="$DEVLOG_DIR/.turn-start"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 
 # 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
 # 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
