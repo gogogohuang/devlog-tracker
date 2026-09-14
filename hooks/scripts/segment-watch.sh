@@ -4,18 +4,19 @@
 
 set -uo pipefail
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
-SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
-
 _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$SCRIPT_DIR/json-field.sh"
 # shellcheck source=devlog-md.sh
 . "$SCRIPT_DIR/devlog-md.sh"
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
+
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "$PROJECT_DIR"
+ENABLED_FLAG="$DEVLOG_DIR/.enabled"
+SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 
 [ -f "$ENABLED_FLAG" ] || exit 0
 
@@ -63,10 +64,11 @@ is_safe_readonly_git_command() {
 }
 
 is_devlog_tool_allowed() {
+  local devlog_leaf="${DEVLOG_FILE##*/}"
   case "$1" in
     Write|Edit|StrReplace|Read|Grep)
       case "$2" in
-        .devlog/devlog.md|*/.devlog/devlog.md) return 0 ;;
+        .devlog/"$devlog_leaf"|*/.devlog/"$devlog_leaf") return 0 ;;
       esac
       ;;
     Bash)
