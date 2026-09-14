@@ -52,7 +52,8 @@ IN_PROGRESS，因為背景任務還在跑）。等它跑完我會回報結果並
 
 ## 檔案位置
 
-- 主檔：`.devlog/devlog.md`
+- 主檔：`.devlog/devlog.md`——在 `main`／`master` 分支上工作時使用
+- 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案、且 `.devlog/devlog.md` 已有內容時，會把它改名（非複製）成該分支的檔案。細節見 `docs/design/branch-scoped-devlog.md`。
 - 歸檔：`.devlog/devlog.archive.md`
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 
