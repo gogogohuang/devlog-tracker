@@ -15,13 +15,6 @@ set -uo pipefail
 
 REASON="${1:-unknown}"
 DETAIL="${2:-}"
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
-ROUND_OPEN="$DEVLOG_DIR/.round-open"
-INTERRUPTED_FLAG="$DEVLOG_DIR/.interrupted"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
-TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
 _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
@@ -29,6 +22,15 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/json-field.sh"
 # shellcheck source=devlog-lock.sh
 . "$SCRIPT_DIR/devlog-lock.sh"
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
+
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "$PROJECT_DIR"
+ENABLED_FLAG="$DEVLOG_DIR/.enabled"
+ROUND_OPEN="$DEVLOG_DIR/.round-open"
+INTERRUPTED_FLAG="$DEVLOG_DIR/.interrupted"
+TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
 drop_markers() {
   rm -f "$ROUND_OPEN" "$INTERRUPTED_FLAG" 2>/dev/null || true
