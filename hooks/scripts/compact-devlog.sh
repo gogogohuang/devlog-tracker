@@ -5,11 +5,12 @@ _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-md.sh"
 . "$SCRIPT_DIR/devlog-lock.sh"
+. "$SCRIPT_DIR/devlog-path.sh"
 
-DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
-MAIN="$DEVLOG_DIR/devlog.md"
+MAIN="$DEVLOG_FILE"
 ARCHIVE="$DEVLOG_DIR/devlog.archive.md"
 [ -f "$MAIN" ] || { echo "devlog.md 不存在" >&2; exit 1; }
 
