@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-md.sh"
 # shellcheck source=devlog-lock.sh
 . "$SCRIPT_DIR/devlog-lock.sh"
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
 
 TOPIC=""
 TEXT=""
@@ -25,8 +27,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-MAIN="$DEVLOG_DIR/devlog.md"
+devlog_resolve_paths "$PROJECT_DIR"
+MAIN="$DEVLOG_FILE"
 
 [ -f "$DEVLOG_DIR/.enabled" ] || { echo "NOT_ENABLED" >&2; exit 1; }
 [ -f "$DEVLOG_DIR/.lessons-enabled" ] || { echo "LESSONS_NOT_ENABLED" >&2; exit 1; }

@@ -11,10 +11,12 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/json-field.sh"
 # shellcheck source=devlog-md.sh
 . "$SCRIPT_DIR/devlog-md.sh"
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-MAIN="$DEVLOG_DIR/devlog.md"
+devlog_resolve_paths "$PROJECT_DIR"
+MAIN="$DEVLOG_FILE"
 
 TOPIC="${1:-}"
 

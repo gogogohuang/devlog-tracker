@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-md.sh"
 . "$SCRIPT_DIR/json-field.sh"
 . "$SCRIPT_DIR/devlog-lock.sh"
+. "$SCRIPT_DIR/devlog-path.sh"
 
 FROM=""
 TO=""
@@ -29,10 +30,10 @@ NAME="$(slugify "$NAME")"
   || { echo "檔名無效" >&2; exit 1; }
 [ "${#NAME}" -le 64 ] || { echo "檔名超過 64 字元" >&2; exit 1; }
 
-DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
-MAIN="$DEVLOG_DIR/devlog.md"
+MAIN="$DEVLOG_FILE"
 TARGET="$DEVLOG_DIR/devlog.$NAME.md"
 [ -f "$MAIN" ] || { echo "devlog.md 不存在" >&2; exit 1; }
 [ ! -e "$TARGET" ] || { echo "目標檔案已存在：$TARGET" >&2; exit 1; }

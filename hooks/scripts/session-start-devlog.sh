@@ -16,17 +16,18 @@
 
 set -uo pipefail
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
-SPAN_FILE="$DEVLOG_DIR/.span-open"
-
 _src="${BASH_SOURCE[0]}"
 HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
 . "$HOOKS_DIR/json-field.sh"
 # shellcheck source=detect-pending-question.sh
 . "$HOOKS_DIR/detect-pending-question.sh"
+# shellcheck source=devlog-path.sh
+. "$HOOKS_DIR/devlog-path.sh"
+
+PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "$PROJECT_DIR"
+SPAN_FILE="$DEVLOG_DIR/.span-open"
 
 INPUT="$(cat 2>/dev/null || true)"
 SOURCE="$(json_str_field "$INPUT" source)"
@@ -61,7 +62,7 @@ fi
 
 [ -f "$DEVLOG_FILE" ] || exit 0
 
-echo "以下是本專案 .devlog/devlog.md 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
+echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
 echo ""
 awk '
   /^[ \t]*```/ { fence = !fence }

@@ -22,17 +22,17 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/workspace-snapshot.sh"
 # shellcheck source=detect-pending-question.sh
 . "$HOOKS_DIR/detect-pending-question.sh"
+# shellcheck source=devlog-path.sh
+. "$HOOKS_DIR/devlog-path.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+[ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
+devlog_resolve_paths "$PROJECT_DIR"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
 AWAITING_FILE="$DEVLOG_DIR/.awaiting-reply"
 
-[ -f "$ENABLED_FLAG" ] || exit 0
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
@@ -169,7 +169,7 @@ if [ -n "$FOLD_ROUND" ]; then
     rm -f "$SEG_TMP" 2>/dev/null || true
   fi
 
-  printf '{"round": %s, "opened_at": "%s"}\n' "$FOLD_ROUND" "$FULL_TS" > "$ROUND_OPEN" 2>/dev/null || true
+  printf '{"round": %s, "opened_at": "%s", "file": "%s"}\n' "$FOLD_ROUND" "$FULL_TS" "${DEVLOG_FILE##*/}" > "$ROUND_OPEN" 2>/dev/null || true
 elif [ "$SPAN_SKIP" -eq 0 ]; then
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
@@ -211,7 +211,7 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
   } >> "$DEVLOG_FILE" 2>/dev/null || true
 
   if [ -f "$DEVLOG_FILE" ]; then
-    printf '{"round": %s, "opened_at": "%s"}\n' "$NEXT_N" "$TS" > "$ROUND_OPEN" 2>/dev/null || true
+    printf '{"round": %s, "opened_at": "%s", "file": "%s"}\n' "$NEXT_N" "$TS" "${DEVLOG_FILE##*/}" > "$ROUND_OPEN" 2>/dev/null || true
   fi
 fi
 

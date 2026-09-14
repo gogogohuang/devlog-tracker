@@ -57,8 +57,23 @@ last_round_block() {
 INPUT="$(cat 2>/dev/null || true)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+# 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
+# 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
+# 這個 gate 放在路徑解析之前，沒啟用時就不必付 git rev-parse 的成本；
+# DEVLOG_DIR 永遠是 $PROJECT_DIR/.devlog，與分支無關，所以兩者等價。
+ENABLED_FLAG="$PROJECT_DIR/.devlog/.enabled"
+if [ ! -f "$ENABLED_FLAG" ]; then
+  # 沒啟用就不做任何強制，但仍要清掉殘留的 .interrupted，否則之後重新
+  # /devlog-tracker:start 會繼承一個陳舊的中斷旗標。.interrupted 跟
+  # DEVLOG_DIR 一樣與分支無關，所以這裡不必解析分支。
+  if [ -f "$PROJECT_DIR/.devlog/.interrupted" ]; then
+    rm -f "$PROJECT_DIR/.devlog/.interrupted" 2>/dev/null || true
+  fi
+  exit 0
+fi
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
+devlog_resolve_paths "$PROJECT_DIR"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
   rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
@@ -85,13 +100,8 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
 fi
 
 # --- 開關檢查 -----------------------------------------------------------
-ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 TURN_MARKER="$DEVLOG_DIR/.turn-start"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 
-# 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
-# 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
-[ -f "$ENABLED_FLAG" ] || exit 0
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
@@ -552,7 +562,7 @@ if [ -f "$CHECKPOINT_FILE" ]; then
       json_int_set "$CHECKPOINT_FILE" rounds_since_checkpoint 0
       json_int_set "$CHECKPOINT_FILE" checkpoint_marker_count "$CURRENT_MARKER_COUNT"
     elif [ "$CP_ROUNDS" -ge "$CP_MAX" ]; then
-      echo "已經 ${CP_ROUNDS} 輪沒有寫 checkpoint 摘要了（門檻 ${CP_MAX}）。請在 .devlog/devlog.md 追加一段「## Checkpoint（Round X-Y 摘要）」，總結這段期間做了什麼，寫完再結束這一輪。" >&2
+      echo "已經 ${CP_ROUNDS} 輪沒有寫 checkpoint 摘要了（門檻 ${CP_MAX}）。請在 .devlog/${DEVLOG_FILE##*/} 追加一段「## Checkpoint（Round X-Y 摘要）」，總結這段期間做了什麼，寫完再結束這一輪。" >&2
       exit 2
     fi
   fi
