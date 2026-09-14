@@ -22,10 +22,11 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/workspace-snapshot.sh"
 # shellcheck source=detect-pending-question.sh
 . "$HOOKS_DIR/detect-pending-question.sh"
+# shellcheck source=devlog-path.sh
+. "$HOOKS_DIR/devlog-path.sh"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
-DEVLOG_DIR="$PROJECT_DIR/.devlog"
+devlog_resolve_paths "$PROJECT_DIR"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
-DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
