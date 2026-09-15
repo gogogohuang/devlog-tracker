@@ -22,6 +22,9 @@ round() {
 ### Summary
 s${n}
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 h${n}

@@ -43,9 +43,15 @@ pick up old work. Only continue (or start, which only summarises).
 4. Last **historical** Round (not the continue-turn skeleton):
    - `DONE` → say the previous ask finished; wait. No git check.
    - `IN_PROGRESS` / `INTERRUPTED` / `BLOCKED` → **verify, then act**.
-5. Close this turn on the open Round as usual (Summary / Handoff /
-   Status, including `#### 工作區` when the new Status is `IN_PROGRESS`
-   or `BLOCKED`). Do not edit the historical Round.
+5. **Write-back (L1 hard rule):** close this turn on the open Round —
+   `### Summary` / `### Reply` / `### Handoff` / `### Status` (including
+   `#### 工作區` / `#### 完成條件` / `#### 下一步` when the new Status is
+   `IN_PROGRESS` or `BLOCKED`). Do not edit the historical Round.
+   Reading the SSOT without writing back is an L1 failure. With
+   `.enabled`, Stop enforces the close; without Stop / before `start` /
+   Cursor without hooks, the agent still must write. If a subagent only
+   changes code, the parent turn owns the write-back (or the brief must
+   require it).
 
 ## Verify before acting
 

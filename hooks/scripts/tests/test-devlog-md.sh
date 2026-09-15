@@ -40,6 +40,9 @@ hello
 ### Summary
 done
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 done
@@ -70,6 +73,9 @@ second
 ### Summary
 done
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 done
@@ -95,6 +101,9 @@ cat > "$TMP_ROOT/devlog.md" <<'EOF'
 ### Summary
 done
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 done
@@ -118,6 +127,9 @@ hello
 
 ### Summary
 done
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -276,6 +288,9 @@ cat > "$TMP_ROOT/claim.md" <<'EOF'
 ### Summary
 old
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 main @ deadbeef，工作樹乾淨
@@ -289,6 +304,9 @@ IN_PROGRESS
 
 ### Summary
 newer
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 工作區

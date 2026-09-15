@@ -54,6 +54,9 @@ secret intermediate ${n}
 ### Summary
 summary ${n}
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 handoff ${n}
@@ -239,6 +242,9 @@ done
 ### Summary
 finished
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 finished
@@ -279,6 +285,9 @@ done
 
 ### Summary
 finished
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -343,6 +352,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 
 ### Summary
 real one
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況

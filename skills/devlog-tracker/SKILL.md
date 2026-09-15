@@ -10,26 +10,27 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 
 ## 核心原則
 
-devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步）的 single source of truth，
+devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步、完成條件）的 single source of truth，
+也是 L1「人觸發 continue／開 session 後 agent 可接手」的主入口；接手輪必須把狀態**寫回**本檔。
 不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git（`#### 工作區` 是收尾當下的已核對快取：
 `IN_PROGRESS`／`BLOCKED` 時 Stop hook 一律對過 live git，`DONE` 若「檔案」有內容也對過；接手時樹可能已變，`continue`／`resume`
 仍以實際工作樹為準，見 `docs/design/continue.md`）；完整逐字過程的真相是對話 transcript（`/clear` 後不存在）；設計
 決策的真相是 `docs/design/*.md`。使用者在裡面許願、Claude 也在裡面回報進度與結果——取代「終端機
-一 clear 就沒了」的對話記錄，讓工作可以隨時中斷、隨時接續。
+一 clear 就沒了」的對話記錄，讓工作可以隨時中斷、隨時接續。L2（無人喚醒）與 L3（跨機共享 `.devlog/`）不在範圍。
 
 ## 寫進 devlog 不等於講給使用者聽
 
-`### Summary`／`### Handoff`／`### 段落`／`## Checkpoint` 這些內容是寫給「下一個
+`### Summary`／`### Reply`／`### Handoff`／`### 段落`／`## Checkpoint` 這些內容是寫給「下一個
 讀 devlog.md 的人」看的，不是講給正在對話的使用者聽的——這是兩件不同的事，收尾時
 用 Edit／Write 工具**安靜地**寫進 `.devlog/devlog.md`（工具呼叫本身不會顯示給
 使用者），寫完之後**不要**在聊天回覆裡再提這件事。
 
 具體來說，這輪收尾的聊天回覆裡：
 
-- **不要**出現「devlog」「Round」「Summary」「Handoff」「Status」「這一輪」這些字，
+- **不要**出現「devlog」「Round」「Summary」「Handoff」「Reply」「Status」「這一輪」這些字，
   也不要說「已寫入」「已補上」「已記錄」「收尾完成」之類的動作旁白——使用者看不到
   你剛剛用工具做了什麼，講這些等於自己報告一件使用者沒問過的事，是雜訊。
-- **不要**把剛寫進 Handoff／Summary 的內容（決策、下一步、現況）換句話再講一次。
+- **不要**把剛寫進 Handoff／Summary／Reply 的內容（決策、下一步、現況、對使用者說過的話）換句話再講一次。
   如果使用者原本就在等這個結論，直接把結論講給他聽即可，不用先鋪一句「我把這輪記
   錄下來了」再講結論。
 - 唯一的例外是使用者自己開口問跟 devlog 有關的事（例如問「這輪有記錄嗎」「幫我看
@@ -83,10 +84,10 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
    + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。`.turn-start` 雜湊是
    **寫完 skeleton 之後**才拍的，所以 Stop 仍能判斷 Claude 有沒有再補收尾。
 2. Claude 編輯**同一個** Round：不要再 append 一個新的 `## Round`。不要改 User Input
-   （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Handoff`，
+   （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Reply` / `### Handoff`，
    把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。
 3. `Stop` hook（`hooks/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
-   缺少 `### Summary` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
+   缺少 `### Summary` / `### Reply` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
    `.round-open`。
 
 好處：就算工作做到一半被中斷（下一輪還沒開始就被使用者關掉、或換 session），
@@ -147,12 +148,17 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 `/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
 「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的 `#### 工作區`
-（跑步驟 5.1，編成同一格式再對），再依「下一步」開工。有快照但不符才先寫 `### 段落`；
+（跑步驟 5.1，編成同一格式再對），再依「下一步」開工，並對照「完成條件」。有快照但不符才先寫 `### 段落`；
 沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
 同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。擋著的時候，唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse`（不含任何 shell 串接符號）仍可執行，方便自行核對「宣稱 vs 實際」再動手寫段落。
 不要自動觸發。`/devlog-tracker:start` 只對進度，不開工、不核對。
+
+### L1 寫回義務
+
+接手（continue、SessionStart 注入後依下一步行動、或同 session 接著做）不是「讀檔 → 改程式 → 結束」。
+**同一輪必須把狀態寫回** `.devlog/devlog.md`（本輪 Round 的 Summary／Reply／Handoff／Status），讓下一任只靠檔案就能再接。讀而不寫 = 交接斷鏈 = L1 失敗。有 `.enabled` 時 Stop 會擋；沒有 Stop／未 start／Cursor 未裝 hook 時仍要自行寫回。子 agent 若只改 code，主對話負責收尾寫回（或 brief 要求子任務寫回）。聊天不要旁白「已寫入 devlog」。
 
 ## 每一輪的紀錄格式
 
@@ -162,14 +168,17 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 ## Round <N> — <ISO 8601 時間戳，含時區>
 
 ### User Input
-<使用者這輪的輸入，貼近原話，保留關鍵細節，不用強制逐字照抄>
+<使用者這輪的輸入：預設保留送出原文；見下方 User Input 原則>
 
 ### Summary
 <2–4 句，給人掃：這輪結論、有沒有卡住。不要寫檔案路徑、commit hash、skill 名稱、逐步指令>
 
+### Reply
+<這輪實際對使用者說的話／答應的邊界／未決提問，短述即可。給下一輪知道承諾，不是 Handoff>
+
 ### Handoff
 #### 決策
-<影響後續方向的選擇與理由。沒做選擇就整節省略>
+<影響後續方向的選擇與理由；若依賴設計文件，寫上 `docs/design/...` 路徑。沒做選擇就整節省略>
 
 #### 檔案
 <機器可核對格式，見下方「檔案 machine-verify」：零個以上 `commit <hash>：` 區塊（依時間序），
@@ -181,7 +190,12 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 Stop hook 會機器核對；DONE 且「檔案」整節省略時，工作區才能跟著省略。收尾前跑 git 再寫，見下方格式>
 
 #### 現況
-<任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有>
+<任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有。
+BLOCKED 時寫清楚缺什麼、出現長怎樣（可觀察條件）>
+
+#### 完成條件
+<IN_PROGRESS／BLOCKED 必寫：可觀察的做完判準（測試指令、檔案行為、使用者已確認的範圍）。
+下一輪對照此節決定能否 DONE。DONE 且沒有後續就整節省略>
 
 #### 下一步
 <下一輪第一件具體要做的事（路徑、指令、要載入的 skill）。
@@ -194,18 +208,20 @@ DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。
 
 寫入原則：
-- **User Input 預設貼近使用者原話，但保留彈性，不強制逐字照錄。** 目標是讓人「只讀這份
-  檔案、不用翻對話紀錄」就能接續開發，所以要保留原始措辭裡的關鍵細節（用詞、並列條件、
-  隨口補充的例外情況），但不用機械式地一字不漏照抄——內容太長、太雜（例如夾雜大段貼上的
-  log 或程式碼）時，可以留原文最相關的部分、把明顯的雜訊留在原處摘要帶過，怎麼拿捏由
-  Claude 自己判斷，不用每次都整段複製。
-- **兩個讀者拆開：** `Summary` 只給人掃；`Handoff` 只給下一輪 Claude 接手。同一件事不要兩邊複述。
-- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 下一步），Stop hook 會檢查已出現的小節
+- **User Input：送出原文優先。** hook 在 `UserPromptSubmit` 已寫入送出當下的 prompt（截斷／遮罩規則見
+  `docs/design/recording-moments.md`）。Claude **不要改寫、不要潤飾、不要事後摘要取代原文**，除非
+  裡面是 hook 的 `（無 prompt）` 占位。目標是讓人「只讀這份檔案、不用翻對話紀錄」就能接續；關鍵措辭
+  （用詞、並列條件、例外）必須留在檔裡。超長內容由 hook 截斷並標明；不要在收尾時再手動縮成更短的改寫版。
+- **三個讀者拆開：** `Summary` 只給人掃；`Reply` 只記對使用者說過／答應過的話；`Handoff` 只給下一輪
+  Claude 接手。同一件事不要三邊複述。
+- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），Stop hook 會檢查已出現的小節
   順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整節省略，不要寫「無」。
-  `現況` 幾乎每輪都該有。`工作區` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
+  `現況` 幾乎每輪都該有。`工作區`、`完成條件` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
   但 `DONE` 若 `檔案` 有內容（宣稱動過／commit 過檔案），`工作區` 一樣必寫且會被 Stop hook 機器核對，
   避免「已 commit 完成」卻其實沒 commit 這種宣稱跟實際不符沒人發現。
-  `下一步` 要具體到下一輪打開就能做，寫「繼續完成」不算完成。
+  `完成條件` 要寫到下一輪能對照判斷「可否 DONE」（例如「`bash hooks/scripts/tests/test-foo.sh` 全過」），
+  不要只寫「功能完成」。`下一步` 要具體到下一輪打開就能做（路徑／反引號指令／skill 名），寫「繼續完成」不算完成；
+  `IN_PROGRESS` 時 Stop 會做輕量可執行檢查（見下）。`BLOCKED` 的 `現況` 或 `下一步` 必須寫「缺什麼、出現長怎樣」。
 - **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式；`rev-parse --short HEAD` 失敗但 `git symbolic-ref --short HEAD` 抓得到分支名（尚無 commit，例如剛 `git init`）用 unborn 格式；兩者都失敗才是非 git。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
   - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
   - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
@@ -229,10 +245,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   刪除+新增，不是第四類。`.devlog/` 路徑不算進比對。看不懂的行（沒有照這個格式寫）會被擋下來，
   不是 fail-open——這是 Claude 該產生的格式，不是可有可無的宣告。細節見
   `docs/design/files-verify.md`（`hooks/scripts/files-snapshot.sh`）。
-- Handoff 只寫已發生的事；未來式只允許出現在「下一步」。
+- Handoff 只寫已發生的事；未來式只允許出現在「下一步」與「完成條件」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
-  `DONE` = 這輪請求已結束。**例外只有 hook 自動蓋 `INTERRUPTED` 時**：`close-open-round.sh`
+  `DONE` = 這輪請求已結束（應已滿足「完成條件」或本輪請求本身已結束）。**例外只有 hook 自動蓋 `INTERRUPTED` 時**：`close-open-round.sh`
   會在下面多印一行 `[reason: ...]`（例如 `[reason: dangling:next_prompt]`），這是 hook 自己的
   除錯代號、用方括號標記成內部 metadata，特意不用 HTML 註解（會被 Markdown 渲染器整段隱藏，
   之後要 debug 反而看不到），不算違反「只寫一個值」——看到這行不用當成錯誤，Claude 也不用去動它。
@@ -246,8 +262,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Handoff`、兩者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複，以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「下一步」且不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
-新開的 Round 兩個標題都要有，瑣碎輪也不例外。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」與「下一步」且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」或「下一步」須含缺件句式（缺／等待／等使用者等）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
+新開的 Round 三個標題（Summary／Reply／Handoff）都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）
 
@@ -257,7 +273,7 @@ Stop hook 會檢查最後一個 Round 是否同時有 `### Summary` 與 `### Han
 判斷測試：**如果把這一輪從 devlog 刪掉，之後光讀檔案接續工作，會不會漏掉重要資訊？**
 會漏掉就不瑣碎，要完整寫；不會漏掉（純確認、閒聊、使用者只回「好」「謝謝」、沒有產生任何
 實質變化或懸而未決的事）就是瑣碎，但**還是要有這個 Round 區塊**，只是 Summary 一句話、
-Handoff 只留「現況」一句（沒有「工作區」），Status 多半 `DONE`。兩個標題仍然都要有。
+Reply 一句（對使用者說過的話）、Handoff 只留「現況」一句（沒有「工作區」），Status 多半 `DONE`。三個標題仍然都要有。
 
 具體訊號：
 
@@ -290,11 +306,15 @@ Edit／StrReplace 追加一段（**禁止**用 Write 覆寫整份檔）。
 `UserPromptSubmit` 開新 `## Round`）會把這組問答硬拆成兩個不相關的 Round。
 Reply Fold 讓它折進同一個 Round。
 
-**提問前**（結束 turn 之前）：先用 Edit 在 `### Summary` 之前插入一段
+`AskUserQuestion` 在同一 turn 內問答，不用 fold、不要跑 `await-open.sh`；
+但仍要用 `### 段落（AskUserQuestion）` 把問題與答案寫進本 Round，方便 L1
+接手。細節見 `references/reply-fold.md`。
+
+**提問前**（純文字跨 turn；結束 turn 之前）：先用 Edit 在 `### Summary` 之前插入一段
 `### 段落（Claude 提問）` 記下問題原文，再跑
 `${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh` 標記「下一則訊息大概是在
 回答這個 Round」。使用者回答時 `round-start.sh` 會自動折成對應段落，不用手動
-處理。連續多輪一問一答（例如 grilling）時不必每題重寫 Summary／Handoff／
+處理。連續多輪一問一答（例如 grilling）時不必每題重寫 Summary／Reply／Handoff／
 Status，只有整場問答真正結束才收尾一次。
 
 完整步驟、折疊格式、猜錯的處理、跟 task-notification／Span Mode／checkpoint

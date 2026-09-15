@@ -98,6 +98,9 @@ hello
 ### Summary
 partial
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 partial
@@ -187,6 +190,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 old
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 old
@@ -225,6 +231,9 @@ done
 
 ### Summary
 finished
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -266,6 +275,9 @@ hello
 
 ### Summary
 partial
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況

@@ -47,6 +47,9 @@ write_round() {
     echo "### Summary"
     echo "fixture"
     echo ""
+    echo "### Reply"
+    echo "fixture reply."
+    echo ""
     echo "### Handoff"
     printf '%s\n' "$1"
     echo ""
@@ -65,6 +68,8 @@ d
 main @ ${HASH}，工作樹乾淨
 #### 現況
 c
+#### 完成條件
+observable done.
 #### 下一步
 n"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1

@@ -78,6 +78,10 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
     if (detail == "awaiting_question") return "這輪在等待使用者回答 AskUserQuestion 時結束，還沒收到答案。"
     return "這輪意外中斷。"
   }
+  function reply_stub() {
+    if (detail == "awaiting_question") return "（中斷前正在等使用者回答問題。）"
+    return "（這輪意外中斷，沒有對使用者完成回覆。）"
+  }
   function handoff_stub() {
     if (detail == "awaiting_question") return "Claude 提了問題還在等回答，session 就先結束了；不是中途出錯，只是還沒收到答案。需要的話重新確認一次問題再繼續。"
     return "這輪沒有正常收尾。"
@@ -96,11 +100,15 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
     if (rn != want + 0) { exit 2 }
 
     has_s = 0
+    has_r = 0
     has_h = 0
     for (i = last_start; i <= last_end; i++) {
       if (lines[i] ~ /^### Summary/) has_s = 1
+      if (lines[i] ~ /^### Reply/) has_r = 1
       if (lines[i] ~ /^### Handoff/) has_h = 1
     }
+    # Recovered-complete still keys off Summary+Handoff (pre-Reply contract);
+    # Stop will require Reply on the next normal close if missing.
     if (recovered && has_s && has_h) { exit 3 }
 
     skip_val = 0
@@ -113,6 +121,11 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
         if (!has_s) {
           print "### Summary"
           print summary_stub()
+          print ""
+        }
+        if (!has_r) {
+          print "### Reply"
+          print reply_stub()
           print ""
         }
         if (!has_h) {
@@ -133,6 +146,11 @@ awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="
       if (!has_s) {
         print "### Summary"
         print summary_stub()
+        print ""
+      }
+      if (!has_r) {
+        print "### Reply"
+        print reply_stub()
         print ""
       }
       if (!has_h) {

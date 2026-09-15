@@ -65,6 +65,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 done
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 done
@@ -76,6 +79,9 @@ DONE
 
 ### Summary
 done
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況

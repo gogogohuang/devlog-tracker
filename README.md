@@ -8,13 +8,15 @@
 
 把「這輪做了什麼、決定了什麼、下一步是什麼」寫進專案內的 `devlog.md`。Stop hook 保證每輪都寫完才放行；沒明確 `/devlog-tracker:start` 前不會建立或改動 `.devlog/`。
 
-`devlog.md` 只管**跨 session 的交接連續性**（決策軌跡、目前卡點、下一步），不是整個專案的單一真相來源：
+`devlog.md` 只管**跨 session 的交接連續性**（決策軌跡、目前卡點、完成條件、下一步），並作為 **L1**（人觸發 continue／開 session 注入後，agent 只靠 SSOT 接手，且必須把本輪狀態**寫回**本檔）的主入口。不是整個專案的單一真相來源：
 
 - 程式碼／檔案狀態的真相仍是 git
 - 完整逐字過程的真相是對話 transcript（`/clear` 後不存在）
 - 設計決策的真相是 `docs/design/*.md`
 
-這份檔案只是取代「終端機一 clear 就沒了」的缺口，讓工作可以隨時中斷、隨時接續。
+這份檔案只是取代「終端機一 clear 就沒了」的缺口，讓工作可以隨時中斷、隨時接續。L2（無人喚醒）與 L3（跨機共享 `.devlog/`）不在範圍；細節見 [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)。
+
+每輪收尾固定寫 `Summary`／`Reply`（對使用者說過的話）／`Handoff`（含未完成時的 `完成條件`）／`Status`。接手＝核對工作區 → 做下一步 → **寫回**；讀而不寫算交接失敗。
 
 ## 安裝
 
@@ -89,7 +91,7 @@ sequenceDiagram
 
   U->>H: 送出訊息
   H->>D: 先寫 Round skeleton（User Input + IN_PROGRESS）
-  C->>D: 補 Summary / Handoff，改 Status
+  C->>D: 補 Summary / Reply / Handoff，改 Status
   C->>H: 這一輪要結束
   alt 沒寫完、標題是空的，或 Status 不合法
     H-->>C: 擋住，要求補寫
@@ -98,19 +100,20 @@ sequenceDiagram
   end
 ```
 
-每一輪固定四塊：
+每一輪固定：
 
-- **`User Input`** — 貼近原話，常見 token 會遮罩
-- **`Summary`** — 給人掃
-- **`Handoff`** — 給下一輪 Claude：決策／檔案／工作區／現況／下一步
+- **`User Input`** — 送出原文優先（hook 寫入；Claude 不要改寫），常見 token 會遮罩
+- **`Summary`** — 給人掃的結論
+- **`Reply`** — 這輪對使用者說過／答應過的話
+- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）
 - **`Status`** — `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED` 四選一
 
-其中「工作區」是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。
+其中「工作區」是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。「完成條件」在進行中／卡住必寫。
 
-Stop hook 會做三件事：
+Stop hook 會做這些事：
 
-1. 確認標題底下有內容、Status 是上述四值之一
-2. 進行中／卡住時有「下一步」，且不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)）
+1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 小節順序為 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
+2. 進行中／卡住時有「完成條件」與「下一步」；「下一步」不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)）；進行中另做輕量可執行檢查；卡住時「現況」或「下一步」須含缺件句式
 3. 機器核對「工作區」是否跟收尾當下的 git 狀態逐字相符（進行中／卡住一律核對，`DONE` 只在「檔案」非空時核對），避免「已 commit 完成」卻其實沒 commit 這類宣稱跟實際不符
 
 `#### 檔案` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
@@ -119,7 +122,7 @@ Stop hook 會做三件事：
 
 ## Hook 會自動做的事
 
-正常規則是「一則使用者訊息 = 一輪，結束前一定要寫完 Summary／Handoff／Status」。下面四個機制各自放寬這條規則的不同一塊，彼此正交、可以同時存在：
+正常規則是「一則使用者訊息 = 一輪，結束前一定要寫完 Summary／Reply／Handoff／Status」。下面四個機制各自放寬這條規則的不同一塊，彼此正交、可以同時存在：
 
 | 機制 | 放寬的是 | 解決的問題 |
 |---|---|---|
@@ -156,7 +159,7 @@ Stop hook 會做三件事：
 
 #### Reply Fold
 
-Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——提問前先手動記一段問題原文再跑 `await-open.sh` 標記，下一則訊息（答案）就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。連續多輪一問一答（例如 grilling）時，中途每題只記問題段落，不必每題重寫 Summary/Handoff/Status，等整場問答真正結束才收尾一次。跟 `AskUserQuestion` 工具無關（同一 turn 內問答，本來就不會產生第二個 Round）。背景 task-notification（子 agent 完成通知）也會自動走同一套折疊機制，不留原始 XML，只記精簡摘要。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
+Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——提問前先手動記一段問題原文再跑 `await-open.sh` 標記，下一則訊息（答案）就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。連續多輪一問一答（例如 grilling）時，中途每題只記問題段落，不必每題重寫 Summary/Reply/Handoff/Status，等整場問答真正結束才收尾一次。`AskUserQuestion` 在同一 turn 內問答，不用 fold，但仍要用 `### 段落（AskUserQuestion）` 記下問題與答案。背景 task-notification（子 agent 完成通知）也會自動走同一套折疊機制，不留原始 XML，只記精簡摘要。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
 
 #### 分支各自的 devlog 檔
 
