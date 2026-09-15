@@ -33,6 +33,9 @@ append_minimal_round() {
 ### Summary
 fixture
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 fixture
@@ -116,8 +119,8 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 SPAN_HASH_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "span open, ticks at max, no write -> blocked (falls back to normal check)" 2 $?
 case "$SPAN_HASH_MISS_MSG" in
-  *"User Input / Summary / Handoff / Status"*) echo "PASS: expired-span hash-miss message names all Round sections" ;;
-  *) echo "FAIL: expired-span hash-miss message should name User Input / Summary / Handoff / Status, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
+  *"User Input / Summary / Reply / Handoff / Status"*) echo "PASS: expired-span hash-miss message names all Round sections" ;;
+  *) echo "FAIL: expired-span hash-miss message should name User Input / Summary / Reply / Handoff / Status, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
 esac
 case "$SPAN_HASH_MISS_MSG" in
   *"不要再新增一個 ## Round"*) echo "FAIL: expired-span hash-miss message must not forbid a new Round"; FAIL=1 ;;
@@ -270,6 +273,9 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 fixture
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 fixture
@@ -299,6 +305,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ### Summary
 prior
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 prior
@@ -310,8 +319,8 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 HASH_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "no write this round -> blocked (heading tests setup)" 2 $?
 case "$HASH_MISS_MSG" in
-  *"User Input / Summary / Handoff / Status"*) echo "PASS: hash-miss message names Summary / Handoff" ;;
-  *) echo "FAIL: hash-miss message should name User Input / Summary / Handoff / Status, got: $HASH_MISS_MSG"; FAIL=1 ;;
+  *"User Input / Summary / Reply / Handoff / Status"*) echo "PASS: hash-miss message names Summary / Reply / Handoff" ;;
+  *) echo "FAIL: hash-miss message should name User Input / Summary / Reply / Handoff / Status, got: $HASH_MISS_MSG"; FAIL=1 ;;
 esac
 case "$HASH_MISS_MSG" in
   *"User Input / Response / Status"*) echo "FAIL: hash-miss message still names Response"; FAIL=1 ;;
@@ -353,14 +362,17 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ### Summary
 missing handoff
 
+### Reply
+has reply
+
 ### Status
 DONE
 DEVEOF
 HEADING_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "last Round missing ### Handoff -> blocked" 2 $?
 case "$HEADING_MISS_MSG" in
-  *'### Summary'*'### Handoff'*) echo "PASS: heading-miss message names both required headings" ;;
-  *) echo "FAIL: heading-miss message should mention ### Summary and ### Handoff, got: $HEADING_MISS_MSG"; FAIL=1 ;;
+  *'### Summary'*'### Reply'*'### Handoff'*) echo "PASS: heading-miss message names required headings" ;;
+  *) echo "FAIL: heading-miss message should mention ### Summary / ### Reply / ### Handoff, got: $HEADING_MISS_MSG"; FAIL=1 ;;
 esac
 case "$HEADING_MISS_MSG" in
   *"不要再新增一個 ## Round"*) echo "PASS: heading-miss message forbids a second Round" ;;
@@ -373,6 +385,7 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ## Round 4 — 2026-09-09T10:15:00+08:00
 
 ### Summary
+### Reply
 ### Handoff
 ### Status
 DONE
@@ -418,6 +431,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ### Summary
 complete
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 complete
@@ -430,6 +446,9 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 
 ### Summary
 complete
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -451,6 +470,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 
 ### Summary
 complete
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -523,6 +545,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ### Summary
 說明 Round 格式。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 已回覆格式問題。
@@ -552,6 +577,9 @@ DONE
 
 ### Summary
 new shape
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -594,6 +622,9 @@ block me
 
 ### Summary
 done
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -669,6 +700,9 @@ recover
 
 ### Summary
 recovered after interrupt
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -771,6 +805,9 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 一句話。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 做完了。
@@ -788,6 +825,9 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 
 ### Summary
 還在做。
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -807,11 +847,16 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 還在做。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 非 git 工作區
 #### 現況
 做到一半。
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 打開 foo.ts 繼續。
 
@@ -828,6 +873,9 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 
 ### Summary
 x
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -848,9 +896,14 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 還在做。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 做到一半。
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 繼續完成
 
@@ -872,9 +925,14 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 還在做。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 做到一半。
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
 #### 下一步
 持續優化。
 
@@ -893,11 +951,16 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 還在做。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 非 git 工作區
 #### 現況
 做到一半。
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 先繼續完成 foo.ts 的錯誤處理，再跑一次測試。
 
@@ -917,11 +980,16 @@ cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 還在做。
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 非 git 工作區
 #### 現況
 做到一半。
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 繼續完成
 打開 bar.ts 補上測試。
@@ -931,6 +999,117 @@ IN_PROGRESS
 EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 multi-line body including a filler line -> allowed" 0 $?
+
+# --- L1: missing ### Reply -> blocked --------------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 98 — 2026-09-15T10:00:00+08:00
+
+### Summary
+x
+
+### Handoff
+#### 現況
+y
+
+### Status
+DONE
+EOF
+REPLY_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+assert_exit "last Round missing ### Reply -> blocked" 2 $?
+case "$REPLY_MISS_MSG" in
+  *'### Reply'*) echo "PASS: missing-Reply message names ### Reply" ;;
+  *) echo "FAIL: expected ### Reply in message, got: $REPLY_MISS_MSG"; FAIL=1 ;;
+esac
+
+# --- L1: IN_PROGRESS 下一步 without actionable signal -> blocked ------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 99 — 2026-09-15T10:01:00+08:00
+
+### Summary
+還在做。
+
+### Reply
+還在處理。
+
+### Handoff
+#### 工作區
+非 git 工作區
+#### 現況
+做到一半。
+#### 完成條件
+功能可用。
+#### 下一步
+再想一下怎麼做比較好
+
+### Status
+IN_PROGRESS
+EOF
+ACTION_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+assert_exit "IN_PROGRESS 下一步 without path/cmd/skill -> blocked" 2 $?
+case "$ACTION_MSG" in
+  *"可執行跡象"*) echo "PASS: actionable-lint message" ;;
+  *) echo "FAIL: expected 可執行跡象 message, got: $ACTION_MSG"; FAIL=1 ;;
+esac
+
+# --- L1: BLOCKED without 缺件句式 -> blocked --------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 100 — 2026-09-15T10:02:00+08:00
+
+### Summary
+卡住。
+
+### Reply
+需要更多資訊。
+
+### Handoff
+#### 工作區
+非 git 工作區
+#### 現況
+做到一半。
+#### 完成條件
+拿到資料後把 hooks/foo.sh 改完。
+#### 下一步
+改 hooks/foo.sh
+
+### Status
+BLOCKED
+EOF
+BLOCKED_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+assert_exit "BLOCKED without 缺件句式 -> blocked" 2 $?
+case "$BLOCKED_MSG" in
+  *"缺什麼"*) echo "PASS: BLOCKED 缺件 message" ;;
+  *) echo "FAIL: expected 缺什麼 message, got: $BLOCKED_MSG"; FAIL=1 ;;
+esac
+
+# --- L1: BLOCKED with 缺件句式 -> allowed -----------------------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 101 — 2026-09-15T10:03:00+08:00
+
+### Summary
+卡住。
+
+### Reply
+還在等 API key。
+
+### Handoff
+#### 工作區
+非 git 工作區
+#### 現況
+缺使用者提供的 API key（寫進 .env 即算到）。
+#### 完成條件
+.env 有 key 且 hooks/foo.sh 改完。
+#### 下一步
+等使用者提供 key 後改 hooks/foo.sh
+
+### Status
+BLOCKED
+EOF
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "BLOCKED with 缺件句式 -> allowed" 0 $?
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

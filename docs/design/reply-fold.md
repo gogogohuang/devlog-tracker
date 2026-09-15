@@ -18,11 +18,20 @@ answer becomes a brand-new Round with no structural link back to the
 question it's answering. Reading the log back, the question and its answer
 look like two unrelated turns.
 
-This does **not** cover Claude asking via the `AskUserQuestion` tool: that
-tool call and its result both happen inside one turn (no Stop in between,
-no new `UserPromptSubmit`), so no second Round is ever created and there is
-nothing to fold. Reply Fold only matters when Claude ends the *entire* turn
-on a plain-text question and the answer arrives as a separate message.
+This does **not** use Reply Fold for Claude asking via the
+`AskUserQuestion` tool: that tool call and its result both happen inside
+one turn (no Stop in between, no new `UserPromptSubmit`), so no second
+Round is ever created and there is nothing to fold. Reply Fold only
+matters when Claude ends the *entire* turn on a plain-text question and
+the answer arrives as a separate message.
+
+**AskUserQuestion still must be recorded for L1.** Before or when calling
+the tool, append a `### 段落 N - HH:MM（AskUserQuestion）` with the
+question text; after the tool returns, append the answer in the same
+Round. Do **not** run `await-open.sh` for AskUserQuestion. If the round
+ends still waiting on external input, close with `BLOCKED` and a missing-
+input phrase in `現況` / `下一步`. Authoring detail:
+`skills/devlog-tracker/references/reply-fold.md`.
 
 ## Design constraint
 

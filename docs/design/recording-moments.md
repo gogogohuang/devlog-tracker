@@ -111,6 +111,11 @@ Unexpected interrupt (hook) on that same block:
 
 - Source: `UserPromptSubmit` stdin field `prompt` (`jq` if present,
   else the same loose string match as other hooks).
+- **Verbatim-first (L1):** the hook writes the submitted prompt as the
+  Round's User Input. Claude must not rewrite, polish, or replace it with
+  a shorter paraphrase at close — only fill the hook's `（無 prompt）`
+  placeholder when that is what was written. Truncation / redact below are
+  the only allowed losses of fidelity; do not add a second manual trim.
 - Truncate at 4000 characters; if truncated, append a one-line notice.
 - Wrap the body in a fenced `text` block so prompt lines matching
   `^## ` / `^### ` do not break last-Round extraction (this branch
@@ -118,6 +123,8 @@ Unexpected interrupt (hook) on that same block:
 - If the prompt itself contains a triple-backtick fence, replace that
   fence with a single-line marker before wrapping so the wrapper stays
   closed.
+- Redact rules (secrets) still apply after truncation; see prompt-redact
+  design. Truncation before redact can split a token (known limitation).
 
 ## Marker files
 

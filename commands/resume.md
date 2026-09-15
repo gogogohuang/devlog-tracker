@@ -15,4 +15,4 @@ CLAUDE_PROJECT_DIR="<剛才記下的專案根目錄絕對路徑，不要用 $(pw
 - `IN_PROGRESS`／`INTERRUPTED`：提出 Handoff「下一步」（沒有就依「現況」與實際工作樹推）。
 - `BLOCKED`：說明缺什麼；缺的外部輸入已經出現就提出下一步，仍缺就停。git 相不相符不能證明缺件已到，不要發明輸入。
 
-後續紀錄一律寫進 `.devlog/devlog.md`，不要改寫具名 keep 檔。
+後續紀錄一律寫進 `.devlog/devlog.md`，不要改寫具名 keep 檔。使用者確認並開工後，**同一輪必須收尾寫回** Summary／Reply／Handoff／Status（L1 寫回義務同 `commands/continue.md` 步驟 6）。

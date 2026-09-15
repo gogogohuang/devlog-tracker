@@ -43,6 +43,9 @@ write_round() {
     echo "### Summary"
     echo "fixture"
     echo ""
+    echo "### Reply"
+    echo "fixture reply."
+    echo ""
     echo "### Handoff"
     if [ -n "$files" ]; then
       echo "#### 檔案"
@@ -55,8 +58,10 @@ write_round() {
     echo "#### 現況"
     echo "fixture"
     if [ "$status" != "DONE" ]; then
+      echo "#### 完成條件"
+      echo "observable done via test."
       echo "#### 下一步"
-      echo "fixture next step"
+      echo "edit hooks/scripts/enforce-devlog.sh"
     fi
     echo ""
     echo "### Status"

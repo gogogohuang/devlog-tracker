@@ -145,29 +145,31 @@ fi
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
   if [ "$SPAN_VALID" -eq 1 ]; then
-    echo "這一輪尚未寫入 devlog.md。請依 skills/devlog-tracker/SKILL.md 在檔案尾端追加一個新的 ## Round，包含 User Input / Summary / Handoff / Status。" >&2
+    echo "這一輪尚未寫入 devlog.md。請依 skills/devlog-tracker/SKILL.md 在檔案尾端追加一個新的 ## Round，包含 User Input / Summary / Reply / Handoff / Status。" >&2
   else
-    echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Handoff / Status。不要再新增一個 ## Round。" >&2
+    echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Reply / Handoff / Status。不要再新增一個 ## Round。" >&2
   fi
   exit 2
 fi
 
-# --- 標題檢查（Summary + Handoff）-----------------------------------------
+# --- 標題檢查（Summary + Reply + Handoff）---------------------------------
 # 雜湊已經證明這輪有寫入。接著取出最後一個 Round 區塊：從最後一個
 # 「## Round 」行起到下一條「## 」標題之前（或 EOF）。圍欄（```）內的
 # 行不參與起迄判定，避免 User Input / Handoff 引用 `## Round` 或 `## 安裝`
 # 範例時把有效的最後一個 Round 誤切成缺標題。這個區塊必須同時有
-# 以 ### Summary、### Handoff 開頭的行。只驗標題存在，不驗內容。
+# 以 ### Summary、### Reply、### Handoff 開頭的行。只驗標題存在，不驗內容。
 # 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
 # 變成新的卡死理由。
 LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
 if [ -n "$LAST_ROUND" ]; then
   HAS_SUMMARY=0
+  HAS_REPLY=0
   HAS_HANDOFF=0
   printf '%s\n' "$LAST_ROUND" | grep -q '^### Summary' && HAS_SUMMARY=1
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Reply' && HAS_REPLY=1
   printf '%s\n' "$LAST_ROUND" | grep -q '^### Handoff' && HAS_HANDOFF=1
-  if [ "$HAS_SUMMARY" -eq 0 ] || [ "$HAS_HANDOFF" -eq 0 ]; then
-    echo "最後一個 Round 缺少 \`### Summary\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這兩個標題（Summary 給人掃、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+  if [ "$HAS_SUMMARY" -eq 0 ] || [ "$HAS_REPLY" -eq 0 ] || [ "$HAS_HANDOFF" -eq 0 ]; then
+    echo "最後一個 Round 缺少 \`### Summary\`、\`### Reply\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這三個標題（Summary 給人掃、Reply 記對使用者說過的話、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
     exit 2
   fi
 
@@ -216,25 +218,25 @@ if [ -n "$LAST_ROUND" ]; then
   }
 
   SUM_BODY_OK=0
+  REPLY_BODY_OK=0
   HAN_BODY_OK=0
   nonempty_body '^### Summary' && SUM_BODY_OK=1
+  nonempty_body '^### Reply' && REPLY_BODY_OK=1
   nonempty_body '^### Handoff' && HAN_BODY_OK=1
-  if [ "$SUM_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
-    echo "最後一個 Round 的 ### Summary 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+  if [ "$SUM_BODY_OK" -eq 0 ] || [ "$REPLY_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
+    echo "最後一個 Round 的 ### Summary、### Reply 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
     exit 2
   fi
 
   # --- Handoff subsection order check (docs/design/devlog-as-ssot-assessment.md,
-  # Phase 2). 決策 → 檔案 → 工作區 → 現況 → 下一步 is a fixed order (SKILL.md
-  # writing rule, docs/design/summary-handoff.md rule 3). Detect a present-but
-  # -reordered or duplicated recognized subsection. Unrecognized #### headings
-  # are ignored — this only tightens what SKILL.md already promises, it does
-  # not invent a new rule.
+  # Phase 2 + L1 完成條件). 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
+  # is a fixed order. Detect a present-but-reordered or duplicated recognized
+  # subsection. Unrecognized #### headings are ignored.
   HANDOFF_BODY="$(section_body '^### Handoff')"
   ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk -v nofence="$NOFENCE" '
     BEGIN {
       order["決策"] = 1; order["檔案"] = 2; order["工作區"] = 3
-      order["現況"] = 4; order["下一步"] = 5
+      order["現況"] = 4; order["完成條件"] = 5; order["下一步"] = 6
       last = 0; prev_name = ""
     }
     /^[ \t]*```/ { if (!nofence) fence = !fence; next }
@@ -259,7 +261,7 @@ if [ -n "$LAST_ROUND" ]; then
         echo "Handoff 的「#### ${DUP_NAME}」出現超過一次。請合併成一節。" >&2
         ;;
       order:*)
-        echo "Handoff 小節順序錯了（應該是 決策 → 檔案 → 工作區 → 現況 → 下一步）：${ORDER_ERR#order:}" >&2
+        echo "Handoff 小節順序錯了（應該是 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步）：${ORDER_ERR#order:}" >&2
         ;;
     esac
     exit 2
@@ -281,6 +283,17 @@ if [ -n "$LAST_ROUND" ]; then
   esac
 
   if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
+    HAS_DONE_CRITERIA=0
+    printf '%s\n' "$LAST_ROUND" | grep -q '^#### 完成條件' && HAS_DONE_CRITERIA=1
+    DONE_CRITERIA_OK=0
+    if [ "$HAS_DONE_CRITERIA" -eq 1 ]; then
+      handoff_subsection_body '^#### 完成條件' | grep -q '[^[:space:]]' && DONE_CRITERIA_OK=1
+    fi
+    if [ "$DONE_CRITERIA_OK" -eq 0 ]; then
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 完成條件」且後面有內容（可觀察的做完判準）。" >&2
+      exit 2
+    fi
+
     HAS_NEXT=0
     printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
     NEXT_OK=0
@@ -311,6 +324,28 @@ if [ -n "$LAST_ROUND" ]; then
           exit 2
           ;;
       esac
+    fi
+
+    # --- IN_PROGRESS only: light actionable lint for 下一步 (L1).
+    # Pass if body shows a path (/), backtick command, file-ish token, or
+    # skill mention. False negatives OK; avoid scoring prose.
+    if [ "$STATUS_VAL" = "IN_PROGRESS" ]; then
+      if ! printf '%s\n' "$NEXT_BODY_TRIMMED" | grep -qE '/|`|\.[A-Za-z0-9]{1,10}([^A-Za-z0-9]|$)|[Ss][Kk][Ii][Ll][Ll]|hooks/|docs/|commands/|skills/'; then
+        echo "Status 是 IN_PROGRESS 時，「#### 下一步」須含可執行跡象（路徑、反引號指令、檔名或 skill）。請寫到下一輪打開就能做。" >&2
+        exit 2
+      fi
+    fi
+
+    # --- BLOCKED: 缺件句式 in 現況 or 下一步 (binary check for next agent).
+    if [ "$STATUS_VAL" = "BLOCKED" ]; then
+      BLOCKED_HINT="$( {
+        handoff_subsection_body '^#### 現況'
+        handoff_subsection_body '^#### 下一步'
+      } | tr '\n' ' ')"
+      if ! printf '%s\n' "$BLOCKED_HINT" | grep -qE '缺|等待|等使用者|需要.*提供|尚未|出現.*算|出現即'; then
+        echo "Status 是 BLOCKED 時，「#### 現況」或「#### 下一步」須寫清楚缺什麼、出現長怎樣（缺件句式），讓下一輪能判斷缺件是否已到。" >&2
+        exit 2
+      fi
     fi
   fi
 

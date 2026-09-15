@@ -230,6 +230,9 @@ done
 ### Summary
 finished
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 finished
@@ -259,9 +262,14 @@ what color should the button be?
 ### Summary
 Asked the user to pick a color.
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 Waiting on the user's color choice.
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
 #### 下一步
 Apply the chosen color once they answer.
 
@@ -328,6 +336,9 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 done
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 done
@@ -355,9 +366,14 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 in progress
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 running
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 keep going
 
@@ -399,9 +415,14 @@ cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ### Summary
 waiting
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 waiting on reply
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
 #### 下一步
 apply the answer
 
@@ -433,6 +454,9 @@ refactor the widget module
 
 ### Summary
 Refactored the widget module.
+
+### Reply
+fixture reply.
 
 ### Handoff
 #### 現況
@@ -520,11 +544,16 @@ cat > "$WS/.devlog/devlog.md" <<EOF
 ### Summary
 s
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 ${LIVE}
 #### 現況
 going
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 do x
 
@@ -542,11 +571,16 @@ cat > "$WS/.devlog/devlog.md" <<EOF
 ### Summary
 s
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 main @ deadbeef，工作樹乾淨
 #### 現況
 going
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 do x
 
@@ -568,6 +602,9 @@ cat > "$WS/.devlog/devlog.md" <<EOF
 ### Summary
 s
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 main @ deadbeef，工作樹乾淨
@@ -586,11 +623,16 @@ cat > "$WS/.devlog/devlog.md" <<EOF
 ### Summary
 s
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 工作區
 main @ deadbeef，工作樹乾淨
 #### 現況
 going
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 do x
 

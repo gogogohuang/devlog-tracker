@@ -21,6 +21,9 @@ echo '## Round 1 — 2026-09-12T00:00:00+08:00
 ### Summary
 fixture
 
+### Reply
+fixture reply.
+
 ### Handoff
 #### 現況
 fixture
