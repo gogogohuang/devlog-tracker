@@ -10,6 +10,11 @@
 # instead of the generic "沒有正常收尾" — caller decides via
 # detect-pending-question.sh; empty/unknown detail falls back to the generic
 # stub, same as before.
+# When detail is empty, the stub wording also depends on RECOVERED (did
+# devlog.md change at all since the round's skeleton was written): if not,
+# nothing was ever written back for this round (most likely the next prompt
+# arrived before Claude engaged with it at all), so the stub says that
+# plainly instead of implying work was interrupted mid-way.
 # Silent on stdout — SessionStart injects stdout as additionalContext.
 set -uo pipefail
 
@@ -76,14 +81,17 @@ TMP="$DEVLOG_FILE.tmp"
 awk -v want="$OPEN_ROUND" -v reason="$REASON" -v detail="$DETAIL" -v recovered="$RECOVERED" '
   function summary_stub() {
     if (detail == "awaiting_question") return "這輪在等待使用者回答 AskUserQuestion 時結束，還沒收到答案。"
+    if (recovered == 0) return "這一輪送出後，devlog.md 沒有留下任何後續處理紀錄就結束了。"
     return "這輪意外中斷。"
   }
   function reply_stub() {
     if (detail == "awaiting_question") return "（中斷前正在等使用者回答問題。）"
+    if (recovered == 0) return "（這一輪在 devlog.md 裡沒有留下回覆紀錄。）"
     return "（這輪意外中斷，沒有對使用者完成回覆。）"
   }
   function handoff_stub() {
     if (detail == "awaiting_question") return "Claude 提了問題還在等回答，session 就先結束了；不是中途出錯，只是還沒收到答案。需要的話重新確認一次問題再繼續。"
+    if (recovered == 0) return "這一輪沒有留下任何處理紀錄；下一步請看上面的 User Input 原文決定要不要接著處理。"
     return "這輪沒有正常收尾。"
   }
   /^[ \t]*```/ { fence = !fence }

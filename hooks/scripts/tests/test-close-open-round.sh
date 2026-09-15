@@ -67,7 +67,8 @@ else
 fi
 touch "$DEVLOG_DIR/.enabled"
 
-# --- 2: matching skeleton -> INTERRUPTED + stubs + markers gone -------------
+# --- 2: matching skeleton, never touched (not recovered) -> INTERRUPTED +
+#        "no record left" stub wording + markers gone -----------------------
 write_skeleton
 touch "$DEVLOG_DIR/.interrupted"
 bash "$SCRIPT_DIR/close-open-round.sh" "StopFailure:server_error"
@@ -75,10 +76,21 @@ assert_exit "matching open round -> exit 0" 0 $?
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "status INTERRUPTED" $'### Status\nINTERRUPTED' "$BODY"
 assert_contains "reason line" "StopFailure:server_error" "$BODY"
-assert_contains "summary stub" "這輪意外中斷。" "$BODY"
+assert_contains "summary stub (not recovered)" "devlog.md 沒有留下任何後續處理紀錄就結束了" "$BODY"
 assert_contains "handoff stub heading" "#### 現況" "$BODY"
-assert_contains "handoff stub body" "這輪沒有正常收尾。" "$BODY"
+assert_contains "handoff stub body (not recovered)" "這一輪沒有留下任何處理紀錄" "$BODY"
 assert_contains "user input kept" "hello" "$BODY"
+
+# --- 2b: skeleton + a segment was recorded (recovered) but Summary/Handoff
+#         still missing -> INTERRUPTED + the old "interrupted mid-way" stub --
+write_skeleton
+cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n### 段落 1 - 12:01\n```text\nsome progress\n```\n\n' >> "$DEVLOG_DIR/devlog.md"
+bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
+BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+assert_contains "recovered summary stub" "這輪意外中斷。" "$BODY"
+assert_contains "recovered handoff stub" "這輪沒有正常收尾。" "$BODY"
+assert_contains "recovered segment kept" "some progress" "$BODY"
 if [ -f "$DEVLOG_DIR/.round-open" ] || [ -f "$DEVLOG_DIR/.interrupted" ]; then
   echo "FAIL: markers should be deleted after a successful stamp"
   FAIL=1
