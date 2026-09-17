@@ -16,6 +16,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
+ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 
 INPUT="$(cat 2>/dev/null || true)"
@@ -62,11 +63,10 @@ is_safe_readonly_git_command() {
 }
 
 is_devlog_tool_allowed() {
-  local devlog_leaf="${DEVLOG_FILE##*/}"
   case "$1" in
     Write|Edit|StrReplace|Read|Grep)
       case "$2" in
-        .devlog/"$devlog_leaf"|*/.devlog/"$devlog_leaf") return 0 ;;
+        .devlog/.round-current.md|*/.devlog/.round-current.md) return 0 ;;
       esac
       ;;
     Bash)
@@ -89,11 +89,11 @@ if [ -f "$MISMATCH_FILE" ]; then
     rm -f "$MISMATCH_FILE" 2>/dev/null || true
   else
     SEGMENTS=""
-    if [ -f "$DEVLOG_FILE" ]; then
-      LAST_START="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $1 }')"
+    if [ -f "$ROUND_CURRENT" ]; then
+      LAST_START="$(devlog_list_round_starts "$ROUND_CURRENT" | awk 'END { print $1 }')"
       if [ -n "$LAST_START" ]; then
-        LAST_END="$(devlog_block_end "$DEVLOG_FILE" "$LAST_START")"
-        SEGMENTS="$(devlog_round_segments_body "$DEVLOG_FILE" "$LAST_START" "$LAST_END")"
+        LAST_END="$(devlog_block_end "$ROUND_CURRENT" "$LAST_START")"
+        SEGMENTS="$(devlog_round_segments_body "$ROUND_CURRENT" "$LAST_START" "$LAST_END")"
       fi
     fi
     segments_flat="$(printf '%s' "$SEGMENTS" | tr '\n' '\036')"
@@ -103,7 +103,7 @@ if [ -f "$MISMATCH_FILE" ]; then
       *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
       *)
         if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH" "$COMMAND"; then
-          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/${DEVLOG_FILE##*/}，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
+          echo "上一輪「#### 工作區」跟目前 git 不符。請先 Read .devlog/.round-current.md，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
           echo "" >&2
           echo "實際：" >&2
           printf '%s\n' "$LIVE_MARK" >&2
@@ -157,8 +157,8 @@ NOW="$(date +%s 2>/dev/null || echo '')"
 case "$NOW" in ''|*[!0-9]*) exit 0 ;; esac
 
 ID_MT=""; ID_SZ=""
-if [ -f "$DEVLOG_FILE" ]; then
-  ID="$(devlog_file_identity "$DEVLOG_FILE" || true)"
+if [ -f "$ROUND_CURRENT" ]; then
+  ID="$(devlog_file_identity "$ROUND_CURRENT" || true)"
   ID_MT="${ID%% *}"
   ID_SZ="${ID#* }"
   STORED_MT="$(json_str_get "$SEGMENT_FILE" last_seen_mtime 2>/dev/null || true)"
@@ -166,8 +166,8 @@ if [ -f "$DEVLOG_FILE" ]; then
   if [ -n "$ID_MT" ] && [ -n "$ID_SZ" ] && [ "$ID_MT" = "$STORED_MT" ] && [ "$ID_SZ" = "$STORED_SZ" ] && [ -n "$SEG_SUM" ]; then
     CURRENT="$SEG_SUM"
   else
-    CURRENT="$(cksum < "$DEVLOG_FILE" 2>/dev/null | tr -d '\n' || echo '')"
-    ID="$(devlog_file_identity "$DEVLOG_FILE" || true)"
+    CURRENT="$(cksum < "$ROUND_CURRENT" 2>/dev/null | tr -d '\n' || echo '')"
+    ID="$(devlog_file_identity "$ROUND_CURRENT" || true)"
     ID_MT="${ID%% *}"
     ID_SZ="${ID#* }"
   fi
@@ -190,7 +190,7 @@ fi
 
 ELAPSED=$((NOW - SEG_EPOCH))
 if [ "$ELAPSED" -ge "$SEG_MAX" ]; then
-  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/${DEVLOG_FILE##*/}（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/${DEVLOG_FILE##*/}，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。（唯讀的 git status／diff／log／show／rev-parse 仍可執行。）" >&2
+  echo "這一輪已經 ${ELAPSED} 秒沒有更新 .devlog/.round-current.md（門檻 ${SEG_MAX} 秒）。請先 Read .devlog/.round-current.md，再用 Edit 或 StrReplace **追加**一段「### 段落」（一行也可以）；禁止用 Write 覆寫整份檔。寫完再繼續呼叫其他工具。（唯讀的 git status／diff／log／show／rev-parse 仍可執行。）" >&2
   exit 2
 fi
 

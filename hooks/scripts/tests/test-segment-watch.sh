@@ -12,8 +12,8 @@ export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 DEVLOG_DIR="$TMP_ROOT/.devlog"
 mkdir -p "$DEVLOG_DIR"
 touch "$DEVLOG_DIR/.enabled"
-printf 'seed\n' > "$DEVLOG_DIR/devlog.md"
-SEED_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf 'seed\n' > "$DEVLOG_DIR/.round-current.md"
+SEED_CKSUM="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 
 FAIL=0
 assert_exit() {
@@ -43,11 +43,11 @@ write_state() {
 NOW="$(date +%s)"
 EXPIRED="$((NOW - 960))"
 BASH_PAYLOAD='{"tool_name":"Bash","tool_input":{"command":"echo hi"}}'
-WRITE_REL='{"tool_name":"Write","tool_input":{"file_path":".devlog/devlog.md"}}'
-WRITE_ABS="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/devlog.md"}}' "$TMP_ROOT")"
+WRITE_REL='{"tool_name":"Write","tool_input":{"file_path":".devlog/.round-current.md"}}'
+WRITE_ABS="$(printf '{"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current.md"}}' "$TMP_ROOT")"
 WRITE_OTHER='{"tool_name":"Write","tool_input":{"file_path":"src/foo.ts"}}'
-EDIT_REL='{"tool_name":"Edit","tool_input":{"file_path":".devlog/devlog.md"}}'
-STRREPLACE_REL='{"tool_name":"StrReplace","tool_input":{"file_path":".devlog/devlog.md"}}'
+EDIT_REL='{"tool_name":"Edit","tool_input":{"file_path":".devlog/.round-current.md"}}'
+STRREPLACE_REL='{"tool_name":"StrReplace","tool_input":{"file_path":".devlog/.round-current.md"}}'
 
 # --- Scenario 1: no .enabled -> exit 0 ------------------------------------
 rm -f "$DEVLOG_DIR/.enabled"
@@ -95,9 +95,9 @@ assert_exit "expired + missing session_id -> blocked" 2 $?
 
 # --- expired + Read / Grep / agent_id (unblock plan) ------------------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
-printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/devlog.md"},"session_id":"aaa"}' \
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/.round-current.md"},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + Read devlog.md -> allowed" 0 $?
+assert_exit "expired + Read .round-current.md -> allowed" 0 $?
 
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"README.md"},"session_id":"aaa"}' \
@@ -105,9 +105,9 @@ printf '%s' '{"tool_name":"Read","tool_input":{"file_path":"README.md"},"session
 assert_exit "expired + Read other -> blocked" 2 $?
 
 write_state "$EXPIRED" "$SEED_CKSUM" 900
-printf '%s' '{"tool_name":"Grep","tool_input":{"path":".devlog/devlog.md","pattern":"Round"},"session_id":"aaa"}' \
+printf '%s' '{"tool_name":"Grep","tool_input":{"path":".devlog/.round-current.md","pattern":"Round"},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + Grep devlog.md -> allowed" 0 $?
+assert_exit "expired + Grep .round-current.md -> allowed" 0 $?
 
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa","agent_id":"agent-xyz"}' \
@@ -123,28 +123,45 @@ write_state "$EXPIRED" "$SEED_CKSUM" 900
 ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
 case "$ERR" in
-  *Read*.devlog/devlog.md*禁止*覆寫*) echo "PASS: stderr instructs Read then append" ;;
+  *Read*.devlog/.round-current.md*禁止*覆寫*) echo "PASS: stderr instructs Read then append" ;;
   *) echo "FAIL: stderr [$ERR]"; FAIL=1 ;;
 esac
 
-# --- Scenario 4: expired + Write relative devlog.md -> exit 0 ---------------
+# --- Scenario 4: expired + Write relative .round-current.md -> exit 0 ---------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$WRITE_REL" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + Write .devlog/devlog.md -> allowed" 0 $?
+assert_exit "expired + Write .devlog/.round-current.md -> allowed" 0 $?
 
-# --- Scenario 5: expired + Write absolute path ending in /.devlog/devlog.md -
+# --- Scenario 5: expired + Write absolute path ending in /.devlog/.round-current.md -
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$WRITE_ABS" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + Write absolute /.devlog/devlog.md -> allowed" 0 $?
+assert_exit "expired + Write absolute /.devlog/.round-current.md -> allowed" 0 $?
 
-# --- Scenario 6: expired + Edit relative devlog.md -> exit 0 -----------------
+# --- Scenario 6: expired + Edit relative .round-current.md -> exit 0 -----------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$EDIT_REL" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + Edit .devlog/devlog.md -> allowed" 0 $?
+assert_exit "expired + Edit .devlog/.round-current.md -> allowed" 0 $?
 
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$STRREPLACE_REL" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
-assert_exit "expired + StrReplace .devlog/devlog.md -> allowed" 0 $?
+assert_exit "expired + StrReplace .devlog/.round-current.md -> allowed" 0 $?
+
+# --- Scenario 6b: allowlist path check against .round-current.md ------------
+ALLOW_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$ALLOW_DIR"
+mkdir -p "$ALLOW_DIR/.devlog"
+touch "$ALLOW_DIR/.devlog/.enabled"
+printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\nX\n```\n\n### Status\nIN_PROGRESS\n' > "$ALLOW_DIR/.devlog/.round-current.md"
+NOW_EPOCH="$(date +%s)"
+OLD_EPOCH=$((NOW_EPOCH - 1000))
+printf '{"last_change_epoch": %s, "last_seen_cksum": "stale", "max_silent_seconds": 600}\n' "$OLD_EPOCH" > "$ALLOW_DIR/.devlog/.segment-state"
+
+INPUT='{"tool_name":"Edit","tool_input":{"file_path":".devlog/.round-current.md"}}'
+OUT="$(echo "$INPUT" | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1)"
+RC=$?
+assert_exit "allowlist: Edit on .round-current.md passes through" 0 "$RC"
+rm -rf "$ALLOW_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 # --- Scenario 7: expired + Write other file -> exit 2 -----------------------
 write_state "$EXPIRED" "$SEED_CKSUM" 900
@@ -197,7 +214,7 @@ assert_exit "expired + Bash without jq -> blocked" 2 $?
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$WRITE_REL" | PATH="$PATH_NO_JQ" bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "expired + Write without jq -> allowed" 0 $?
-WRITE_SPACED='{ "tool_name" : "Write" , "tool_input": {"file_path":".devlog/devlog.md"} }'
+WRITE_SPACED='{ "tool_name" : "Write" , "tool_input": {"file_path":".devlog/.round-current.md"} }'
 write_state "$EXPIRED" "$SEED_CKSUM" 900
 printf '%s' "$WRITE_SPACED" | PATH="$PATH_NO_JQ" bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "expired + spaced Write without jq -> allowed" 0 $?
@@ -210,7 +227,7 @@ assert_exit "expired + empty stdin -> allowed" 0 $?
 # --- Scenario 13: round-start.sh resets clock and preserves max -------------
 write_state 1 "old-sum" 600
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-POST_SKEL="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+POST_SKEL="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 RS_EPOCH="$(grep -o '"last_change_epoch"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.segment-state" | grep -o '[0-9]\+$')"
 RS_SUM="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 RS_MAX="$(grep -o '"max_silent_seconds"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.segment-state" | grep -o '[0-9]\+$')"
@@ -230,8 +247,8 @@ assert_exit "segment-state missing last_seen_cksum key -> allowed" 0 $?
 
 # --- Scenario 15: identity match skips cksum but still blocks when expired --
 # round-start may have rewritten the file; re-seed so cksum matches identity.
-printf 'seed\n' > "$DEVLOG_DIR/devlog.md"
-SEED_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf 'seed\n' > "$DEVLOG_DIR/.round-current.md"
+SEED_CKSUM="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 
 file_identity() {
   local f="$1" mt sz
@@ -246,7 +263,7 @@ file_identity() {
   return 1
 }
 
-ID_LINE="$(file_identity "$DEVLOG_DIR/devlog.md")"
+ID_LINE="$(file_identity "$DEVLOG_DIR/.round-current.md")"
 ID_MT="${ID_LINE%% *}"
 ID_SZ="${ID_LINE#* }"
 printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "last_seen_mtime": "%s", "last_seen_size": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
@@ -274,14 +291,14 @@ fi
 # --- Scenario 16: identity mismatch forces cksum and clears silence ---------
 printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "last_seen_mtime": "%s", "last_seen_size": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
   "$EXPIRED" "$SEED_CKSUM" "$ID_MT" "$ID_SZ" > "$DEVLOG_DIR/.segment-state"
-printf 'x' >> "$DEVLOG_DIR/devlog.md"
-NEW_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf 'x' >> "$DEVLOG_DIR/.round-current.md"
+NEW_CKSUM="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mtime/size change -> allowed (re-hash)" 0 $?
 SEEN_MT="$(grep -o '"last_seen_mtime"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_mtime"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 SEEN_SZ="$(grep -o '"last_seen_size"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_size"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 SEEN_SUM="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
-ID_LINE2="$(file_identity "$DEVLOG_DIR/devlog.md")"
+ID_LINE2="$(file_identity "$DEVLOG_DIR/.round-current.md")"
 ID_MT2="${ID_LINE2%% *}"
 ID_SZ2="${ID_LINE2#* }"
 if [ "$SEEN_MT" = "$ID_MT2" ] && [ "$SEEN_SZ" = "$ID_SZ2" ] && [ "$SEEN_SUM" = "$NEW_CKSUM" ]; then
@@ -292,8 +309,8 @@ else
 fi
 
 # --- Scenario 17: missing identity fields fall through to cksum -------------
-printf 'seed\n' > "$DEVLOG_DIR/devlog.md"
-SEED_CKSUM="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+printf 'seed\n' > "$DEVLOG_DIR/.round-current.md"
+SEED_CKSUM="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "aaa"}\n' \
   "$EXPIRED" "$SEED_CKSUM" > "$DEVLOG_DIR/.segment-state"
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
@@ -305,7 +322,7 @@ printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&
 assert_exit "missing identity + hash change -> allowed" 0 $?
 
 # --- workspace mismatch marker blocks non-devlog tools ----------------------
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
 ### User Input
@@ -317,12 +334,12 @@ keep going
 IN_PROGRESS
 EOF
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
-write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch marker + Bash -> blocked" 2 $?
 
-printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/devlog.md"},"session_id":"aaa"}' \
+printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/.round-current.md"},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch marker + Read devlog -> allowed" 0 $?
 
@@ -335,19 +352,19 @@ esac
 
 # last Round contains the live snapshot -> marker cleared, Bash allowed
 # (fresh clock so the silence valve does not also fire)
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat >> "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ### 段落 1
 宣稱 vs 實際
 main @ deadbeef，工作樹乾淨
 EOF
-write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch recorded in 段落 -> Bash allowed" 0 $?
 [ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: marker removed after 段落" || { echo "FAIL: marker remains"; FAIL=1; }
 
 # two-line dirty snapshot (branch @ hash + 未提交) recorded in 段落 -> marker cleared
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
 ### User Input
@@ -366,14 +383,14 @@ cat > "$DEVLOG_DIR/.workspace-mismatch" <<'EOF'
 feat/foo @ abc1234
 未提交：a.txt
 EOF
-write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "two-line dirty snapshot in 段落 -> Bash allowed" 0 $?
 [ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: two-line marker removed after 段落" || { echo "FAIL: two-line marker remains"; FAIL=1; }
 
 # Same string outside a 段落 must not clear the marker
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
 ### User Input
@@ -383,7 +400,7 @@ main @ deadbeef，工作樹乾淨
 IN_PROGRESS
 EOF
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
-write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "snapshot in User Input only -> still blocked" 2 $?
@@ -395,7 +412,7 @@ assert_exit "snapshot in User Input only -> still blocked" 2 $?
 # unconditionally non-mutating git subcommands stays open; anything with
 # shell metacharacters (chaining/redirection/substitution) or a mutating
 # subcommand (commit, branch -d, etc.) stays blocked.
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
 ### User Input
@@ -407,7 +424,7 @@ keep going
 IN_PROGRESS
 EOF
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
-write_state "$NOW" "$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')" 900
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
 printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git status --short"},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch marker + read-only git status -> allowed" 0 $?
@@ -432,7 +449,7 @@ assert_exit "mismatch marker + git branch -d (mutating, not allowlisted) -> stil
 # marker works even without .segment-state (today that file missing exits 0)
 rm -f "$DEVLOG_DIR/.segment-state"
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
 ### Status

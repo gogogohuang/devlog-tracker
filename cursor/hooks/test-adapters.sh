@@ -98,12 +98,12 @@ assert_single_json "mismatch submit single json" "$OUT"
 # preToolUse allowlists writes to the devlog and denies expired other tools
 NOW="$(date +%s)"
 OLD=$((NOW - 1000))
-SUM="$(cksum < "$SUBMIT/.devlog/devlog.md" | tr -d '\n')"
+SUM="$(cksum < "$SUBMIT/.devlog/.round-current.md" | tr -d '\n')"
 printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "cursor-1"}\n' "$OLD" "$SUM" > "$SUBMIT/.devlog/.segment-state"
-OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/devlog.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
 case "$OUT" in *'"permission":"deny"'*) echo "FAIL: devlog write denied"; FAIL=1 ;; *) echo "PASS: devlog write allowed" ;; esac
 assert_single_json "preTool write single json" "$OUT"
-OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"StrReplace","tool_input":{"file_path":"%s/.devlog/devlog.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"StrReplace","tool_input":{"file_path":"%s/.devlog/.round-current.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
 case "$OUT" in *'"permission":"deny"'*) echo "FAIL: StrReplace devlog denied"; FAIL=1 ;; *) echo "PASS: StrReplace devlog allowed" ;; esac
 assert_single_json "preTool StrReplace single json" "$OUT"
 OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Bash","tool_input":{},"session_id":"cursor-1"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
