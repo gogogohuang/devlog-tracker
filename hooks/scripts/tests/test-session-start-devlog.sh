@@ -111,7 +111,8 @@ fi
 # --- Scenario 5: startup heals open round then still injects --------------
 rm -f "$DEVLOG_DIR/.span-open"
 touch "$DEVLOG_DIR/.enabled"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -174,7 +175,8 @@ else
 fi
 
 # --- Scenario 8: source=fork heals an open skeleton (script already does) --
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -201,7 +203,8 @@ fi
 # --- Scenario 9: source=clear does not inject; still heals open round ------
 rm -f "$DEVLOG_DIR/.span-open"
 touch "$DEVLOG_DIR/.enabled"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input

@@ -113,10 +113,10 @@ export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 # --- 3: next prompt is Round 2 (dangling heal stamps devlog.md; the new
 # round opens in .round-current.md) — a genuinely-open Round 1 sitting in
-# devlog.md is a hand-built fixture representing what close-open-round.sh
-# still operates on today (Task 3 hasn't retargeted it yet) --------------
+# .round-current.md is a hand-built fixture representing what
+# close-open-round.sh operates on ------------------------------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -273,8 +273,8 @@ else
 fi
 
 # --- 10: dangling heal skips a completed last Round, still opens Round 2 ----
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -296,8 +296,8 @@ finished
 DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/.round-current.md"
 printf '%s' '{"prompt":"next"}' | bash "$SCRIPT_DIR/round-start.sh"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
@@ -673,6 +673,7 @@ OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh"
 [ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: matching 工作區 writes no marker" || { echo "FAIL: marker on match"; FAIL=1; }
 grep -q '^## Round 2' "$WS/.devlog/.round-current.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
 
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
