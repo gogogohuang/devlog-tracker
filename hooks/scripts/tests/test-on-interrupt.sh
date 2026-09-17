@@ -46,7 +46,7 @@ for err in rate_limit billing_error account_on_hold; do
   write_open
   echo "{\"error\":\"$err\"}" | bash "$SCRIPT_DIR/on-stop-failure.sh"
   assert_exit "StopFailure $err -> exit 0" 0 $?
-  BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+  BODY="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
   case "$BODY" in
     *INTERRUPTED*) echo "FAIL: $err must not stamp INTERRUPTED"; FAIL=1 ;;
     *) echo "PASS: $err left Status IN_PROGRESS" ;;
@@ -82,9 +82,9 @@ assert_contains "session end reason" "SessionEnd:clear" "$BODY"
 # SessionEnd without marker
 write_open
 rm -f "$DEVLOG_DIR/.round-open"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+BEFORE="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 echo '{"reason":"other"}' | bash "$SCRIPT_DIR/on-session-end.sh"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
+AFTER="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 if [ "$BEFORE" = "$AFTER" ]; then
   echo "PASS: SessionEnd without .round-open is a no-op"
 else
@@ -102,7 +102,7 @@ else
   echo "FAIL: .interrupted missing"
   FAIL=1
 fi
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 case "$BODY" in
   *INTERRUPTED*) echo "FAIL: on-tool-failure must not patch devlog.md"; FAIL=1 ;;
   *) echo "PASS: on-tool-failure did not patch devlog.md" ;;
