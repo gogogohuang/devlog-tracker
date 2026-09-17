@@ -22,8 +22,9 @@ devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下
 
 `### Summary`／`### Reply`／`### Handoff`／`### 段落`／`## Checkpoint` 這些內容是寫給「下一個
 讀 devlog.md 的人」看的，不是講給正在對話的使用者聽的——這是兩件不同的事，收尾時
-用 Edit／Write 工具**安靜地**寫進 `.devlog/devlog.md`（工具呼叫本身不會顯示給
-使用者），寫完之後**不要**在聊天回覆裡再提這件事。
+用 Edit／Write 工具**安靜地**寫進 `.devlog/.round-current.md`（這一輪還開著時的
+實際編輯對象，收尾成功或被判定中斷後才會由 hook 自動併回 `.devlog/devlog.md`；
+工具呼叫本身不會顯示給使用者），寫完之後**不要**在聊天回覆裡再提這件事。
 
 具體來說，這輪收尾的聊天回覆裡：
 
@@ -44,12 +45,12 @@ IN_PROGRESS，因為背景任務還在跑）。等它跑完我會回報結果並
 內部記錄動作。
 
 **最容易漏掉的一種情況：結尾的「這輪改了什麼」總結。** 這輪如果除了
-`devlog.md` 還真的改了別的檔案（例如 README.md、程式碼），結尾照常給一兩句
-話總結改了什麼、下一步是什麼——但 `.devlog/devlog.md` 這個異動本身**不算
-在「改了什麼」裡面，永遠不要提**，因為那是記錄動作本身、不是產出。舉例：
-這輪同時修了 `README.md` 又寫了 `devlog.md`，結尾只講「README.md 已更新
-成...」，不要接著再講「devlog 也已更新／已補上這輪的 Summary/Handoff」——
-後面這句要整句刪掉，不是縮短。
+`.devlog/.round-current.md`（收尾後才會併入 `devlog.md`）還真的改了別的檔案
+（例如 README.md、程式碼），結尾照常給一兩句話總結改了什麼、下一步是什麼——
+但這個異動本身**不算在「改了什麼」裡面，永遠不要提**，因為那是記錄動作本身、
+不是產出。舉例：這輪同時修了 `README.md` 又寫了 `.devlog/.round-current.md`，
+結尾只講「README.md 已更新成...」，不要接著再講「devlog 也已更新／已補上這輪的
+Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 
 ## 檔案位置
 
@@ -57,6 +58,8 @@ IN_PROGRESS，因為背景任務還在跑）。等它跑完我會回報結果並
 - 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案、且 `.devlog/devlog.md` 已有內容時，會把它改名（非複製）成該分支的檔案。細節見 `docs/design/branch-scoped-devlog.md`。
 - 歸檔：`.devlog/devlog.archive.md`
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
+- 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
+  收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
 
@@ -80,22 +83,27 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 開關啟動之後，才會進入下面這套強制流程：
 
 1. 使用者送出新訊息時，`UserPromptSubmit` hook（`hooks/scripts/round-start.sh`）
-   若開關開著，就在 `.devlog/devlog.md` 尾端追加這一輪的 skeleton（`### User Input`
+   若開關開著，就在 `.devlog/.round-current.md` 寫入這一輪的 skeleton（`### User Input`
    + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。`.turn-start` 雜湊是
-   **寫完 skeleton 之後**才拍的，所以 Stop 仍能判斷 Claude 有沒有再補收尾。
+   **寫完 skeleton 之後**才對 `.round-current.md` 拍的，所以 Stop 仍能判斷 Claude
+   有沒有再補收尾。
 2. Claude 編輯**同一個** Round：不要再 append 一個新的 `## Round`。不要改 User Input
    （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Reply` / `### Handoff`，
-   把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。
+   把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。這一輪還開著的時候，編輯的對象
+   是 `.devlog/.round-current.md`，不是 `devlog.md`——這一輪還沒併回去之前，
+   `devlog.md` 完全看不到它。
 3. `Stop` hook（`hooks/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
    缺少 `### Summary` / `### Reply` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
-   `.round-open`。
+   `.round-open`，並把 `.round-current.md` 的內容併回 `devlog.md` 尾端、清空
+   `.round-current.md`（設計見 `docs/design/round-current-split.md`）。
 
 好處：就算工作做到一半被中斷（下一輪還沒開始就被使用者關掉、或換 session），
 只要**上一輪有正常結束過**，devlog.md 就一定留有當時的 Status（多半是 `IN_PROGRESS`
 或 `BLOCKED`）可以接續——這跟「plan 是否完成」完全無關，純粹綁在「這一輪有沒有結束」
 這個事件上。
 
-需要誠實說明的邊界：User Input 在送出當下就已經在 `devlog.md`。正常結束時 Stop 仍保證有 Summary / Handoff。
+需要誠實說明的邊界：User Input 在送出當下就已經在 `.devlog/.round-current.md`
+（收尾成功或被判定中斷後才會併回 `devlog.md`）。正常結束時 Stop 仍保證有 Summary / Handoff。
 意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
 **下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上）。
 `PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成 Esc
@@ -293,8 +301,9 @@ Reply 一句（對使用者說過的話）、Handoff 只留「現況」一句（
 呼叫次數機械觸發。不要把段落內容再抄進 Summary 或 Handoff。
 
 另有一道保底：同一輪連續約 10 分鐘（可用 `/devlog-tracker:segment-watch <時間長度>`
-調整）沒改 `devlog.md`，下一個工具會被 PreToolUse hook 擋住，先 Read 再用
-Edit／StrReplace 追加一段（**禁止**用 Write 覆寫整份檔）。
+調整）沒改 `.devlog/.round-current.md`，下一個工具會被 PreToolUse hook 擋住，先
+Read `.devlog/.round-current.md` 再用 Edit／StrReplace 追加一段（**禁止**用 Write
+覆寫整份檔）。
 
 完整格式範例、寫入細則、跟 dynamic workflow／subagent 的例外情況，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/round-segments.md`。
@@ -385,4 +394,4 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 ## 無條件清空：`/devlog-tracker:clean`
 
-把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下，重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。
+把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下（若有開著，內容讀自 `.devlog/.round-current.md`，不是已經清空的 `devlog.md`），重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。
