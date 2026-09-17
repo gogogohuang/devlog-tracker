@@ -80,7 +80,7 @@ make_round "$OPEN/.devlog/devlog.md" 2 DONE
   printf '## Round 3 — 2026-09-09T12:00:00+08:00\n\n'
   printf '### User Input\n```text\nplease do not touch this fake heading:\n## Round 1 fake\n## Round 99 — fake heading\n```\n\n'
   printf '### Status\nIN_PROGRESS\n'
-} >> "$OPEN/.devlog/devlog.md"
+} > "$OPEN/.devlog/.round-current.md"
 printf '%s\n' '{"round": 3, "opened_at": "now"}' > "$OPEN/.devlog/.round-open"
 printf '%s\n' '{"round": 2, "ticks": 1, "max_silent_ticks": 5}' > "$OPEN/.devlog/.span-open"
 printf '%s\n' '{"rounds_since_checkpoint": 19, "max_silent_rounds": 20, "checkpoint_marker_count": 2}' > "$OPEN/.devlog/.checkpoint-state"
@@ -96,6 +96,7 @@ grep -q '^## Round 2 ' "$OPEN/.devlog/devlog.md" && { echo "FAIL: old round 2 su
 grep -q '^please do not touch this fake heading:$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced body preserved verbatim" || { echo "FAIL: fenced body altered"; FAIL=1; }
 grep -q '^## Round 1 fake$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced fake heading untouched" || { echo "FAIL: fenced fake heading renamed"; FAIL=1; }
 grep -q '^## Round 99 — fake heading$' "$OPEN/.devlog/devlog.md" && echo "PASS: second fenced fake heading untouched" || { echo "FAIL: second fenced fake heading renamed"; FAIL=1; }
+[ ! -e "$OPEN/.devlog/.round-current.md" ] && echo "PASS: .round-current.md cleared" || { echo "FAIL: .round-current.md remains"; FAIL=1; }
 grep -q '"round": 1' "$OPEN/.devlog/.round-open" && echo "PASS: round-open reset to 1" || { echo "FAIL: round-open"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.span-open" ] && echo "PASS: span-open removed" || { echo "FAIL: span-open remains"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.interrupted" ] && echo "PASS: interrupted removed" || { echo "FAIL: interrupted remains"; FAIL=1; }
@@ -134,7 +135,7 @@ export CLAUDE_PROJECT_DIR="$SIB"
 printf '%s\n' '# archive' > "$SIB/.devlog/devlog.archive.md"
 printf '%s\n' '# kept' > "$SIB/.devlog/devlog.span-mode.md"
 printf '# project\n\n' > "$SIB/.devlog/devlog.md"
-make_round "$SIB/.devlog/devlog.md" 1 DONE
+make_round "$SIB/.devlog/.round-current.md" 1 DONE
 printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$SIB/.devlog/.round-open"
 bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
 grep -q '^# archive' "$SIB/.devlog/devlog.archive.md" && echo "PASS: archive.md untouched" || { echo "FAIL: archive.md touched"; FAIL=1; }
@@ -146,7 +147,7 @@ mkdir -p "$ENAB/.devlog"
 export CLAUDE_PROJECT_DIR="$ENAB"
 printf '%s\n' 'enabled' > "$ENAB/.devlog/.enabled"
 printf '# project\n\n' > "$ENAB/.devlog/devlog.md"
-make_round "$ENAB/.devlog/devlog.md" 1 IN_PROGRESS
+make_round "$ENAB/.devlog/.round-current.md" 1 IN_PROGRESS
 printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$ENAB/.devlog/.round-open"
 bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
 [ -f "$ENAB/.devlog/.enabled" ] && echo "PASS: .enabled untouched" || { echo "FAIL: .enabled removed"; FAIL=1; }
