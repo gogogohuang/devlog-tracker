@@ -61,8 +61,8 @@ touch "$SUBMIT/.devlog/.enabled"
 OUT="$(printf '{"workspace_roots":["%s"],"prompt":"hello","session_id":"cursor-1"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-submit-prompt.sh")"
 case "$OUT" in *'"continue":true'*) echo "PASS: submit continues" ;; *) echo "FAIL: submit [$OUT]"; FAIL=1 ;; esac
 assert_single_json "submit single json" "$OUT"
-grep -q 'hello' "$SUBMIT/.devlog/devlog.md" && echo "PASS: submit writes round" || { echo "FAIL: submit round"; FAIL=1; }
-ROUNDS="$(grep -c '^## Round ' "$SUBMIT/.devlog/devlog.md" || true)"
+grep -q 'hello' "$SUBMIT/.devlog/.round-current.md" && echo "PASS: submit writes round" || { echo "FAIL: submit round"; FAIL=1; }
+ROUNDS="$(grep -c '^## Round ' "$SUBMIT/.devlog/.round-current.md" || true)"
 if [ "$ROUNDS" -eq 1 ]; then echo "PASS: submit writes one round"; else echo "FAIL: submit round count [$ROUNDS]"; FAIL=1; fi
 
 # submit prompt with stale 工作區 forwards additional_context
@@ -128,15 +128,9 @@ grep -q 'INTERRUPTED' "$SUBMIT/.devlog/devlog.md" && echo "PASS: aborted closes 
 assert_single_json "aborted stop single json" "$OUT"
 
 # sessionEnd delegates its reason to the existing close helper
-cat >> "$SUBMIT/.devlog/devlog.md" <<'EOF'
-
-## Round 2 — now
-
-### Status
-IN_PROGRESS
-EOF
+printf '\n## Round 2 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current.md"
 printf '%s\n' '{"round": 2, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open"
-cksum < "$SUBMIT/.devlog/devlog.md" > "$SUBMIT/.devlog/.turn-start"
+cksum < "$SUBMIT/.devlog/.round-current.md" > "$SUBMIT/.devlog/.turn-start"
 OUT="$(printf '{"workspace_roots":["%s"],"reason":"windowClosed"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-session-end.sh")"
 grep -q 'SessionEnd:windowClosed' "$SUBMIT/.devlog/devlog.md" && echo "PASS: session end reason" || { echo "FAIL: session end"; FAIL=1; }
 assert_single_json "sessionEnd single json" "$OUT"
