@@ -169,6 +169,34 @@ devlog_round_segments_body() {
   ' "$1"
 }
 
+devlog_merge_round_current() {
+  # Appends $2's content onto $1 (one blank line separator, matching the
+  # existing "\n## Round N" append convention) and removes $2. No-op if $2
+  # is absent or empty — nothing to merge.
+  local devlog="$1" current="$2"
+  [ -s "$current" ] || return 0
+  {
+    printf '\n'
+    cat "$current"
+  } >> "$devlog" 2>/dev/null || return 1
+  rm -f "$current" 2>/dev/null || true
+  return 0
+}
+
+devlog_reopen_last_round() {
+  # Moves the last "## Round N ..." block out of $1 into $2 (creating $2),
+  # removing those lines from $1. Returns 1 and touches neither file if $1
+  # has no round to move.
+  local devlog="$1" current="$2" start end
+  start="$(devlog_list_round_starts "$devlog" | awk 'END { print $1 }')"
+  [ -n "$start" ] || return 1
+  end="$(devlog_block_end "$devlog" "$start")"
+  awk -v start="$start" -v end="$end" 'NR >= start && NR <= end' "$devlog" > "$current" 2>/dev/null || return 1
+  awk -v start="$start" -v end="$end" 'NR < start || NR > end' "$devlog" > "$devlog.tmp" 2>/dev/null \
+    && mv "$devlog.tmp" "$devlog" 2>/dev/null || { rm -f "$devlog.tmp" "$current" 2>/dev/null; return 1; }
+  return 0
+}
+
 workspace_claim_state() {
   local dir="$1" file="$2" start end status claimed live
   if ! type workspace_snapshot >/dev/null 2>&1; then
