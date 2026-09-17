@@ -138,6 +138,10 @@ FILE="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "file stamped INTERRUPTED" "INTERRUPTED" "$FILE"
 
 # --- Scenario 6: compact must NOT heal; Stop still enforces ---------------
+# enforce-devlog.sh (round-current split) hashes/reads .round-current.md,
+# not devlog.md, so the dangling "mid compact" round must be seeded there
+# too, and .turn-start hashed from that same file, or the later Stop call's
+# hash comparison can never observe "no write since turn start".
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
@@ -149,8 +153,19 @@ mid compact
 ### Status
 IN_PROGRESS
 EOF
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+mid compact
+```
+
+### Status
+IN_PROGRESS
+EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 OUTPUT="$(echo '{"source":"compact"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
 assert_contains "compact still injects Round 1" "Round 1" "$OUTPUT"
 FILE="$(cat "$DEVLOG_DIR/devlog.md")"

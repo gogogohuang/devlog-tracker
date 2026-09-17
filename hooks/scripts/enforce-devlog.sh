@@ -138,11 +138,29 @@ if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
 fi
 
 # --- 標題檢查（Summary + Reply + Handoff）---------------------------------
-# 雜湊已經證明這輪有寫入。.round-current.md 恰好裝著這一輪（且只有這一輪），
-# 直接整份讀進來當作要驗證的內容即可，不用再從 devlog.md 裡掃「最後一個
-# ## Round」。這個區塊必須同時有以 ### Summary、### Reply、### Handoff 開頭
-# 的行。只驗標題存在，不驗內容。讀不到內容（檔案不存在等）：fail-open（不擋）。
-LAST_ROUND="$(cat "$ROUND_CURRENT" 2>/dev/null || true)"
+# 雜湊已經證明這輪有寫入。.round-current.md 理論上恰好裝著這一輪（且只有
+# 這一輪），但不能整份 cat 進來當作要驗證的內容：Claude 收尾這一輪時可能
+# 已經在同一個檔案尾端接著寫了一段「## Checkpoint」（見下面 Step 9 的
+# merge，會把整個檔案一起併進 devlog.md），而內容裡如果完全沒有
+# `## Round ` 這一行（例如只是一段雜訊文字），代表根本沒有 Round 可驗——
+# 兩種情況都必須比照舊版 last_round_block() 的
+# 邊界規則來擷取：找第一行 `## Round `（fence 之外），一路擷取到下一個
+# 不在 fence 裡的 `## ` 為止（或檔尾），把後面接的 Checkpoint 等區段排除
+# 在外。完全找不到 `## Round ` 這一行：fail-open（LAST_ROUND 留空，不擋），
+# 對應舊版 `if (start == 0) exit 0` 的行為。
+LAST_ROUND="$(awk '
+  /^[ \t]*```/ { fence = !fence }
+  !fence && /^## Round / { start = NR }
+  { lines[NR] = $0; infence[NR] = fence }
+  END {
+    if (start == 0) exit 0
+    end = NR
+    for (i = start + 1; i <= NR; i++) {
+      if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+    }
+    for (i = start; i <= end; i++) print lines[i]
+  }
+' "$ROUND_CURRENT" 2>/dev/null || true)"
 if [ -n "$LAST_ROUND" ]; then
   HAS_SUMMARY=0
   HAS_REPLY=0

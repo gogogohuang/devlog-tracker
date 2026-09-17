@@ -464,26 +464,32 @@ case "$EMPTY_MSG" in
   *) echo "FAIL: empty-body stderr, got: $EMPTY_MSG"; FAIL=1 ;;
 esac
 
-# --- Heading Scenario 5: hash changed, content isn't shaped like a Round --
-# Round-current split: enforce-devlog.sh now reads .round-current.md as a
-# whole (Step 5) instead of scanning devlog.md for the last "## Round "
-# block, so there is no longer a "no ## Round heading -> fail-open" escape
-# hatch for this file — .round-current.md's invariant is that it always
-# holds exactly one round, so non-round content in it is a real problem,
-# not a benign scan miss. HAS_SUMMARY/HAS_HANDOFF correctly catch this and
-# block instead.
+# --- Heading Scenario 5: hash changed, content has no "## Round " at all --
+# Fixed on review: enforce-devlog.sh must still fail-open (exit 0) when
+# .round-current.md's content contains zero "## Round " lines anywhere —
+# matching the pre-split last_round_block()'s `if (start == 0) exit 0`
+# behavior, and the plan's Global Constraints ("解析不到任何 `## Round`：
+# fail-open（不擋）"). Content is still merged into devlog.md (there is
+# nothing round-shaped to validate, but the round is still finished).
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/.round-current.md"
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "hash changed, content has no ### Summary/### Handoff -> blocked" 2 $?
+OUT5="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+RC5=$?
+assert_exit "no ## Round line at all -> fail-open, allowed" 0 "$RC5"
+assert_round_merged "no ## Round line at all" "just a note, not a round"
 
 # --- Heading Scenario 6: Checkpoint text must not satisfy headings --------
-# Last Round lacks both headings; a following Checkpoint quotes them. Under
-# the round-current split there is no other-rounds boundary to guard against
-# within this single-round scratch file, but the missing ### Status still
-# independently blocks this — this is still a real (if now differently
-# reasoned) regression guard that quoted headings elsewhere never satisfy a
-# genuinely incomplete round.
+# Last Round lacks both headings; a following, trailing "## Checkpoint"
+# section quotes fully valid-looking Summary/Handoff/Status content. Fixed
+# on review: the extraction of .round-current.md must be bounded the same
+# way the pre-split last_round_block() was — stop at the next unfenced
+# "## " line — so this trailing Checkpoint section can never satisfy the
+# Round's own requirements. The fixture is deliberately built so the two
+# implementations diverge: a naive whole-file read (the bug) would find
+# the quoted headings, bodies, and Status under Checkpoint and wrongly
+# allow (exit 0); the bounded read excludes all of that, sees a Round with
+# no headings at all, and correctly blocks (exit 2). This makes the
+# assertion below a real regression guard, not just an accidental pass.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 5 — 2026-09-09T10:20:00+08:00
@@ -491,12 +497,22 @@ old response blob
 
 ## Checkpoint（Round 5 摘要）
 ### Summary
-quoted
+quoted summary text that must not satisfy the Round above
+
 ### Handoff
-quoted
+#### 現況
+quoted handoff text that must not satisfy the Round above
+
+### Status
+DONE
 DEVEOF
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "headings only inside Checkpoint, last Round missing ### Status -> blocked" 2 $?
+ERR6="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+RC6=$?
+assert_exit "headings only inside trailing Checkpoint -> blocked" 2 "$RC6"
+case "$ERR6" in
+  *"缺少"*"Summary"*|*"缺少"*"Handoff"*) echo "PASS: blocked for missing headings in the bounded Round, not the Checkpoint's" ;;
+  *) echo "FAIL: expected missing-headings message, got: $ERR6"; FAIL=1 ;;
+esac
 
 # --- Heading Scenario 7: Checkpoint after completing the open skeleton Round -
 # round-start.sh always opens a skeleton; Claude must finish Summary+Handoff
