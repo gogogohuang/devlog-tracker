@@ -38,9 +38,27 @@ assert_exit() {
   fi
 }
 
+# Round-current split: enforce-devlog.sh validates .round-current.md now
+# (not devlog.md), and merges it into devlog.md on success. One assertion
+# per "should succeed" case exercises that merge.
+assert_round_merged() {
+  local desc="$1"
+  if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+    echo "FAIL: $desc (.round-current.md should be merged away)"
+    FAIL=1
+  elif ! grep -q 'fixture' "$DEVLOG_DIR/devlog.md" 2>/dev/null; then
+    echo "FAIL: $desc (devlog.md missing merged content)"
+    FAIL=1
+  else
+    echo "PASS: $desc (round-current merged into devlog.md)"
+  fi
+}
+
 write_round() {
   # $1 = Handoff body (already includes #### subsection lines). Status DONE
   # throughout so this suite is decoupled from Phase 1's 工作區/下一步 checks.
+  # Writes into .round-current.md — the file enforce-devlog.sh now validates
+  # (round-start.sh already opened a skeleton there; this overwrites it).
   {
     echo "## Round 1 — 2026-09-10T00:00:00+08:00"
     echo ""
@@ -55,7 +73,7 @@ write_round() {
     echo ""
     echo "### Status"
     echo "DONE"
-  } > "$DEVLOG_DIR/devlog.md"
+  } > "$DEVLOG_DIR/.round-current.md"
 }
 
 # --- full canonical order -> allowed -----------------------------------------
@@ -74,6 +92,7 @@ observable done.
 n"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "full canonical order -> allowed" 0 $?
+assert_round_merged "full canonical order"
 
 # --- subset in order -> allowed -----------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -83,6 +102,7 @@ d
 c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "subset in canonical order -> allowed" 0 $?
+assert_round_merged "subset in canonical order"
 
 # --- reordered -> blocked -------------------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -120,6 +140,7 @@ x
 c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unrecognized #### heading interleaved -> ignored, allowed" 0 $?
+assert_round_merged "unrecognized #### heading interleaved"
 
 # --- fenced example reordering subsection headings -> ignored, allowed -----
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -136,6 +157,7 @@ d
 c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example reordering subsection headings -> ignored, allowed" 0 $?
+assert_round_merged "fenced example reordering subsection headings"
 
 # --- fenced example duplicating a heading already used -> ignored, allowed -
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -150,6 +172,7 @@ d2
 c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example duplicating a used heading -> ignored, allowed" 0 $?
+assert_round_merged "fenced example duplicating a used heading"
 
 # --- unterminated fence inside #### 決策 -> fail-open, not a false block
 # (final-review Fix 1). A ``` fence that never closes (odd fence-marker
@@ -165,6 +188,7 @@ write_round "#### 決策
 c"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unterminated fence in 決策, real 現況 after it -> fail-open, allowed" 0 $?
+assert_round_merged "unterminated fence in 決策, real 現況 after it"
 
 # --- same unterminated fence, but hiding a real duplicate below it --------
 # ORDER_ERR re-scans the extracted Handoff body with its own fence tracking;

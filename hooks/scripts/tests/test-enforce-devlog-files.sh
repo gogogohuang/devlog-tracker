@@ -33,8 +33,26 @@ assert_exit() {
   fi
 }
 
+# Round-current split: enforce-devlog.sh validates .round-current.md now
+# (not devlog.md), and merges it into devlog.md on success. One assertion
+# per "should succeed" case exercises that merge.
+assert_round_merged() {
+  local desc="$1"
+  if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+    echo "FAIL: $desc (.round-current.md should be merged away)"
+    FAIL=1
+  elif ! grep -q 'fixture' "$DEVLOG_DIR/devlog.md" 2>/dev/null; then
+    echo "FAIL: $desc (devlog.md missing merged content)"
+    FAIL=1
+  else
+    echo "PASS: $desc (round-current merged into devlog.md)"
+  fi
+}
+
 # write_round: $1 = workspace body, $2 = files body (both may be empty to
 # omit the section). Status is always IN_PROGRESS unless $3 overrides it.
+# Writes into .round-current.md — the file enforce-devlog.sh now validates
+# (round-start.sh already opened a skeleton there; this overwrites it).
 write_round() {
   local ws="$1" files="$2" status="${3:-IN_PROGRESS}"
   {
@@ -66,7 +84,7 @@ write_round() {
     echo ""
     echo "### Status"
     echo "$status"
-  } > "$DEVLOG_DIR/devlog.md"
+  } > "$DEVLOG_DIR/.round-current.md"
 }
 
 ws_clean() {
@@ -85,6 +103,7 @@ write_round "$(ws_clean)" "commit ${HASH}：
 新增：b.txt" "DONE"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "commit block matches diff-tree -> allowed" 0 $?
+assert_round_merged "commit block matches diff-tree"
 
 # --- committed block, wrong category -> blocked, message shows expected -----
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -103,6 +122,7 @@ write_round "$(ws_clean)" "commit 0000000：
 新增：nonexistent.txt" "DONE"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unresolvable commit hash -> fail-open, allowed" 0 $?
+assert_round_merged "unresolvable commit hash"
 
 # --- 尚未 commit, claimed path really dirty -> allowed ------------------------
 echo change >> "$TMP_ROOT/a.txt"
@@ -112,6 +132,7 @@ write_round "main @ ${HASH}
 修改：a.txt" "IN_PROGRESS"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "uncommitted claim matches actual dirty file -> allowed" 0 $?
+assert_round_merged "uncommitted claim matches actual dirty file"
 
 # --- 尚未 commit, fabricated path -> blocked ----------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -133,6 +154,7 @@ write_round "main @ ${HASH}
 修改：a.txt" "IN_PROGRESS"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unclaimed extra dirty file (residue) -> still allowed" 0 $?
+assert_round_merged "unclaimed extra dirty file (residue)"
 rm -f "$TMP_ROOT/residue.txt"
 git -C "$TMP_ROOT" checkout -q -- a.txt
 
@@ -200,6 +222,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 write_round "" "" "DONE"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "empty 檔案 section -> unaffected, allowed" 0 $?
+assert_round_merged "empty 檔案 section"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
