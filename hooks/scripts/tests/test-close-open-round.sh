@@ -36,9 +36,19 @@ assert_not_contains() {
     *) echo "PASS: $desc" ;;
   esac
 }
+assert_file_absent() {
+  local desc="$1" path="$2"
+  if [ -f "$path" ]; then
+    echo "FAIL: $desc (file still present: $path)"
+    FAIL=1
+  else
+    echo "PASS: $desc"
+  fi
+}
 
 write_skeleton() {
-  cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+  : > "$DEVLOG_DIR/devlog.md"
+  cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -52,27 +62,28 @@ EOF
   printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 }
 
-# --- 1: no .enabled -> no-op, file unchanged --------------------------------
+# --- 1: no .enabled -> no-op, .round-current.md untouched -------------------
 rm -f "$DEVLOG_DIR/.enabled"
 write_skeleton
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+BEFORE="$(cat "$DEVLOG_DIR/.round-current.md")"
 bash "$SCRIPT_DIR/close-open-round.sh" "dangling:next_prompt"
 assert_exit "no .enabled -> exit 0" 0 $?
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
+AFTER="$(cat "$DEVLOG_DIR/.round-current.md")"
 if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: no .enabled -> devlog.md unchanged"
+  echo "PASS: no .enabled -> .round-current.md unchanged"
 else
-  echo "FAIL: no .enabled should not edit devlog.md"
+  echo "FAIL: no .enabled should not edit .round-current.md"
   FAIL=1
 fi
 touch "$DEVLOG_DIR/.enabled"
 
 # --- 2: matching skeleton, never touched (not recovered) -> INTERRUPTED +
-#        "no record left" stub wording + markers gone -----------------------
+#        "no record left" stub wording, merged into devlog.md, markers gone -
 write_skeleton
 touch "$DEVLOG_DIR/.interrupted"
 bash "$SCRIPT_DIR/close-open-round.sh" "StopFailure:server_error"
 assert_exit "matching open round -> exit 0" 0 $?
+assert_file_absent "stamp: .round-current.md removed after merge" "$DEVLOG_DIR/.round-current.md"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "status INTERRUPTED" $'### Status\nINTERRUPTED' "$BODY"
 assert_contains "reason line" "StopFailure:server_error" "$BODY"
@@ -98,8 +109,9 @@ else
   echo "PASS: .round-open and .interrupted deleted"
 fi
 
-# --- 3: already has headings -> do not duplicate stubs, still stamp ---------
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# --- 3: already has headings -> do not duplicate stubs, still stamp+merge ---
+: > "$DEVLOG_DIR/devlog.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -123,6 +135,7 @@ EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 rm -f "$DEVLOG_DIR/.turn-start"
 bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
+assert_file_absent "existing-headings: .round-current.md removed after merge" "$DEVLOG_DIR/.round-current.md"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "kept existing summary" "partial" "$BODY"
 COUNT="$(printf '%s\n' "$BODY" | grep -c '^### Summary' || true)"
@@ -135,37 +148,19 @@ fi
 assert_contains "stamped interrupt" "INTERRUPTED" "$BODY"
 assert_contains "user_interrupt reason" "user_interrupt" "$BODY"
 
-# --- 4: wrong round in marker -> delete marker, do not edit -----------------
-write_skeleton
-printf '%s\n' '{"round": 99, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
-bash "$SCRIPT_DIR/close-open-round.sh" "dangling:session_start"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
-if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: mismatched round -> file unchanged"
-else
-  echo "FAIL: mismatched round edited the wrong Round"
-  FAIL=1
-fi
-assert_not_contains "mismatch must not stamp" "INTERRUPTED" "$AFTER"
-if [ -f "$DEVLOG_DIR/.round-open" ]; then
-  echo "FAIL: mismatched marker should still be deleted"
-  FAIL=1
-else
-  echo "PASS: mismatched .round-open deleted"
-fi
-
-# --- 5: no .round-open -> delete .interrupted, do not edit devlog -----------
+# --- 4: no .round-open -> delete .interrupted, do not touch either file -----
 write_skeleton
 rm -f "$DEVLOG_DIR/.round-open"
 touch "$DEVLOG_DIR/.interrupted"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+BEFORE_CUR="$(cat "$DEVLOG_DIR/.round-current.md")"
+BEFORE_MAIN="$(cat "$DEVLOG_DIR/devlog.md")"
 bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:other"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
-if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: missing .round-open -> devlog unchanged"
+AFTER_CUR="$(cat "$DEVLOG_DIR/.round-current.md")"
+AFTER_MAIN="$(cat "$DEVLOG_DIR/devlog.md")"
+if [ "$BEFORE_CUR" = "$AFTER_CUR" ] && [ "$BEFORE_MAIN" = "$AFTER_MAIN" ]; then
+  echo "PASS: missing .round-open -> nothing merged or edited"
 else
-  echo "FAIL: missing .round-open edited the file"
+  echo "FAIL: missing .round-open touched a file"
   FAIL=1
 fi
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
@@ -174,18 +169,21 @@ if [ -f "$DEVLOG_DIR/.interrupted" ]; then
 else
   echo "PASS: missing .round-open deleted .interrupted"
 fi
+rm -f "$DEVLOG_DIR/.round-current.md"
 
-# --- 5b: malformed .round-open -> delete .interrupted, do not edit ---------
+# --- 4b: malformed .round-open -> delete both markers, do not touch either --
 write_skeleton
 printf '%s\n' 'not valid json' > "$DEVLOG_DIR/.round-open"
 touch "$DEVLOG_DIR/.interrupted"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+BEFORE_CUR="$(cat "$DEVLOG_DIR/.round-current.md")"
+BEFORE_MAIN="$(cat "$DEVLOG_DIR/devlog.md")"
 bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:other"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
-if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: malformed .round-open -> devlog unchanged"
+AFTER_CUR="$(cat "$DEVLOG_DIR/.round-current.md")"
+AFTER_MAIN="$(cat "$DEVLOG_DIR/devlog.md")"
+if [ "$BEFORE_CUR" = "$AFTER_CUR" ] && [ "$BEFORE_MAIN" = "$AFTER_MAIN" ]; then
+  echo "PASS: malformed .round-open -> nothing merged or edited"
 else
-  echo "FAIL: malformed .round-open edited the file"
+  echo "FAIL: malformed .round-open touched a file"
   FAIL=1
 fi
 if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
@@ -194,8 +192,9 @@ if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
 else
   echo "PASS: malformed .round-open deleted both markers"
 fi
+rm -f "$DEVLOG_DIR/.round-current.md"
 
-# --- 6: last Round after a Checkpoint; only last Round is patched -----------
+# --- 5: prior finished history in devlog.md is preserved across the merge --
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T11:00:00+08:00
 
@@ -212,6 +211,10 @@ old
 ### Status
 DONE
 
+## Checkpoint（Round 1 摘要）
+keep me
+EOF
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 2 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -221,63 +224,24 @@ new
 
 ### Status
 IN_PROGRESS
-
-## Checkpoint（Round 1-2 摘要）
-keep me
 EOF
 printf '%s\n' '{"round": 2, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:clear"
+assert_file_absent "prior-history: .round-current.md removed after merge" "$DEVLOG_DIR/.round-current.md"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "round 1 stays DONE" $'### Status\nDONE' "$BODY"
 assert_contains "round 2 interrupted" "INTERRUPTED" "$BODY"
 assert_contains "checkpoint kept" "keep me" "$BODY"
 
-# --- 7: completed last Round + hash moved -> do not stamp -----------------
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
-## Round 1 — 2026-09-09T12:00:00+08:00
-
-### User Input
-```text
-done
-```
-
-### Summary
-finished
-
-### Reply
-fixture reply.
-
-### Handoff
-#### 現況
-finished
-
-### Status
-DONE
-EOF
-printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
-touch "$DEVLOG_DIR/.interrupted"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
-bash "$SCRIPT_DIR/close-open-round.sh" "SessionEnd:clear"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
-if [ "$BEFORE" = "$AFTER" ]; then
-  echo "PASS: recovered-complete -> devlog.md unchanged"
-else
-  echo "FAIL: recovered-complete edited a finished Round"
-  FAIL=1
-fi
-assert_not_contains "recovered-complete must not stamp" "INTERRUPTED" "$AFTER"
-assert_contains "recovered-complete keeps DONE" $'### Status\nDONE' "$AFTER"
-if [ -f "$DEVLOG_DIR/.round-open" ] || [ -f "$DEVLOG_DIR/.interrupted" ]; then
-  echo "FAIL: recovered-complete should still delete markers"
-  FAIL=1
-else
-  echo "PASS: recovered-complete deleted markers"
-fi
-
-# --- 8: headings present but hash equal -> still stamp (no recovery proof)
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# --- 6: headings present but hash equal -> still stamp (no recovery proof) --
+# (main's independent "completed last Round + hash moved -> do not stamp"
+# fixture, which asserted devlog.md stayed byte-for-byte unchanged, tested a
+# pre-merge assumption this branch deliberately changes: a recovered round
+# now always gets merged into devlog.md rather than left in place untouched.
+# That property is covered below by scenario 8 ("recovered case also
+# merges"), which asserts the merge instead of asserting no-op.)
+: > "$DEVLOG_DIR/devlog.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -299,11 +263,58 @@ partial
 IN_PROGRESS
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
+assert_file_absent "hash-equal: .round-current.md removed after merge" "$DEVLOG_DIR/.round-current.md"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "hash-equal headings still stamp" "INTERRUPTED" "$BODY"
 assert_contains "hash-equal reason" "user_interrupt" "$BODY"
+
+# --- 7: stamp-then-merge, prior round in devlog.md preserved ---------------
+STAMP_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$STAMP_DIR"
+mkdir -p "$STAMP_DIR/.devlog"
+touch "$STAMP_DIR/.devlog/.enabled"
+printf '## Round 7 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\ndo X\n```\n\n### Status\nIN_PROGRESS\n' > "$STAMP_DIR/.devlog/devlog.md"
+printf '## Round 8 — 2026-09-17T09:30:00+0800\n\n### User Input\n```text\ndo Y\n```\n\n### Status\nIN_PROGRESS\n' > "$STAMP_DIR/.devlog/.round-current.md"
+printf '{"round": 8}\n' > "$STAMP_DIR/.devlog/.round-open"
+cksum < "$STAMP_DIR/.devlog/.round-current.md" > "$STAMP_DIR/.devlog/.turn-start"
+
+bash "$SCRIPT_DIR/close-open-round.sh" "test_reason"
+
+assert_file_absent "stamp: .round-current.md removed after merge" "$STAMP_DIR/.devlog/.round-current.md"
+MAIN_AFTER="$(cat "$STAMP_DIR/.devlog/devlog.md")"
+assert_contains "stamp: round 7 (prior history) still present" "## Round 7" "$MAIN_AFTER"
+assert_contains "stamp: round 8 merged into devlog.md" "## Round 8" "$MAIN_AFTER"
+assert_contains "stamp: INTERRUPTED status merged in" "INTERRUPTED" "$MAIN_AFTER"
+assert_contains "stamp: reason tag merged in" "[reason: test_reason]" "$MAIN_AFTER"
+rm -rf "$STAMP_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+
+# --- 8: recovered case also merges (Claude finished before the signal) -----
+REC_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$REC_DIR"
+mkdir -p "$REC_DIR/.devlog"
+touch "$REC_DIR/.devlog/.enabled"
+: > "$REC_DIR/.devlog/devlog.md"
+printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\ndo X\n```\n\n### Summary\n完成了\n\n### Handoff\n#### 現況\n收尾\n\n### Status\nDONE\n' > "$REC_DIR/.devlog/.round-current.md"
+printf '{"round": 1}\n' > "$REC_DIR/.devlog/.round-open"
+echo "stale-hash-that-does-not-match" > "$REC_DIR/.devlog/.turn-start"
+
+bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt"
+
+assert_file_absent "recovered: .round-current.md removed after merge" "$REC_DIR/.devlog/.round-current.md"
+MAIN_AFTER="$(cat "$REC_DIR/.devlog/devlog.md")"
+assert_contains "recovered: finished round merged into devlog.md" "完成了" "$MAIN_AFTER"
+assert_not_contains "recovered: no INTERRUPTED stamped over real content" "INTERRUPTED" "$MAIN_AFTER"
+if [ -f "$REC_DIR/.devlog/.round-open" ]; then
+  echo "FAIL: recovered case should still delete .round-open"
+  FAIL=1
+else
+  echo "PASS: recovered case deleted .round-open"
+fi
+rm -rf "$REC_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
