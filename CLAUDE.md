@@ -2,7 +2,7 @@
 
 ## 版號規則
 
-每次有實質變更合併進 `main`（新功能、行為變更、bug fix；純文件/註解修正除外）時，都要 bump 版號，三個檔案同步改成同一個版本字串：
+每次有實質變更合併進 `main`（新功能、行為變更、bug fix；純文件/註解修正除外）時，都要 bump 版號，四個檔案同步改成同一個版本字串：
 
 - `.claude-plugin/plugin.json` → `"version"`
 - `.claude-plugin/marketplace.json` → `plugins[0].version`
@@ -21,7 +21,7 @@ chore: bump to X.Y.Z
 一句話說明這次 bump 對應的變更。
 ```
 
-改完用這段驗證三個檔案版號一致再 commit：
+改完用這段驗證四個檔案版號一致再 commit：
 
 ```bash
 python3 - <<'PY'
