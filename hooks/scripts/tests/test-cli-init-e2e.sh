@@ -11,9 +11,6 @@ command -v node >/dev/null 2>&1 || { echo "SKIP: node not installed"; exit 0; }
 PROJECT="$TMP/project"
 mkdir -p "$PROJECT"
 
-node "$REPO_ROOT/bin/devlog-tracker.js" init --codex --cursor >/dev/null 2>"$TMP/stderr" <<< "" \
-  || { echo "FAIL: init exited non-zero"; cat "$TMP/stderr"; FAIL=1; }
-
 cd "$PROJECT" || exit 1
 NODE_BIN="$(command -v node)"
 "$NODE_BIN" "$REPO_ROOT/bin/devlog-tracker.js" init --codex --cursor >/dev/null 2>"$TMP/stderr" \
