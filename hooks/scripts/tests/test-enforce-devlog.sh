@@ -484,7 +484,7 @@ esac
 # so a later turn (or round-start.sh's rescue-merge) can still recover it.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/.round-current.md"
-OUT5="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 RC5=$?
 assert_exit "no ## Round line at all -> fail-open, allowed" 0 "$RC5"
 assert_contains "no ## Round line at all: .round-current.md left untouched" "just a note, not a round" "$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || true)"
@@ -882,7 +882,7 @@ printf '{"round": 1}\n' > "$RECOVER_DIR/.devlog/.round-open"
 echo "stale" > "$RECOVER_DIR/.devlog/.turn-start"
 touch "$RECOVER_DIR/.devlog/.interrupted"
 
-OUT="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 RC=$?
 assert_exit "recovered-through-stop: exits 0" 0 "$RC"
 assert_file_absent "recovered-through-stop: .round-current.md merged away" "$RECOVER_DIR/.devlog/.round-current.md"

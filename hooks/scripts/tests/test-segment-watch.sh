@@ -157,7 +157,7 @@ OLD_EPOCH=$((NOW_EPOCH - 1000))
 printf '{"last_change_epoch": %s, "last_seen_cksum": "stale", "max_silent_seconds": 600}\n' "$OLD_EPOCH" > "$ALLOW_DIR/.devlog/.segment-state"
 
 INPUT='{"tool_name":"Edit","tool_input":{"file_path":".devlog/.round-current.md"}}'
-OUT="$(echo "$INPUT" | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1)"
+echo "$INPUT" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 RC=$?
 assert_exit "allowlist: Edit on .round-current.md passes through" 0 "$RC"
 rm -rf "$ALLOW_DIR"
