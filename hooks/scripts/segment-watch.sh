@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse hook：同一輪若太久沒改 devlog.md，擋住下一個工具，逼補 ### 段落。
+# PreToolUse hook：同一輪若太久沒改 .round-current.md，擋住下一個工具，逼補 ### 段落。
 # fail-open：這支腳本自己出錯一律 exit 0，不該卡死使用者的 session。
 
 set -uo pipefail

@@ -152,10 +152,23 @@ normal success path instead. This recovered-complete rule is implemented
 inside `close-open-round.sh`, so SessionEnd, next prompt, and SessionStart
 share it. Fail-open if stdin cannot be parsed.
 
+### `.devlog/.round-current.md`
+
+Holds the round that is currently open — skeleton, segments, and the
+closing Summary/Handoff/Status — separately from `devlog.md`'s
+append-only history (see `docs/design/round-current-split.md` for the
+full rationale and the two merge points). While a round is open, this
+is what Claude Reads/Edits, and what `round-start.sh`, `segment-watch.sh`,
+and `enforce-devlog.sh` hash/validate against, not `devlog.md`. Merged
+into `devlog.md`'s tail (and then deleted) once the round closes, either
+by a successful Stop or by `close-open-round.sh` stamping/recovering it —
+never left populated in both files at once.
+
 ### `.devlog/.turn-start`
 
-Unchanged role: `cksum` of `devlog.md` at the start of the *Claude*
-portion of the turn. Written **after** the skeleton append (or
+Updated role (post round-current split): `cksum` of
+`.devlog/.round-current.md` — not `devlog.md` — at the start of the
+*Claude* portion of the turn. Written **after** the skeleton append (or
 unchanged when a span tick writes no skeleton).
 
 ## Hook behavior

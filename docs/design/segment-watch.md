@@ -1,9 +1,17 @@
 # Segment Watch (mid-round silence valve)
 
+**Superseded for the tracked-file question:** since
+`docs/design/round-current-split.md` landed, Segment Watch tracks and
+matches against `.devlog/.round-current.md`, not `.devlog/devlog.md`.
+This document's mechanics (silence detection, thresholds, allowlist
+logic) are otherwise still accurate; read `round-current-split.md` first
+for which file is actually hashed/read/matched, then treat every
+`devlog.md` mention below as `.round-current.md` unless noted.
+
 Round Segments stay a judgment call: Claude writes a `### 段落` when a
 meaningful stage result exists, not on a timer. Segment Watch is a
 safety valve for the remaining case — a single round that runs a long
-time with **no** `devlog.md` change. After 10 minutes of silence
+time with **no** `.round-current.md` change. After 10 minutes of silence
 (default; adjustable, see below) it blocks the next tool (`PreToolUse`,
 exit 2) until Claude appends something, even one line.
 
@@ -20,7 +28,7 @@ write until the turn ends.
 
 Claude Code has no background timer during a turn. The valve can only
 run when a tool is about to fire, and compare wall-clock time against
-the last time `devlog.md`'s content hash changed.
+the last time `.devlog/.round-current.md`'s content hash changed.
 
 ## Design constraint
 
@@ -31,14 +39,14 @@ the last time `devlog.md`'s content hash changed.
 - **Fail-open.** Same as every other hook in this plugin: missing
   files, unreadable JSON, non-numeric fields, or a failed `cksum` /
   `date` mean exit 0.
-- **Do not author `devlog.md` from a hook.** Claude writes; the hook
-  only checks.
+- **Do not author `.round-current.md` from a hook.** Claude writes; the
+  hook only checks.
   Exception (see `docs/design/recording-moments.md`): `UserPromptSubmit` writes the
   Round skeleton, and interrupt helpers patch Status to `INTERRUPTED`. Segment Watch
   itself still only checks.
 - **Allow the write that satisfies the block.** If the upcoming tool
-  is Write or Edit targeting this project's `.devlog/devlog.md`, pass
-  even when the timer has expired — otherwise Claude cannot unblock
+  is Write or Edit targeting this project's `.devlog/.round-current.md`,
+  pass even when the timer has expired — otherwise Claude cannot unblock
   itself.
 
 ## Mechanism
@@ -59,8 +67,8 @@ still edit `max_silent_seconds` directly in a pinch, same as
 
 | Field | Meaning |
 |---|---|
-| `last_change_epoch` | Unix seconds. `round-start.sh` sets this to now at the start of every round. `segment-watch.sh` sets it to now whenever `devlog.md`'s cksum differs from `last_seen_cksum`. |
-| `last_seen_cksum` | Last observed `cksum` of `devlog.md` (or `MISSING` if the file is absent). Used only to detect a change; not a second copy of `.turn-start`. |
+| `last_change_epoch` | Unix seconds. `round-start.sh` sets this to now at the start of every round. `segment-watch.sh` sets it to now whenever `.round-current.md`'s cksum differs from `last_seen_cksum`. |
+| `last_seen_cksum` | Last observed `cksum` of `.round-current.md` (or `MISSING` if the file is absent). Used only to detect a change; not a second copy of `.turn-start`. |
 | `last_seen_mtime` / `last_seen_size` | Optional cheap identity. When both match the live file, PreToolUse may skip re-running `cksum` and reuse `last_seen_cksum`. Missing keys fall through to a full `cksum`. |
 | `max_silent_seconds` | Default `600` (10 minutes). No enforced range. |
 
@@ -116,27 +124,29 @@ watch" at every read site.
 - **`round-start.sh`** (`UserPromptSubmit`): existing behavior
   unchanged, plus: if `.enabled` exists and `.segment-state` is
   well-formed, set `last_change_epoch` to now and `last_seen_cksum` to
-  the current `devlog.md` cksum (or `MISSING`). Do not rewrite
+  the current `.round-current.md` cksum (or `MISSING`). Do not rewrite
   `max_silent_seconds`.
 - **`segment-watch.sh`** (`PreToolUse`): after the `.enabled` switch
   check, if `.segment-state` is well-formed:
   1. If PreToolUse `session_id` is non-empty and differs from the stored
      id, exit 0. If PreToolUse has a non-empty `agent_id` (Claude Code
      subagent / dynamic workflow), exit 0.
-  2. Resolve the current `devlog.md` content identity: if on-disk
-     mtime+size match `last_seen_mtime` / `last_seen_size` and
+  2. Resolve the current `.round-current.md` content identity: if
+     on-disk mtime+size match `last_seen_mtime` / `last_seen_size` and
      `last_seen_cksum` is present, reuse that cksum (skip re-hash).
      Otherwise compute `cksum`. If it differs from `last_seen_cksum`,
      persist the new cksum, identity fields, and `last_change_epoch =
      now`, then exit 0.
   3. If the incoming tool is `Write`, `Edit`, `StrReplace`, `Read`, or
      `Grep`, and `tool_input.file_path` (or `tool_input.path` for Grep)
-     is exactly `.devlog/devlog.md` or ends with `/.devlog/devlog.md`,
-     exit 0. No `realpath`; string suffix only.
+     is exactly `.devlog/.round-current.md` or ends with
+     `/.devlog/.round-current.md`, exit 0. No `realpath`; string suffix
+     only.
   4. If `now - last_change_epoch >= max_silent_seconds`, print a
-     stderr message telling Claude to Read `.devlog/devlog.md` then
-     Edit/StrReplace-append a `### 段落` (not full-file Write overwrite),
-     then exit 2.
+     stderr message telling Claude to Read `.devlog/.round-current.md`
+     then Edit/StrReplace-append a `### 段落` (not full-file Write
+     overwrite), then exit 2. Both halves of the message (the diagnostic
+     and the instruction) name `.devlog/.round-current.md`.
   5. Otherwise exit 0.
 
 Stdin is the standard Claude Code PreToolUse payload
@@ -173,22 +183,22 @@ to open or close a watch.
 
 ## Known Limitations
 
-- **PreToolUse may skip `cksum`** when `devlog.md` mtime+size match
-  `last_seen_mtime` / `last_seen_size`. Content changes that preserve
-  both (rare) would not reset the timer until identity drifts.
+- **PreToolUse may skip `cksum`** when `.round-current.md` mtime+size
+  match `last_seen_mtime` / `last_seen_size`. Content changes that
+  preserve both (rare) would not reset the timer until identity drifts.
 - **No background alarm.** If Claude thinks for 10 minutes without
   calling a tool, the valve does not fire.
-- **Bash (and other tools) that rewrite `devlog.md` are not
+- **Bash (and other tools) that rewrite `.round-current.md` are not
   allowlisted.** Only Write/Edit on that path pass while expired.
   After such a Bash write, the next PreToolUse would see a hash
   change and reset the timer — but the Bash call itself would still
   be blocked if already expired. Considered acceptable: SKILL.md
-  already tells Claude to use Write/Edit for `devlog.md`.
+  already tells Claude to use Write/Edit for `.round-current.md`.
 - **Any hash change resets the timer.** Same trust level as the Stop
   hook: presence of a write, not quality of a `### 段落`.
 - **Subagents / other cwd.** The script uses `CLAUDE_PROJECT_DIR`.
   If a tool's `file_path` is a different spelling of the same file
-  that does not suffix-match `.devlog/devlog.md`, it is not
+  that does not suffix-match `.devlog/.round-current.md`, it is not
   allowlisted.
 - **Subagent session isolation.** The valve skips a PreToolUse call when
   its non-empty `session_id` differs from the id stored at
@@ -200,9 +210,9 @@ to open or close a watch.
   (subagents must not append parent-round `### 段落` under this valve).
   Main-thread calls omit `agent_id` and still hit the valve.
 - **Unblock without wiping.** Expired main-thread may Read/Grep
-  `.devlog/devlog.md`, then Edit/StrReplace to append. Full-file Write
-  overwrite remains technically allowlisted for legacy paths but SKILL
-  and stderr forbid it — prefer append.
+  `.devlog/.round-current.md`, then Edit/StrReplace to append. Full-file
+  Write overwrite remains technically allowlisted for legacy paths but
+  SKILL and stderr forbid it — prefer append.
 - **Read-only git inspection stays open while blocked (2026-09-11).** Both
   this valve and the workspace-mismatch valve (`docs/design/continue.md`)
   deny `Bash` by default, which used to leave no way to run `git
