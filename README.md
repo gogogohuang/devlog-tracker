@@ -72,7 +72,7 @@ bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
 | `/devlog-tracker:keep` | 掃全檔分主題，一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
 | `/devlog-tracker:resume <name>` | 讀具名保存檔的最後一輪與 Handoff，核對「工作區」後提出接續；新工作仍寫回主 `devlog.md`。 |
 | `/devlog-tracker:clean` | 無條件清空 `devlog.md`（含專案摘要與所有 Round 歷史），不搬移、不備份、不可復原；執行前一定會先問，要明確回覆「清空」才動手。只留目前開著的那一輪，重編成 `## Round 1`。 |
-| `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch 與最後一輪 Status。 |
+| `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch、Lessons Mode 工作區漂移計數與最後一輪 Status。 |
 | `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode（不要手寫 `.span-open` JSON）。 |
 | `/devlog-tracker:segment-watch <時間長度>` | 調整 Segment Watch 的沉默門檻（預設 10 分鐘）。專案還沒 `/devlog-tracker:start` 時回報 `NOT_STARTED`，不會建立任何檔案。 |
 | `/devlog-tracker:checkpoint <輪數>` | 調整 Checkpoint Mode 的沉默門檻（預設 20 輪）。專案還沒 start 時回報 `NOT_STARTED`。 |

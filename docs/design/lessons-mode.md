@@ -15,7 +15,7 @@ the *system being developed*.
 |---|---|---|---|
 | Manages | quiet ticks during automated continuation | periodic cross-round progress digest | cross-time process pitfalls, opt-in |
 | Default | off (opened per task) | on once `.enabled` is set | **off**, separate opt-in even after `.enabled` |
-| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved, or a self-judged detour |
+| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved, or a self-judged detour, or cumulative workspace-drift mismatches (mechanical, see below) |
 | Enforced by hook? | yes (tick budget) | yes (round budget) | **no** — fully Claude's discretion |
 | Storage | `devlog.md` inline | `devlog.md` inline (`## Checkpoint`) | separate per-topic files |
 
@@ -39,8 +39,10 @@ the *system being developed*.
 
 ## When Claude should consider writing a lessons entry
 
-Only while `.lessons-enabled` exists. Two trigger signals, both **advisory
-— never hook-enforced**:
+Only while `.lessons-enabled` exists. Three trigger signals: two advisory
+(both below), plus one mechanical (see 「機制性訊號：工作區漂移重複發生」further
+down) — the mechanical one is hook-counted and print-only, not Claude's own
+judgment.
 
 1. **`BLOCKED` → resolved.** The previous historical Round's `### Status`
    was `BLOCKED` and this Round's `### Status` is not. This is the one
