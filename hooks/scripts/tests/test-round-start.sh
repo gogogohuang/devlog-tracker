@@ -705,6 +705,33 @@ assert_contains "mismatch stdout has live snapshot" "$LIVE" "$OUT"
 MARKER="$(cat "$WS/.devlog/.workspace-mismatch")"
 [ "$MARKER" = "$LIVE" ] && echo "PASS: marker is live snapshot" || { echo "FAIL: marker [$MARKER]"; FAIL=1; }
 
+# --- lessons drift counter: mechanical nudge on repeated mismatch --------
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch"
+touch "$WS/.devlog/.lessons-enabled"
+printf '%s\n' '{"mismatch_count": 0, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "drift count 1/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 1' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 1" || { echo "FAIL: drift count not 1"; FAIL=1; }
+
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "drift count 2/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 2" || { echo "FAIL: drift count not 2"; FAIL=1; }
+
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "drift count hits threshold: prints nudge" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 0' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count reset after nudge" || { echo "FAIL: drift count not reset"; FAIL=1; }
+
+# without .lessons-enabled: no counting, no nudge, state file untouched
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled"
+printf '%s\n' '{"mismatch_count": 2, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "lessons off: no nudge even near threshold" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count untouched when lessons off" || { echo "FAIL: drift count changed when lessons off"; FAIL=1; }
+rm -f "$WS/.devlog/.lessons-drift-state" "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 

@@ -33,6 +33,7 @@ CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
 AWAITING_FILE="$DEVLOG_DIR/.awaiting-reply"
+DRIFT_FILE="$DEVLOG_DIR/.lessons-drift-state"
 
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
@@ -130,6 +131,20 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
       printf '%s\n' "$LIVE_WS" > "$MISMATCH_FILE" 2>/dev/null || true
       printf '%s\n' "上一輪 Handoff「#### 工作區」跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
       printf '\n宣稱：\n%s\n\n實際：\n%s\n' "$CLAIMED_WS" "$LIVE_WS"
+
+      if [ -f "$DEVLOG_DIR/.lessons-enabled" ] && [ -f "$DRIFT_FILE" ]; then
+        DRIFT_COUNT="$(json_int_get "$DRIFT_FILE" mismatch_count)"
+        DRIFT_MAX="$(json_int_get "$DRIFT_FILE" threshold)"
+        case "$DRIFT_COUNT" in ''|*[!0-9]*) DRIFT_COUNT=0 ;; esac
+        case "$DRIFT_MAX" in ''|*[!0-9]*) DRIFT_MAX=3 ;; esac
+        NEW_DRIFT_COUNT=$((DRIFT_COUNT + 1))
+        if [ "$NEW_DRIFT_COUNT" -ge "$DRIFT_MAX" ]; then
+          json_int_set "$DRIFT_FILE" mismatch_count 0
+          printf '\n[Lessons Mode 提示] 工作區宣稱與實際不符已累積出現 %s 次（門檻 %s）。可考慮用 lessons-append.sh 記一筆流程教訓，非強制。\n' "$NEW_DRIFT_COUNT" "$DRIFT_MAX"
+        else
+          json_int_set "$DRIFT_FILE" mismatch_count "$NEW_DRIFT_COUNT"
+        fi
+      fi
     fi
   fi
 fi
