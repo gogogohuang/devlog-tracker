@@ -705,6 +705,68 @@ assert_contains "mismatch stdout has live snapshot" "$LIVE" "$OUT"
 MARKER="$(cat "$WS/.devlog/.workspace-mismatch")"
 [ "$MARKER" = "$LIVE" ] && echo "PASS: marker is live snapshot" || { echo "FAIL: marker [$MARKER]"; FAIL=1; }
 
+# --- lessons drift counter: mechanical nudge on repeated mismatch --------
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch"
+touch "$WS/.devlog/.lessons-enabled"
+printf '%s\n' '{"mismatch_count": 0, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "drift count 1/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 1' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 1" || { echo "FAIL: drift count not 1"; FAIL=1; }
+
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "drift count 2/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 2" || { echo "FAIL: drift count not 2"; FAIL=1; }
+
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "drift count hits threshold: prints nudge" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 0' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count reset after nudge" || { echo "FAIL: drift count not reset"; FAIL=1; }
+
+# without .lessons-enabled: no counting, no nudge, state file untouched
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled"
+printf '%s\n' '{"mismatch_count": 2, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "lessons off: no nudge even near threshold" "[Lessons Mode 提示]" "$OUT"
+grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count untouched when lessons off" || { echo "FAIL: drift count changed when lessons off"; FAIL=1; }
+rm -f "$WS/.devlog/.lessons-drift-state" "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+
+# --- lessons drift counter: upgrade path — .lessons-enabled exists (from
+# before this branch) but .lessons-drift-state was never created. round-start.sh
+# must create it with defaults and still act on this same invocation's
+# mismatch, not require a second message ------------------------------------
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch" "$WS/.devlog/.lessons-drift-state"
+touch "$WS/.devlog/.lessons-enabled"
+cat > "$WS/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+going
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+[ -f "$WS/.devlog/.lessons-drift-state" ] && echo "PASS: upgrade path creates .lessons-drift-state on first drift" || { echo "FAIL: .lessons-drift-state not created for pre-existing lessons-enabled"; FAIL=1; }
+grep -q '"mismatch_count": 1' "$WS/.devlog/.lessons-drift-state" 2>/dev/null && echo "PASS: newly-created state already counted this invocation's mismatch (1)" || { echo "FAIL: mismatch_count not 1 in newly-created state"; FAIL=1; }
+grep -q '"threshold": 3' "$WS/.devlog/.lessons-drift-state" 2>/dev/null && echo "PASS: newly-created state has default threshold 3" || { echo "FAIL: threshold not 3 in newly-created state"; FAIL=1; }
+assert_not_contains "upgrade path: no nudge yet on first-ever drift (1 < 3)" "[Lessons Mode 提示]" "$OUT"
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled" "$WS/.devlog/.lessons-drift-state"
+
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 

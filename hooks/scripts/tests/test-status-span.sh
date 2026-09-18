@@ -30,6 +30,11 @@ OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
 case "$OUT" in *"LESSONS=yes"*) pass "lessons on when flag present" ;; *) fail "lessons on when flag present [$OUT]" ;; esac
 rm -f "$TMP/.devlog/.lessons-enabled"
 
+printf '%s\n' '{"mismatch_count": 1, "threshold": 3}' > "$TMP/.devlog/.lessons-drift-state"
+OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
+case "$OUT" in *"LESSONS_DRIFT=1/3"*) pass "lessons drift status line" ;; *) fail "lessons drift status line [$OUT]" ;; esac
+rm -f "$TMP/.devlog/.lessons-drift-state"
+
 OUT="$(bash "$SCRIPT_DIR/span-open.sh")"
 [ "$OUT" = "OPENED=1" ] && pass "span opened" || fail "span open [$OUT]"
 grep -q '"round": 1' "$TMP/.devlog/.span-open" && pass "round stored" || fail "round stored"

@@ -13,5 +13,9 @@ fi
 if [ ! -f "$DEVLOG_DIR/.lessons-enabled" ]; then
   date -Iseconds > "$DEVLOG_DIR/.lessons-enabled" 2>/dev/null || echo enabled > "$DEVLOG_DIR/.lessons-enabled"
 fi
+if [ ! -f "$DEVLOG_DIR/.lessons-drift-state" ]; then
+  printf '%s\n' '{"mismatch_count": 0, "threshold": 3}' \
+    > "$DEVLOG_DIR/.lessons-drift-state" 2>/dev/null || true
+fi
 echo "LESSONS_ENABLED=$DEVLOG_DIR/.lessons-enabled"
 exit 0

@@ -15,7 +15,7 @@ the *system being developed*.
 |---|---|---|---|
 | Manages | quiet ticks during automated continuation | periodic cross-round progress digest | cross-time process pitfalls, opt-in |
 | Default | off (opened per task) | on once `.enabled` is set | **off**, separate opt-in even after `.enabled` |
-| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved, or a self-judged detour |
+| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved, or a self-judged detour, or cumulative workspace-drift mismatches (mechanical, see below) |
 | Enforced by hook? | yes (tick budget) | yes (round budget) | **no** — fully Claude's discretion |
 | Storage | `devlog.md` inline | `devlog.md` inline (`## Checkpoint`) | separate per-topic files |
 
@@ -39,8 +39,10 @@ the *system being developed*.
 
 ## When Claude should consider writing a lessons entry
 
-Only while `.lessons-enabled` exists. Two trigger signals, both **advisory
-— never hook-enforced**:
+Only while `.lessons-enabled` exists. Three trigger signals: two advisory
+(both below), plus one mechanical (see 「機制性訊號：工作區漂移重複發生」further
+down) — the mechanical one is hook-counted and print-only, not Claude's own
+judgment.
 
 1. **`BLOCKED` → resolved.** The previous historical Round's `### Status`
    was `BLOCKED` and this Round's `### Status` is not. This is the one
@@ -55,6 +57,35 @@ Only while `.lessons-enabled` exists. Two trigger signals, both **advisory
 Writing an entry is **never required** to close a Round (unlike
 `#### 工作區`/`#### 檔案`, which are machine-verified when applicable).
 Skipping it is not an error and produces no warning.
+
+## 機制性訊號：工作區漂移重複發生（顧問式，非強制）
+
+第三種考慮寫一筆的訊號，跟上面兩種不同：不是 Claude 自我判斷，而是 hook 用既有的機器
+訊號累積計數、達門檻才印一句**建議**——依然不強制寫、不阻擋任何工具。
+
+- **訊號來源**：`round-start.sh` 既有的工作區漂移偵測（`docs/design/continue.md`
+  「同輪工作區漂移偵測」）。每次偵測到上一輪 Handoff 的「工作區」跟目前 git 狀態不符
+  （跟產生 `.workspace-mismatch` 同一時機），只要 `.lessons-enabled` 存在，就把
+  `.devlog/.lessons-drift-state` 的 `mismatch_count` 累加 1。
+- **門檻**：`.lessons-drift-state` 的 `threshold` 欄位，預設 3，可用
+  `/devlog-tracker:lessons-drift <次數>` 調整（跟 `checkpoint`/`segment-watch` 同款
+  指令，隸屬 Lessons Mode：沒開會回報 `LESSONS_NOT_ENABLED`）。
+- **達門檻時**：`round-start.sh` 在既有的 mismatch 提示之後多印一行建議（「工作區宣稱
+  與實際不符已累積出現 N 次，可考慮用 lessons-append.sh 記一筆流程教訓，非強制」），
+  並把 `mismatch_count` 重置為 0——Claude 仍可略過不寫，這一輪的收尾完全不受影響。
+- **累積而非連續**：計數不要求連續發生（不像 Checkpoint Mode 的沉默輪數），任何時間點
+  的 mismatch 都算一次；`.lessons-drift-state` 跨 Round 持續存在，只有達門檻印完那次才
+  歸零。
+- **只在 Lessons Mode 開著時計數**：`.lessons-enabled` 不存在時，`round-start.sh`
+  完全不碰 `.lessons-drift-state`——沒開 Lessons Mode 就沒有任何額外開銷或提示。
+- **狀態檔建立時機**：`/devlog-tracker:lessons-on` 每次執行時，若
+  `.lessons-drift-state` 不存在就建立（`{"mismatch_count": 0, "threshold": 3}`）——
+  涵蓋「剛開 Lessons Mode」跟「舊專案升級到這個版本」兩種情況。
+  `/devlog-tracker:lessons-off` 不動這個檔案，維持既有的非破壞性原則。
+- **`/devlog-tracker:status`** 會多印一行 `LESSONS_DRIFT=<count>/<threshold>`。
+
+這條訊號的存在**修訂了下面 Non-goals 原本「不做計數式提醒」的決定**——差異與理由見該
+條目。
 
 ## Storage: per-topic files, mirroring `keep`
 
@@ -196,8 +227,16 @@ If a topic file does grow large in practice, revisit then — not now.
 - Fixed subsections within an entry (no `問題`/`原因`/`解法` template) —
   free prose only.
 - A user-tunable "how many silent Rounds before nudging a lessons entry"
-  counter — unlike Checkpoint Mode, there is no silent-count nudge here
-  at all; writing is opt-in per Round, not periodically demanded.
+  counter — unlike Checkpoint Mode, there is no silent-count nudge here at
+  all; writing is opt-in per Round, not periodically demanded.
+  **Revised** (see 「機制性訊號：工作區漂移重複發生」above): this bullet
+  excluded a *round-silence* counter specifically, mirroring Checkpoint
+  Mode's shape. It did not anticipate a differently-shaped signal —
+  cumulative 工作區-mismatch occurrences — which already has an
+  unambiguous, existing machine signal (`.workspace-mismatch`,
+  `docs/design/continue.md`) that round-silence never had. A count-based
+  *advisory print only* is added for that one case; round-silence counting
+  and self-judged detours are otherwise unchanged by this revision.
 
 ## Files
 
@@ -211,6 +250,11 @@ If a topic file does grow large in practice, revisit then — not now.
 | `hooks/scripts/session-start-devlog.sh` | Track `last_lessons` alongside `last_kept`; surface `## Lessons 索引` in the excerpt |
 | `skills/devlog-tracker/SKILL.md` | New section: what Lessons Mode is, the two trigger signals, that it is opt-in and never hook-enforced |
 | `docs/design/lessons-mode.md` | This spec |
+| `commands/lessons-drift.md` | `/devlog-tracker:lessons-drift <次數>`: adjust the drift-nudge threshold |
+| `hooks/scripts/lessons-drift-set.sh` | Sets `.lessons-drift-state`'s `threshold`, mirroring `checkpoint-set.sh` |
+| `hooks/scripts/round-start.sh` | Also increments/reads `.lessons-drift-state` inside the existing mismatch block |
+| `hooks/scripts/lessons-on.sh` | Also creates `.lessons-drift-state` with defaults if missing |
+| `hooks/scripts/status-devlog.sh` | Also prints `LESSONS_DRIFT=<count>/<threshold>` |
 
 No `hooks/hooks.json` changes beyond what `session-start-devlog.sh` already
 does — `lessons-append.sh` is Claude-invoked only, same as `keep-move.sh`.

@@ -11,6 +11,11 @@ devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
 
 [ -f "$DEVLOG_DIR/.enabled" ] && echo "ENABLED=yes" || echo "ENABLED=no"
 [ -f "$DEVLOG_DIR/.lessons-enabled" ] && echo "LESSONS=yes" || echo "LESSONS=no"
+if [ -f "$DEVLOG_DIR/.lessons-drift-state" ]; then
+  drift_count="$(json_int_get "$DEVLOG_DIR/.lessons-drift-state" mismatch_count)"
+  drift_max="$(json_int_get "$DEVLOG_DIR/.lessons-drift-state" threshold)"
+  printf 'LESSONS_DRIFT=%s/%s\n' "${drift_count:-0}" "${drift_max:-3}"
+fi
 if [ -f "$DEVLOG_DIR/.span-open" ]; then
   r="$(json_int_get "$DEVLOG_DIR/.span-open" round)"
   opened="$(json_str_get "$DEVLOG_DIR/.span-open" opened_at)"
