@@ -25,7 +25,70 @@ assert_exit() {
   fi
 }
 
+assert_file_absent() {
+  local desc="$1" path="$2"
+  if [ ! -e "$path" ]; then
+    echo "PASS: $desc"
+  else
+    echo "FAIL: $desc (expected absent: $path)"
+    FAIL=1
+  fi
+}
+
+assert_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "PASS: $desc" ;;
+    *) echo "FAIL: $desc (expected to contain '$needle')"; FAIL=1 ;;
+  esac
+}
+
+assert_not_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "FAIL: $desc (expected NOT to contain '$needle')"; FAIL=1 ;;
+    *) echo "PASS: $desc" ;;
+  esac
+}
+
+# Round-current split: enforce-devlog.sh validates .round-current.md now
+# (not devlog.md), and merges it into devlog.md on success. One assertion
+# per "should succeed" case exercises that merge.
+assert_round_merged() {
+  local desc="$1" marker="${2:-fixture}"
+  assert_file_absent "$desc: .round-current.md merged away" "$DEVLOG_DIR/.round-current.md"
+  assert_contains "$desc: content landed in devlog.md" "$marker" "$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || true)"
+}
+
+# Completes "the round being validated this Stop call": overwrites the
+# skeleton round-start.sh just opened in .round-current.md with a full
+# Summary/Handoff/Status(DONE) round body (same header shape devlog.md
+# rounds use — devlog_merge_round_current appends this verbatim on success).
 append_minimal_round() {
+  local n="$1" ts="$2"
+  cat > "$DEVLOG_DIR/.round-current.md" <<EOF
+## Round ${n} — ${ts}
+
+### Summary
+fixture
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+fixture
+
+### Status
+DONE
+EOF
+}
+
+# Seeds *prior, already-closed* history directly into devlog.md — content
+# that is NOT "the round being validated" by an immediately-following
+# enforce-devlog.sh call (enforce-devlog.sh only ever reads .round-current.md
+# for content validation now).
+seed_history_round() {
   local n="$1" ts="$2"
   cat >> "$DEVLOG_DIR/devlog.md" <<EOF
 ## Round ${n} — ${ts}
@@ -57,6 +120,7 @@ assert_exit "no write during round -> blocked" 2 $?
 append_minimal_round 1 "2026-09-08T00:00:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "devlog written this round (same-second race) -> allowed" 0 $?
+assert_round_merged "devlog written this round (same-second race)"
 
 # --- Scenario 3: next round starts, devlog NOT touched again -> must block
 # again, proving the marker was correctly refreshed and isn't just "always
@@ -136,6 +200,7 @@ esac
 append_minimal_round 2 "2026-09-08T00:10:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "span open, ticks at max, write happens -> allowed" 0 $?
+assert_round_merged "span open, ticks at max, write happens"
 SPAN_TICKS_RESET="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
 if [ "$SPAN_TICKS_RESET" = "0" ]; then
   echo "PASS: ticks_since_checkin reset to 0 after a successful write"
@@ -162,6 +227,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 append_minimal_round 3 "2026-09-08T00:20:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "checkpoint below threshold, round written -> allowed" 0 $?
+assert_round_merged "checkpoint below threshold, round written"
 CP_ROUNDS_AFTER="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
 if [ "$CP_ROUNDS_AFTER" = "1" ]; then
   echo "PASS: round-start.sh incremented rounds_since_checkpoint to 1"
@@ -224,6 +290,7 @@ assert_exit "malformed .checkpoint-state, no write this round -> blocked by norm
 append_minimal_round 5 "2026-09-08T00:35:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "malformed .checkpoint-state, round written -> allowed (checkpoint check skipped)" 0 $?
+assert_round_merged "malformed .checkpoint-state, round written"
 
 # --- Checkpoint Mode Scenario 6: stored count higher than live count ------
 # (simulating post-archival/manual-edit decrease). Proves the resync guard
@@ -237,7 +304,7 @@ cat > "$DEVLOG_DIR/.checkpoint-state" <<'CPEOF'
 {"rounds_since_checkpoint": 3, "max_silent_rounds": 20, "checkpoint_marker_count": 1}
 CPEOF
 : > "$DEVLOG_DIR/devlog.md"
-append_minimal_round 1 "2026-09-09T00:00:00+08:00"
+seed_history_round 1 "2026-09-09T00:00:00+08:00"
 # devlog.md now has 0 "## Checkpoint" headings, but checkpoint_marker_count
 # says 1 (stale, from before an archival/manual edit removed it): live (0) <
 # stored (1) -- the decrease case.
@@ -252,6 +319,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 append_minimal_round 2 "2026-09-09T00:05:00+08:00"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "decrease observed on an ordinary (non-checkpoint) write -> allowed (below round threshold)" 0 $?
+assert_round_merged "decrease observed on an ordinary (non-checkpoint) write"
 CP_ROUNDS_MID="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
 CP_MARKER_MID="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
 if [ "$CP_ROUNDS_MID" = "4" ] && [ "$CP_MARKER_MID" = "0" ]; then
@@ -266,9 +334,13 @@ fi
 # fire and reset/persist both counters together, proving a real checkpoint
 # write is never blocked or wedged after a resync.
 # round-start.sh opens a skeleton Round first; complete it (Summary+Handoff)
-# before the Checkpoint so the last Round is not left incomplete.
+# before the Checkpoint so the last Round is not left incomplete. Both the
+# completion and the Checkpoint heading are written into .round-current.md —
+# this is the flow Step 9's merge-before-checkpoint-check exists for: a
+# "## Checkpoint" written as part of finishing this round is already inside
+# devlog.md (merged) by the time the checkpoint-marker count below runs.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat >> "$DEVLOG_DIR/.round-current.md" <<'EOF'
 
 ### Summary
 fixture
@@ -282,10 +354,12 @@ fixture
 
 ### Status
 DONE
+
+## Checkpoint（Round 2 摘要）
 EOF
-echo "## Checkpoint（Round 2 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "genuine checkpoint write above the corrected stored value -> allowed" 0 $?
+assert_round_merged "genuine checkpoint write above the corrected stored value" "## Checkpoint（Round 2 摘要）"
 CP_ROUNDS_FINAL="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
 CP_MARKER_FINAL="$(grep -o '"checkpoint_marker_count"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
 if [ "$CP_ROUNDS_FINAL" = "0" ] && [ "$CP_MARKER_FINAL" = "1" ]; then
@@ -341,7 +415,7 @@ esac
 
 # --- Heading Scenario 2: Round written without ### Summary -> blocked -----
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 2 — 2026-09-09T10:05:00+08:00
 
 ### Handoff
@@ -356,7 +430,7 @@ assert_exit "last Round missing ### Summary -> blocked" 2 $?
 
 # --- Heading Scenario 3: Round written without ### Handoff -> blocked -----
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 3 — 2026-09-09T10:10:00+08:00
 
 ### Summary
@@ -381,7 +455,7 @@ esac
 
 # --- Heading Scenario 4: both headings present, empty bodies -> allowed ---
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 4 — 2026-09-09T10:15:00+08:00
 
 ### Summary
@@ -398,33 +472,69 @@ case "$EMPTY_MSG" in
   *) echo "FAIL: empty-body stderr, got: $EMPTY_MSG"; FAIL=1 ;;
 esac
 
-# --- Heading Scenario 5: hash changed, no ## Round heading -> fail-open ---
+# --- Heading Scenario 5: hash changed, content has no "## Round " at all --
+# Fixed on review: enforce-devlog.sh must still fail-open (exit 0) when
+# .round-current.md's content contains zero "## Round " lines anywhere —
+# matching the pre-split last_round_block()'s `if (start == 0) exit 0`
+# behavior, and the plan's Global Constraints ("解析不到任何 `## Round`：
+# fail-open（不擋）"). Fixed again on the final whole-branch review: this
+# content must NOT be merged into devlog.md — there is nothing round-shaped
+# here, and merging would silently commit unstructured noise into the
+# permanent historical record. .round-current.md is left in place untouched
+# so a later turn (or round-start.sh's rescue-merge) can still recover it.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/devlog.md"
+printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "write with no ## Round heading -> fail-open (allowed)" 0 $?
+RC5=$?
+assert_exit "no ## Round line at all -> fail-open, allowed" 0 "$RC5"
+assert_contains "no ## Round line at all: .round-current.md left untouched" "just a note, not a round" "$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || true)"
+assert_not_contains "no ## Round line at all: not merged into devlog.md" "just a note, not a round" "$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || true)"
 
 # --- Heading Scenario 6: Checkpoint text must not satisfy headings --------
-# Last Round lacks both headings; a following Checkpoint quotes them.
-# Extraction stops at the next ^##  line, so this must still block.
+# Last Round lacks both headings; a following, trailing "## Checkpoint"
+# section quotes fully valid-looking Summary/Handoff/Status content. Fixed
+# on review: the extraction of .round-current.md must be bounded the same
+# way the pre-split last_round_block() was — stop at the next unfenced
+# "## " line — so this trailing Checkpoint section can never satisfy the
+# Round's own requirements. The fixture is deliberately built so the two
+# implementations diverge: a naive whole-file read (the bug) would find
+# the quoted headings, bodies, and Status under Checkpoint and wrongly
+# allow (exit 0); the bounded read excludes all of that, sees a Round with
+# no headings at all, and correctly blocks (exit 2). This makes the
+# assertion below a real regression guard, not just an accidental pass.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 5 — 2026-09-09T10:20:00+08:00
 old response blob
 
 ## Checkpoint（Round 5 摘要）
 ### Summary
-quoted
+quoted summary text that must not satisfy the Round above
+
 ### Handoff
-quoted
+#### 現況
+quoted handoff text that must not satisfy the Round above
+
+### Status
+DONE
 DEVEOF
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "headings only inside Checkpoint, last Round missing them -> blocked" 2 $?
+ERR6="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+RC6=$?
+assert_exit "headings only inside trailing Checkpoint -> blocked" 2 "$RC6"
+case "$ERR6" in
+  *"缺少"*"Summary"*|*"缺少"*"Handoff"*) echo "PASS: blocked for missing headings in the bounded Round, not the Checkpoint's" ;;
+  *) echo "FAIL: expected missing-headings message, got: $ERR6"; FAIL=1 ;;
+esac
 
 # --- Heading Scenario 7: Checkpoint after completing the open skeleton Round -
 # round-start.sh always opens a skeleton; Claude must finish Summary+Handoff
 # on that Round. A Checkpoint may follow; the last Round must still have both
-# headings (extraction stops at the Checkpoint ## line).
+# headings. Round 6 is prior, already-merged history (stays in devlog.md);
+# round-start.sh opens Round 7's skeleton into .round-current.md, which gets
+# completed there. The Checkpoint line is appended straight to devlog.md
+# (independent of the round being validated) -- devlog.md content is no
+# longer read for round validation at all under the split, so this also
+# proves the two are now fully decoupled.
 cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ## Round 6 — 2026-09-09T10:25:00+08:00
 
@@ -442,7 +552,7 @@ complete
 DONE
 DEVEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat >> "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 
 ### Summary
 complete
@@ -460,12 +570,17 @@ DEVEOF
 echo "## Checkpoint（Round 6 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "Checkpoint-only append after a complete last Round -> allowed" 0 $?
+assert_round_merged "Checkpoint-only append after a complete last Round" "complete"
 
 # --- Heading Scenario 8: span one-liner on a complete last Round ----------
 # ticks at max so we do not silent-pass; a one-line append must still pass
 # heading check because it lands inside the last Round, which already has
-# both headings.
-cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+# both headings. Span Mode leaves .round-current.md alone across ticks (it
+# is the round Claude keeps extending), so the "complete Round" content must
+# already be sitting in .round-current.md before round-start.sh captures its
+# hash into .turn-start -- otherwise there is nothing for round-start.sh to
+# hash in the first place.
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 6 — 2026-09-09T10:25:00+08:00
 
 ### Summary
@@ -490,9 +605,10 @@ cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
 }
 SPANEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-echo "span check-in: still looping" >> "$DEVLOG_DIR/devlog.md"
+echo "span check-in: still looping" >> "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "span budget expired, one-line append on complete last Round -> allowed" 0 $?
+assert_round_merged "span budget expired, one-line append on complete last Round" "complete"
 SPAN_TICKS_ONELINE="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
 if [ "$SPAN_TICKS_ONELINE" = "0" ]; then
   echo "PASS: span ticks reset after one-line append that passed heading check"
@@ -511,7 +627,7 @@ cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
 }
 SPANEOF
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 7 — 2026-09-09T10:30:00+08:00
 incomplete new round
 DEVEOF
@@ -531,7 +647,7 @@ rm -f "$DEVLOG_DIR/.span-open"
 # markdown example containing `## Round 15` and `## 安裝`. Those fenced lines
 # must not become the last-Round start or the next-heading end.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 8 — 2026-09-09T10:35:00+08:00
 
 ### User Input
@@ -557,9 +673,13 @@ DONE
 DEVEOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "last Round complete, fenced ## Round 15 and ## 安裝 in body -> allowed" 0 $?
+assert_round_merged "last Round complete, fenced ## Round 15 and ## 安裝 in body" "已回覆格式問題"
 
 # --- Heading Scenario 11: older ### Response Round must not block last Round
-# History may still use ### Response. Only the last Round is checked.
+# History may still use ### Response. That older round is genuinely prior,
+# already-merged history -- it stays in devlog.md. Only .round-current.md
+# (Round 2, the round being validated) is read for content validation now,
+# so devlog.md's legacy shape can never interfere with it by construction.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 cat > "$DEVLOG_DIR/devlog.md" <<'DEVEOF'
 ## Round 1 — 2026-09-08T09:00:00+08:00
@@ -572,7 +692,8 @@ old blob without Summary or Handoff
 
 ### Status
 DONE
-
+DEVEOF
+cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 2 — 2026-09-09T10:40:00+08:00
 
 ### Summary
@@ -590,6 +711,7 @@ DONE
 DEVEOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "older Round still uses ### Response, complete last Round -> allowed" 0 $?
+assert_round_merged "older Round still uses ### Response, complete last Round" "complete last Round"
 
 # --- Recording moments: skeleton hash-equal still blocks -------------------
 rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.interrupted"
@@ -612,7 +734,7 @@ else
 fi
 
 # --- Recording moments: Summary+Handoff on same Round deletes .round-open --
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -635,11 +757,12 @@ DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 # Hash equal would block — simulate Claude's edit by appending a newline after snapshot:
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
+printf '\n' >> "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "headings present and hash changed -> allowed" 0 $?
+assert_round_merged "headings present and hash changed" "done"
 if [ -f "$DEVLOG_DIR/.round-open" ]; then
   echo "FAIL: .round-open should be deleted on successful Stop"
   FAIL=1
@@ -654,7 +777,11 @@ else
 fi
 
 # --- Recording moments: .interrupted stamps and does not block -------------
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# The dangling round content lives in .round-current.md now (Task 3);
+# close-open-round.sh stamps it INTERRUPTED there and merges it into
+# devlog.md, removing .round-current.md -- the key new behavior this task's
+# retargeted short-circuit (Step 1) depends on.
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -666,7 +793,7 @@ esc
 IN_PROGRESS
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 touch "$DEVLOG_DIR/.interrupted"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit ".interrupted -> exit 0 (does not fight Esc)" 0 $?
@@ -679,18 +806,26 @@ case "$BODY" in
   *user_interrupt*) echo "PASS: reason is user_interrupt" ;;
   *) echo "FAIL: expected user_interrupt reason"; FAIL=1 ;;
 esac
-if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
-  echo "FAIL: interrupt path should delete both markers"
+if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ] || [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+  echo "FAIL: interrupt path should delete both markers and merge round-current away"
   FAIL=1
 else
-  echo "PASS: interrupt path deleted markers"
+  echo "PASS: interrupt path deleted markers and merged round-current away"
 fi
 
 # --- Recording moments: completed round + .interrupted must NOT stamp ------
 # Esc/is_interrupt fired, but Claude recovered and wrote Summary+Handoff.
 # Stop must clear the marker and take the normal success path — not overwrite
-# a finished Round to INTERRUPTED.
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# a finished Round to INTERRUPTED. This is the "recovered" outcome from
+# close-open-round.sh: it still merges .round-current.md into devlog.md
+# (Task 3's design change), so this Stop invocation's own .round-current.md
+# check (Step 1) correctly finds nothing left to validate and exits 0.
+# devlog.md is reset first: by this point it has accumulated merged content
+# from earlier scenarios in this file (including the previous scenario's
+# genuine INTERRUPTED stamp), and the BODY check below only cares about what
+# this call itself merges.
+: > "$DEVLOG_DIR/devlog.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -712,8 +847,8 @@ round finished normally
 DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/.round-current.md"
 touch "$DEVLOG_DIR/.interrupted"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "complete last Round + .interrupted + hash changed -> exit 0" 0 $?
@@ -726,17 +861,43 @@ case "$BODY" in
   *DONE*) echo "PASS: Status DONE preserved" ;;
   *) echo "FAIL: expected Status DONE to remain"; FAIL=1 ;;
 esac
-if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ]; then
-  echo "FAIL: recovered-complete path should delete .interrupted and .round-open"
+if [ -f "$DEVLOG_DIR/.interrupted" ] || [ -f "$DEVLOG_DIR/.round-open" ] || [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+  echo "FAIL: recovered-complete path should delete .interrupted/.round-open and merge round-current away"
   FAIL=1
 else
-  echo "PASS: recovered-complete path deleted markers"
+  echo "PASS: recovered-complete path deleted markers and merged round-current away"
 fi
+
+# --- Recording moments: interrupted-and-recovered short-circuit reads
+# .round-current.md's presence directly (Step 1), not a devlog.md string
+# match. Separate throwaway project dir so it doesn't disturb $DEVLOG_DIR's
+# ongoing state above.
+RECOVER_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$RECOVER_DIR"
+mkdir -p "$RECOVER_DIR/.devlog"
+touch "$RECOVER_DIR/.devlog/.enabled"
+: > "$RECOVER_DIR/.devlog/devlog.md"
+printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\nX\n```\n\n### Summary\n完成\n\n### Handoff\n#### 現況\nok\n\n### Status\nDONE\n' > "$RECOVER_DIR/.devlog/.round-current.md"
+printf '{"round": 1}\n' > "$RECOVER_DIR/.devlog/.round-open"
+echo "stale" > "$RECOVER_DIR/.devlog/.turn-start"
+touch "$RECOVER_DIR/.devlog/.interrupted"
+
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+RC=$?
+assert_exit "recovered-through-stop: exits 0" 0 "$RC"
+assert_file_absent "recovered-through-stop: .round-current.md merged away" "$RECOVER_DIR/.devlog/.round-current.md"
+MAIN_AFTER="$(cat "$RECOVER_DIR/.devlog/devlog.md")"
+assert_contains "recovered-through-stop: content landed in devlog.md" "完成" "$MAIN_AFTER"
+rm -rf "$RECOVER_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 # --- Recording moments: stale .interrupted without .round-open -------------
 # A leftover .interrupted must not permanently short-circuit Stop when there
 # is no open round — the next Stop must run normal hash/heading enforcement.
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# With no .round-open, close-open-round.sh no-ops and leaves .round-current.md
+# untouched (Task 3) -- Step 1's redesigned short-circuit must then find it
+# still non-empty and fall through to normal enforcement, not exit 0.
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -747,7 +908,7 @@ stale interrupt
 ### Status
 IN_PROGRESS
 EOF
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 rm -f "$DEVLOG_DIR/.round-open"
 touch "$DEVLOG_DIR/.interrupted"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
@@ -799,7 +960,7 @@ fi
 # --- Heading Scenario 12: legal DONE with bodies, no 下一步 -> allowed ----
 touch "$DEVLOG_DIR/.enabled"
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 90 — 2026-09-09T10:40:00+08:00
 
 ### Summary
@@ -817,10 +978,11 @@ DONE
 EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with bodies and no 下一步 -> allowed" 0 $?
+assert_round_merged "DONE with bodies and no 下一步" "做完了"
 
 # --- Heading Scenario 13: IN_PROGRESS without 下一步 -> blocked -----------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 91 — 2026-09-09T10:41:00+08:00
 
 ### Summary
@@ -841,7 +1003,7 @@ assert_exit "IN_PROGRESS without 下一步 -> blocked" 2 $?
 
 # --- Heading Scenario 14: IN_PROGRESS with 下一步 -> allowed --------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 92 — 2026-09-09T10:42:00+08:00
 
 ### Summary
@@ -865,10 +1027,11 @@ IN_PROGRESS
 EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "IN_PROGRESS with 下一步 -> allowed" 0 $?
+assert_round_merged "IN_PROGRESS with 下一步" "打開 foo.ts 繼續"
 
 # --- Heading Scenario 15: illegal Status -> blocked -----------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 93 — 2026-09-09T10:43:00+08:00
 
 ### Summary
@@ -890,7 +1053,7 @@ assert_exit "illegal Status -> blocked" 2 $?
 # --- Next-step blacklist Scenario 1: pure filler phrase -> blocked --------
 # (docs/design/next-step-blacklist.md)
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 94 — 2026-09-09T10:44:00+08:00
 
 ### Summary
@@ -919,7 +1082,7 @@ esac
 
 # --- Next-step blacklist Scenario 2: filler phrase with trailing 。 --------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 95 — 2026-09-09T10:45:00+08:00
 
 ### Summary
@@ -945,7 +1108,7 @@ assert_exit "下一步 is '持續優化。' with trailing punctuation -> blocked
 # --- Next-step blacklist Scenario 3: phrase embedded in a longer sentence -
 # Must NOT block -- only an exact whole-body match is filler.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 96 — 2026-09-09T10:46:00+08:00
 
 ### Summary
@@ -969,12 +1132,13 @@ IN_PROGRESS
 EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 contains 繼續完成 inside a concrete sentence -> allowed" 0 $?
+assert_round_merged "下一步 contains 繼續完成 inside a concrete sentence" "錯誤處理"
 
 # --- Next-step blacklist Scenario 4: multi-line body, one line is filler --
 # Must NOT block -- the blacklist only fires when the whole body is a
 # single line.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 97 — 2026-09-09T10:47:00+08:00
 
 ### Summary
@@ -999,10 +1163,11 @@ IN_PROGRESS
 EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 multi-line body including a filler line -> allowed" 0 $?
+assert_round_merged "下一步 multi-line body including a filler line" "bar.ts"
 
 # --- L1: missing ### Reply -> blocked --------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 98 — 2026-09-15T10:00:00+08:00
 
 ### Summary
@@ -1024,7 +1189,7 @@ esac
 
 # --- L1: IN_PROGRESS 下一步 without actionable signal -> blocked ------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 99 — 2026-09-15T10:01:00+08:00
 
 ### Summary
@@ -1055,7 +1220,7 @@ esac
 
 # --- L1: BLOCKED without 缺件句式 -> blocked --------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 100 — 2026-09-15T10:02:00+08:00
 
 ### Summary
@@ -1086,7 +1251,7 @@ esac
 
 # --- L1: BLOCKED with 缺件句式 -> allowed -----------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-cat >> "$DEVLOG_DIR/devlog.md" <<'EOF'
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 101 — 2026-09-15T10:03:00+08:00
 
 ### Summary

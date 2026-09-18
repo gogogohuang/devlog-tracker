@@ -13,6 +13,14 @@
 # mid-turn auto-compact 改雜湊讓 Stop 靜默放行；compact 仍注入 excerpt
 #（最後一個 Checkpoint + 最近兩輪 Summary/Handoff/Status），不 heal。
 # close-open-round.sh 必須對 stdout 保持沉默。
+#
+# .round-current.md excerpt：因為 compact 不 heal，這一輪真的可能還開著、
+# 內容只在 .devlog/.round-current.md 裡（尚未併回 devlog.md）——起始時的
+# devlog.md 摘要看不到它，會讓 mid-turn auto-compact 的注入內容悄悄漏掉
+# Claude 正在寫的這一輪。devlog.md 摘要印完之後，只要 .round-current.md
+# 非空就整份印出來、清楚標示「尚未收尾」，跟上面的歷史摘要分開。startup /
+# resume / fork 這幾個 source 因為上面已經先 heal 過，這裡通常是空的、印出
+# 來是 no-op，不特別排除，寫法比較單純。讀不到就跳過，fail-open。
 
 set -uo pipefail
 
@@ -27,6 +35,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 devlog_resolve_paths "$PROJECT_DIR"
+ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 
 INPUT="$(cat 2>/dev/null || true)"
@@ -60,11 +69,10 @@ if [ -f "$SPAN_FILE" ]; then
   fi
 fi
 
-[ -f "$DEVLOG_FILE" ] || exit 0
-
-echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
-echo ""
-awk '
+if [ -f "$DEVLOG_FILE" ]; then
+  echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
+  echo ""
+  awk '
   /^[ \t]*```/ { fence = !fence }
   {
     lines[NR] = $0
@@ -133,5 +141,17 @@ awk '
       print ""
     }
   }
-' "$DEVLOG_FILE" 2>/dev/null || true
+  ' "$DEVLOG_FILE" 2>/dev/null || true
+fi
+
+# See header comment: this round may still be genuinely open (compact skips
+# heal) with its real content sitting only in .round-current.md. Surface it
+# separately from the devlog.md excerpt above so it isn't silently dropped.
+if [ -s "$ROUND_CURRENT" ]; then
+  echo "以下是目前還沒收尾、仍在 .devlog/.round-current.md 裡的這一輪內容（跟上面的歷史摘要分開，尚未併入 devlog.md）："
+  echo ""
+  cat "$ROUND_CURRENT" 2>/dev/null || true
+  echo ""
+fi
+
 exit 0

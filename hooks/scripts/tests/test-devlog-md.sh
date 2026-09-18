@@ -27,6 +27,31 @@ assert_contains() {
     *) echo "FAIL: $desc (missing: $needle)"; FAIL=1 ;;
   esac
 }
+assert_not_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "FAIL: $desc (should not contain: $needle)"; FAIL=1 ;;
+    *) echo "PASS: $desc" ;;
+  esac
+}
+assert_file_absent() {
+  local desc="$1" file="$2"
+  if [ ! -f "$file" ]; then
+    echo "PASS: $desc"
+  else
+    echo "FAIL: $desc (file exists: $file)"
+    FAIL=1
+  fi
+}
+assert_exit() {
+  local desc="$1" expected="$2" actual="$3"
+  if [ "$actual" -eq "$expected" ]; then
+    echo "PASS: $desc"
+  else
+    echo "FAIL: $desc (expected exit code $expected, got $actual)"
+    FAIL=1
+  fi
+}
 
 # --- devlog_count_segments: zero segments ----------------------------------
 cat > "$TMP_ROOT/devlog.md" <<'EOF'
@@ -447,6 +472,54 @@ EOF
 SEG_START="$(devlog_list_round_starts "$TMP_ROOT/unclosed-fence-segments.md" | awk 'END { print $1 }')"
 SEG_END="$(devlog_block_end "$TMP_ROOT/unclosed-fence-segments.md" "$SEG_START")"
 assert_contains "segment body survives unclosed fence" "real segment content" "$(devlog_round_segments_body "$TMP_ROOT/unclosed-fence-segments.md" "$SEG_START" "$SEG_END")"
+
+# --- devlog_merge_round_current ---------------------------------------
+mkdir -p "$TMP_ROOT/.devlog"
+MERGE_MAIN="$TMP_ROOT/.devlog/merge-main.md"
+MERGE_CUR="$TMP_ROOT/.devlog/merge-current.md"
+
+printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### Summary\ndone\n\n### Handoff\n#### 現況\nok\n\n### Status\nDONE\n' > "$MERGE_MAIN"
+printf '## Round 2 — 2026-09-17T09:05:00+0800\n\n### User Input\n```text\nhi\n```\n\n### Summary\ns2\n\n### Handoff\n#### 現況\nc2\n\n### Status\nDONE\n' > "$MERGE_CUR"
+
+devlog_merge_round_current "$MERGE_MAIN" "$MERGE_CUR"
+
+MERGED="$(cat "$MERGE_MAIN")"
+assert_contains "merge: round 1 still present" "## Round 1" "$MERGED"
+assert_contains "merge: round 2 appended" "## Round 2" "$MERGED"
+assert_file_absent "merge: round-current removed after merge" "$MERGE_CUR"
+
+# merging an absent/empty round-current is a silent no-op
+BEFORE="$(cat "$MERGE_MAIN")"
+devlog_merge_round_current "$MERGE_MAIN" "$MERGE_CUR"
+AFTER="$(cat "$MERGE_MAIN")"
+if [ "$BEFORE" = "$AFTER" ]; then echo "PASS: merge no-op when round-current absent"; else echo "FAIL: merge no-op when round-current absent"; FAIL=1; fi
+
+# --- devlog_reopen_last_round ------------------------------------------
+REOPEN_MAIN="$TMP_ROOT/.devlog/reopen-main.md"
+REOPEN_CUR="$TMP_ROOT/.devlog/reopen-current.md"
+rm -f "$REOPEN_CUR"
+
+printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### Summary\ns1\n\n### Handoff\n#### 現況\nc1\n\n### Status\nDONE\n\n## Round 2 — 2026-09-17T09:10:00+0800\n\n### User Input\n```text\n問題？\n```\n\n### Summary\ns2\n\n### Handoff\n#### 現況\nBLOCKED 等答案\n\n### Status\nBLOCKED\n' > "$REOPEN_MAIN"
+
+devlog_reopen_last_round "$REOPEN_MAIN" "$REOPEN_CUR"
+RC=$?
+assert_exit "reopen: returns 0 when a round exists" 0 "$RC"
+
+REOPENED="$(cat "$REOPEN_CUR" 2>/dev/null || echo '')"
+assert_contains "reopen: round 2 moved into round-current" "## Round 2" "$REOPENED"
+assert_not_contains "reopen: round 1 not pulled along" "## Round 1" "$REOPENED"
+
+REMAINING="$(cat "$REOPEN_MAIN")"
+assert_contains "reopen: round 1 stays in main file" "## Round 1" "$REMAINING"
+assert_not_contains "reopen: round 2 removed from main file" "## Round 2" "$REMAINING"
+
+# reopen on a file with no round at all fails without touching either file
+EMPTY_MAIN="$TMP_ROOT/.devlog/empty-main.md"
+: > "$EMPTY_MAIN"
+rm -f "$TMP_ROOT/.devlog/should-not-exist.md"
+devlog_reopen_last_round "$EMPTY_MAIN" "$TMP_ROOT/.devlog/should-not-exist.md"
+assert_exit "reopen: returns 1 when no round exists" 1 $?
+assert_file_absent "reopen: no round-current created on failure" "$TMP_ROOT/.devlog/should-not-exist.md"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

@@ -33,8 +33,26 @@ assert_exit() {
   fi
 }
 
+# Round-current split: enforce-devlog.sh validates .round-current.md now
+# (not devlog.md), and merges it into devlog.md on success. One assertion
+# per "should succeed" case exercises that merge.
+assert_round_merged() {
+  local desc="$1" marker="${2:-fixture}"
+  if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+    echo "FAIL: $desc (.round-current.md should be merged away)"
+    FAIL=1
+  elif ! grep -q "$marker" "$DEVLOG_DIR/devlog.md" 2>/dev/null; then
+    echo "FAIL: $desc (devlog.md missing merged content)"
+    FAIL=1
+  else
+    echo "PASS: $desc (round-current merged into devlog.md)"
+  fi
+}
+
 write_round() {
   # $1 = workspace body (multi-line ok); empty string omits the section.
+  # Writes into .round-current.md — the file enforce-devlog.sh now validates
+  # (round-start.sh already opened a skeleton there; this overwrites it).
   local ws="$1"
   {
     echo "## Round 1 — 2026-09-10T00:00:00+08:00"
@@ -59,7 +77,7 @@ write_round() {
     echo ""
     echo "### Status"
     echo "IN_PROGRESS"
-  } > "$DEVLOG_DIR/devlog.md"
+  } > "$DEVLOG_DIR/.round-current.md"
 }
 
 # --- exact match -> allowed --------------------------------------------------
@@ -67,6 +85,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 write_round "main @ ${HASH}，工作樹乾淨"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "workspace matches live clean git state -> allowed" 0 $?
+assert_round_merged "workspace matches live clean git state"
 
 # --- missing section -> blocked, message shows exact expected text ----------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -95,6 +114,7 @@ write_round "main @ ${HASH}
 未提交：a.txt"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "dirty tree, exact two-line workspace -> allowed" 0 $?
+assert_round_merged "dirty tree, exact two-line workspace"
 git -C "$TMP_ROOT" checkout -q -- a.txt 2>/dev/null || rm -f "$TMP_ROOT/a.txt"
 
 # --- BLOCKED status is also enforced -----------------------------------------
@@ -118,7 +138,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "BLOCKED"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "BLOCKED with missing workspace -> blocked" 2 $?
 
@@ -139,9 +159,10 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "DONE"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with no workspace section -> allowed (check does not apply)" 0 $?
+assert_round_merged "DONE with no workspace section"
 
 # --- fenced example quoting #### 工作區 before the real section -> ignored,
 # extractor still finds the real (unfenced) 工作區 body -------------------
@@ -174,9 +195,10 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "IN_PROGRESS"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
+assert_round_merged "fenced example quoting #### 工作區 before the real section"
 
 # --- unterminated fence in an earlier subsection -> fail-open, not a false
 # block (final-review Fix 1). A ``` fence that never closes (odd fence-marker
@@ -209,9 +231,10 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "IN_PROGRESS"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
+assert_round_merged "unterminated fence in 現況"
 
 # --- DONE with a non-empty #### 檔案 (claims files were touched/committed)
 # IS now checked: a DONE round that reports file changes but has no/wrong
@@ -244,7 +267,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "DONE"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 MSG_DONE="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "DONE with #### 檔案 but no #### 工作區 -> blocked" 2 $?
 case "$MSG_DONE" in
@@ -272,7 +295,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "DONE"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and stale 工作區 hash -> blocked" 2 $?
 
@@ -296,9 +319,10 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo "### Status"
   echo "DONE"
-} > "$DEVLOG_DIR/devlog.md"
+} > "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and matching 工作區 -> allowed" 0 $?
+assert_round_merged "DONE with #### 檔案 and matching 工作區"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."

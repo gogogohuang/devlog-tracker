@@ -29,27 +29,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/workspace-snapshot.sh"
 # shellcheck source=files-snapshot.sh
 . "$SCRIPT_DIR/files-snapshot.sh"
-
-# Extracts the last "## Round N ..." block from $1 (fence-aware: a line
-# starting with ``` — optionally indented — toggles in/out of a code
-# fence, and headings inside a fence don't end the block). Used twice
-# below: once for the interrupt-heal check, once for the Summary/Handoff
-# title check.
-last_round_block() {
-  awk '
-    /^[ \t]*```/ { fence = !fence }
-    !fence && /^## Round / { start = NR }
-    { lines[NR] = $0; infence[NR] = fence }
-    END {
-      if (start == 0) exit 0
-      end = NR
-      for (i = start + 1; i <= NR; i++) {
-        if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
-      }
-      for (i = start; i <= end; i++) print lines[i]
-    }
-  ' "$1"
-}
+# shellcheck source=devlog-md.sh
+. "$SCRIPT_DIR/devlog-md.sh"
 
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
@@ -74,17 +55,21 @@ fi
 # shellcheck source=devlog-path.sh
 . "$SCRIPT_DIR/devlog-path.sh"
 devlog_resolve_paths "$PROJECT_DIR"
+ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
 if [ -f "$DEVLOG_DIR/.interrupted" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
   rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
-  # Helper is silent. If it stamped, the last Round now has
-  # INTERRUPTED + [reason: user_interrupt] — exit 0 so Esc is not
-  # converted into "please write Summary". Recovered-complete or a stale
-  # flag leaves Status alone; fall through to hash / headings / checkpoint.
-  _LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
-  case "$_LAST_ROUND" in
-    *$'\nINTERRUPTED\n[reason: user_interrupt]'*) exit 0 ;;
-  esac
+  # close-open-round.sh merges and removes .round-current.md whenever it
+  # decided the round was finished (stamped INTERRUPTED, or recovered —
+  # Claude had already written Summary/Handoff before the interrupt signal
+  # arrived). Either way there is nothing left in .round-current.md for
+  # this Stop invocation to validate. If .round-current.md still has
+  # content, .round-open was stale/absent and close-open-round.sh was a
+  # no-op — fall through to the normal flow below, which validates
+  # whatever the user's actual in-progress turn wrote.
+  if [ ! -s "$ROUND_CURRENT" ]; then
+    exit 0
+  fi
 fi
 
 if command -v jq >/dev/null 2>&1; then
@@ -135,8 +120,8 @@ TURN_START_HASH="$(cat "$TURN_MARKER" 2>/dev/null || echo '')"
 # marker 內容讀不出來（讀取失敗、被意外改壞等）就當作沒有可靠依據，放行。
 [ -n "$TURN_START_HASH" ] || exit 0
 
-if [ -f "$DEVLOG_FILE" ]; then
-  CURRENT_HASH="$(cksum < "$DEVLOG_FILE" 2>/dev/null || echo '')"
+if [ -f "$ROUND_CURRENT" ]; then
+  CURRENT_HASH="$(cksum < "$ROUND_CURRENT" 2>/dev/null || echo '')"
 else
   CURRENT_HASH="MISSING"
 fi
@@ -153,14 +138,29 @@ if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
 fi
 
 # --- 標題檢查（Summary + Reply + Handoff）---------------------------------
-# 雜湊已經證明這輪有寫入。接著取出最後一個 Round 區塊：從最後一個
-# 「## Round 」行起到下一條「## 」標題之前（或 EOF）。圍欄（```）內的
-# 行不參與起迄判定，避免 User Input / Handoff 引用 `## Round` 或 `## 安裝`
-# 範例時把有效的最後一個 Round 誤切成缺標題。這個區塊必須同時有
-# 以 ### Summary、### Reply、### Handoff 開頭的行。只驗標題存在，不驗內容。
-# 解析不到任何 ## Round：fail-open（不擋），避免把「寫了但不是 Round」
-# 變成新的卡死理由。
-LAST_ROUND="$(last_round_block "$DEVLOG_FILE" 2>/dev/null || true)"
+# 雜湊已經證明這輪有寫入。.round-current.md 理論上恰好裝著這一輪（且只有
+# 這一輪），但不能整份 cat 進來當作要驗證的內容：Claude 收尾這一輪時可能
+# 已經在同一個檔案尾端接著寫了一段「## Checkpoint」（見下面 Step 9 的
+# merge，會把整個檔案一起併進 devlog.md），而內容裡如果完全沒有
+# `## Round ` 這一行（例如只是一段雜訊文字），代表根本沒有 Round 可驗——
+# 兩種情況都必須比照舊版 last_round_block() 的
+# 邊界規則來擷取：找第一行 `## Round `（fence 之外），一路擷取到下一個
+# 不在 fence 裡的 `## ` 為止（或檔尾），把後面接的 Checkpoint 等區段排除
+# 在外。完全找不到 `## Round ` 這一行：fail-open（LAST_ROUND 留空，不擋），
+# 對應舊版 `if (start == 0) exit 0` 的行為。
+LAST_ROUND="$(awk '
+  /^[ \t]*```/ { fence = !fence }
+  !fence && /^## Round / { start = NR }
+  { lines[NR] = $0; infence[NR] = fence }
+  END {
+    if (start == 0) exit 0
+    end = NR
+    for (i = start + 1; i <= NR; i++) {
+      if (!infence[i] && lines[i] ~ /^## /) { end = i - 1; break }
+    }
+    for (i = start; i <= end; i++) print lines[i]
+  }
+' "$ROUND_CURRENT" 2>/dev/null || true)"
 if [ -n "$LAST_ROUND" ]; then
   HAS_SUMMARY=0
   HAS_REPLY=0
@@ -173,10 +173,10 @@ if [ -n "$LAST_ROUND" ]; then
     exit 2
   fi
 
-  # Fence-aware like last_round_block() above: a heading-looking line inside
-  # a ``` fence (e.g. a markdown example quoting #### 決策 / #### 現況) must
-  # not be mistaken for a real heading, but its fenced content is still part
-  # of the body once grab has started.
+  # Fence-aware: a heading-looking line inside a ``` fence (e.g. a markdown
+  # example quoting #### 決策 / #### 現況) must not be mistaken for a real
+  # heading, but its fenced content is still part of the body once grab has
+  # started.
   #
   # NOFENCE 防呆：如果這個 Round 裡 ``` 記號的數量是奇數（代表圍欄沒有正常
   # 收尾——真的寫錯了，不是刻意的範例），fence 變數會在這輪剩下的內容裡卡在
@@ -552,8 +552,31 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
   fi
 fi
 
-rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
 rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
+
+# 這一輪通過所有驗證，正式收尾：把 .round-current.md 併回 devlog.md（併完
+# 就地刪除 .round-current.md）。放在 checkpoint 計數檢查之前，這樣如果這輪
+# 內容裡本來就有 Claude 寫的「## Checkpoint」，併進去之後馬上就會被下面的
+# 數量比對算到，不用再等下一輪。
+#
+# 只有 LAST_ROUND 非空（代表上面真的抓到、驗證過一個 `## Round `）才併入。
+# LAST_ROUND 是空的代表整個驗證區塊 fail-open 跳過了（.round-current.md
+# 裡完全沒有 `## Round ` 這一行，例如純雜訊）——這種情況併入只會把未結構化
+# 的內容寫進 devlog.md 的永久歷史，所以刻意保留 .round-current.md 原封不動，
+# 讓之後的輪次或人工介入還能回頭處理，而不是併進去就再也分不出來。
+#
+# .round-open 只有在真的併入成功之後才刪除：devlog_merge_round_current
+# 失敗時（例如寫入失敗）保留 .round-open，讓既有的 dangling-heal 機制
+# （close-open-round.sh，下次 UserPromptSubmit / SessionStart 都會跑到）
+# 之後還有機會重試，而不是內容被孤立在 .round-current.md 卻沒有任何機制
+# 知道要去救它。
+if [ -n "$LAST_ROUND" ]; then
+  if devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"; then
+    rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+  fi
+else
+  rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+fi
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。

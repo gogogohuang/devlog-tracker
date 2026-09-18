@@ -80,7 +80,7 @@ make_round "$OPEN/.devlog/devlog.md" 2 DONE
   printf '## Round 3 — 2026-09-09T12:00:00+08:00\n\n'
   printf '### User Input\n```text\nplease do not touch this fake heading:\n## Round 1 fake\n## Round 99 — fake heading\n```\n\n'
   printf '### Status\nIN_PROGRESS\n'
-} >> "$OPEN/.devlog/devlog.md"
+} > "$OPEN/.devlog/.round-current.md"
 printf '%s\n' '{"round": 3, "opened_at": "now"}' > "$OPEN/.devlog/.round-open"
 printf '%s\n' '{"round": 2, "ticks": 1, "max_silent_ticks": 5}' > "$OPEN/.devlog/.span-open"
 printf '%s\n' '{"rounds_since_checkpoint": 19, "max_silent_rounds": 20, "checkpoint_marker_count": 2}' > "$OPEN/.devlog/.checkpoint-state"
@@ -89,13 +89,18 @@ printf '%s\n' '{"rounds_since_checkpoint": 19, "max_silent_rounds": 20, "checkpo
 OUT="$(bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed)"
 assert_eq "open round: exit 0" 0 "$?"
 assert_eq "open round: stdout" "CLEANED KEPT_ROUND=1" "$OUT"
-grep -q '^# project summary' "$OPEN/.devlog/devlog.md" && { echo "FAIL: project summary survived"; FAIL=1; } || echo "PASS: project summary discarded"
-grep -q '^## Round 1 ' "$OPEN/.devlog/devlog.md" && echo "PASS: open round renumbered to 1" || { echo "FAIL: renumber"; FAIL=1; }
-grep -q '^## Round 2 ' "$OPEN/.devlog/devlog.md" && { echo "FAIL: old round 2 survived"; FAIL=1; } || echo "PASS: old rounds gone"
-[ "$(devlog_list_round_starts "$OPEN/.devlog/devlog.md" | wc -l | tr -d ' ')" = "1" ] && echo "PASS: exactly one real heading remains (fence-aware count)" || { echo "FAIL: heading count"; FAIL=1; }
-grep -q '^please do not touch this fake heading:$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced body preserved verbatim" || { echo "FAIL: fenced body altered"; FAIL=1; }
-grep -q '^## Round 1 fake$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced fake heading untouched" || { echo "FAIL: fenced fake heading renamed"; FAIL=1; }
-grep -q '^## Round 99 — fake heading$' "$OPEN/.devlog/devlog.md" && echo "PASS: second fenced fake heading untouched" || { echo "FAIL: second fenced fake heading renamed"; FAIL=1; }
+# Round-current split invariant: the surviving round lands in
+# .round-current.md (renumbered to Round 1), and devlog.md is emptied/gone
+# — never the other way around (that would leave .round-open pointing at a
+# round Stop/close-open-round.sh can no longer find).
+[ ! -s "$OPEN/.devlog/devlog.md" ] && echo "PASS: devlog.md emptied/absent (project summary + old rounds discarded)" || { echo "FAIL: devlog.md still has content"; FAIL=1; }
+grep -q '^## Round 1 ' "$OPEN/.devlog/.round-current.md" && echo "PASS: open round renumbered to 1" || { echo "FAIL: renumber"; FAIL=1; }
+grep -q '^## Round 2 ' "$OPEN/.devlog/.round-current.md" && { echo "FAIL: old round 2 survived"; FAIL=1; } || echo "PASS: old rounds gone"
+[ "$(devlog_list_round_starts "$OPEN/.devlog/.round-current.md" | wc -l | tr -d ' ')" = "1" ] && echo "PASS: exactly one real heading remains (fence-aware count)" || { echo "FAIL: heading count"; FAIL=1; }
+grep -q '^please do not touch this fake heading:$' "$OPEN/.devlog/.round-current.md" && echo "PASS: fenced body preserved verbatim" || { echo "FAIL: fenced body altered"; FAIL=1; }
+grep -q '^## Round 1 fake$' "$OPEN/.devlog/.round-current.md" && echo "PASS: fenced fake heading untouched" || { echo "FAIL: fenced fake heading renamed"; FAIL=1; }
+grep -q '^## Round 99 — fake heading$' "$OPEN/.devlog/.round-current.md" && echo "PASS: second fenced fake heading untouched" || { echo "FAIL: second fenced fake heading renamed"; FAIL=1; }
+[ -s "$OPEN/.devlog/.round-current.md" ] && echo "PASS: .round-current.md holds the renumbered round" || { echo "FAIL: .round-current.md empty/missing"; FAIL=1; }
 grep -q '"round": 1' "$OPEN/.devlog/.round-open" && echo "PASS: round-open reset to 1" || { echo "FAIL: round-open"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.span-open" ] && echo "PASS: span-open removed" || { echo "FAIL: span-open remains"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.interrupted" ] && echo "PASS: interrupted removed" || { echo "FAIL: interrupted remains"; FAIL=1; }
@@ -103,8 +108,8 @@ grep -q '"round": 1' "$OPEN/.devlog/.round-open" && echo "PASS: round-open reset
 grep -q '"rounds_since_checkpoint": 0' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint rounds reset" || { echo "FAIL: checkpoint rounds"; FAIL=1; }
 grep -q '"checkpoint_marker_count": 0' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint marker count reset" || { echo "FAIL: checkpoint marker count"; FAIL=1; }
 grep -q '"max_silent_rounds": 20' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint max kept" || { echo "FAIL: checkpoint max"; FAIL=1; }
-PERM="$(perm_of "$OPEN/.devlog/devlog.md")"
-[ "$PERM" != "600" ] && echo "PASS: rewritten devlog.md is not owner-only (mode $PERM)" || { echo "FAIL: rewritten devlog.md is 600"; FAIL=1; }
+PERM="$(perm_of "$OPEN/.devlog/.round-current.md")"
+[ "$PERM" != "600" ] && echo "PASS: rewritten .round-current.md is not owner-only (mode $PERM)" || { echo "FAIL: rewritten .round-current.md is 600"; FAIL=1; }
 
 # no open round (never started / paused): whole file deleted
 NOOPEN="$TMP/noopen"
@@ -134,7 +139,7 @@ export CLAUDE_PROJECT_DIR="$SIB"
 printf '%s\n' '# archive' > "$SIB/.devlog/devlog.archive.md"
 printf '%s\n' '# kept' > "$SIB/.devlog/devlog.span-mode.md"
 printf '# project\n\n' > "$SIB/.devlog/devlog.md"
-make_round "$SIB/.devlog/devlog.md" 1 DONE
+make_round "$SIB/.devlog/.round-current.md" 1 DONE
 printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$SIB/.devlog/.round-open"
 bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
 grep -q '^# archive' "$SIB/.devlog/devlog.archive.md" && echo "PASS: archive.md untouched" || { echo "FAIL: archive.md touched"; FAIL=1; }
@@ -146,7 +151,7 @@ mkdir -p "$ENAB/.devlog"
 export CLAUDE_PROJECT_DIR="$ENAB"
 printf '%s\n' 'enabled' > "$ENAB/.devlog/.enabled"
 printf '# project\n\n' > "$ENAB/.devlog/devlog.md"
-make_round "$ENAB/.devlog/devlog.md" 1 IN_PROGRESS
+make_round "$ENAB/.devlog/.round-current.md" 1 IN_PROGRESS
 printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$ENAB/.devlog/.round-open"
 bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
 [ -f "$ENAB/.devlog/.enabled" ] && echo "PASS: .enabled untouched" || { echo "FAIL: .enabled removed"; FAIL=1; }

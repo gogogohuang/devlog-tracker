@@ -4,6 +4,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../json-field.sh
+. "$SCRIPT_DIR/json-field.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -59,10 +61,11 @@ touch "$DEVLOG_DIR/.enabled"
 # --- 2: Round 1 skeleton + markers + hash after write ---------------------
 printf '%s' "$PROMPT_HELLO" | bash "$SCRIPT_DIR/round-start.sh"
 assert_exit "first prompt -> exit 0" 0 $?
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/.round-current.md")"
 assert_contains "Round 1 heading" "## Round 1 —" "$BODY"
 assert_contains "fenced user input" $'```text\nhello world\n```' "$BODY"
 assert_contains "status in progress" $'### Status\nIN_PROGRESS' "$BODY"
+assert_file_absent "Round 1 skeleton -> devlog.md untouched" "$DEVLOG_DIR/devlog.md"
 if [ -f "$DEVLOG_DIR/.round-open" ]; then
   echo "PASS: .round-open created"
 else
@@ -76,7 +79,7 @@ else
   echo "FAIL: .round-open round should be 1, got $OPEN_N"
   FAIL=1
 fi
-AFTER_HASH="$(cksum < "$DEVLOG_DIR/devlog.md")"
+AFTER_HASH="$(cksum < "$DEVLOG_DIR/.round-current.md")"
 START_HASH="$(cat "$DEVLOG_DIR/.turn-start")"
 if [ "$AFTER_HASH" = "$START_HASH" ]; then
   echo "PASS: .turn-start matches post-skeleton hash"
@@ -85,12 +88,49 @@ else
   FAIL=1
 fi
 
-# --- 3: next prompt is Round 2 --------------------------------------------
+# --- 2b: normal (non-fold) new-round path writes to .round-current.md,
+# leaving devlog.md's prior history untouched, and .turn-start hashes
+# .round-current.md -----------------------------------------------------
+NEW_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$NEW_DIR"
+mkdir -p "$NEW_DIR/.devlog"
+touch "$NEW_DIR/.devlog/.enabled"
+printf '## Round 3 — 2026-09-17T08:00:00+0800\n\n### Summary\ns3\n\n### Handoff\n#### 現況\nc3\n\n### Status\nDONE\n' > "$NEW_DIR/.devlog/devlog.md"
+
+echo '{"session_id":"s2","prompt":"下一件事"}' | bash "$SCRIPT_DIR/round-start.sh"
+
+MAIN_AFTER="$(cat "$NEW_DIR/.devlog/devlog.md")"
+CURRENT_AFTER="$(cat "$NEW_DIR/.devlog/.round-current.md" 2>/dev/null || echo '')"
+assert_not_contains "new round: not appended to devlog.md directly" "## Round 4" "$MAIN_AFTER"
+assert_contains "new round: skeleton written to .round-current.md" "## Round 4" "$CURRENT_AFTER"
+assert_contains "new round: devlog.md keeps prior history" "## Round 3" "$MAIN_AFTER"
+
+TURN_HASH="$(cat "$NEW_DIR/.devlog/.turn-start" 2>/dev/null || echo '')"
+EXPECTED_HASH="$(cksum < "$NEW_DIR/.devlog/.round-current.md")"
+if [ "$TURN_HASH" = "$EXPECTED_HASH" ]; then echo "PASS: .turn-start hashes .round-current.md"; else echo "FAIL: .turn-start hashes .round-current.md"; FAIL=1; fi
+rm -rf "$NEW_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+
+# --- 3: next prompt is Round 2 (dangling heal stamps devlog.md; the new
+# round opens in .round-current.md) — a genuinely-open Round 1 sitting in
+# .round-current.md is a hand-built fixture representing what
+# close-open-round.sh operates on ------------------------------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+hello world
+```
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 printf '%s' '{"prompt":"second"}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-assert_contains "Round 2 heading" "## Round 2 —" "$BODY"
-assert_contains "previous round interrupted (dangling heal)" "INTERRUPTED" "$BODY"
-assert_contains "dangling reason" "dangling:next_prompt" "$BODY"
+MAIN_BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "Round 2 heading in .round-current.md" "## Round 2 —" "$CUR_BODY"
+assert_contains "previous round interrupted (dangling heal) in devlog.md" "INTERRUPTED" "$MAIN_BODY"
+assert_contains "dangling reason" "dangling:next_prompt" "$MAIN_BODY"
 OPEN_N="$(grep -o '"round"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.round-open" | grep -o '[0-9]\+$')"
 if [ "$OPEN_N" = "2" ]; then
   echo "PASS: .round-open now round=2"
@@ -143,13 +183,13 @@ rm -f "$DEVLOG_DIR/.span-open"
 # --- 6: missing prompt -> placeholder -------------------------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 printf '%s' '{}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/.round-current.md")"
 assert_contains "placeholder prompt" "（無 prompt）" "$BODY"
 
 # --- 7a: inner fence neutralized before wrapping ----------------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 printf '%s' '{"prompt":"before```inside```after"}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/.round-current.md")"
 assert_contains "inner fence neutralized" "⟨fence⟩" "$BODY"
 if printf '%s\n' "$BODY" | grep -q '```inside'; then
   echo "FAIL: raw inner fence leaked into the wrapper"
@@ -162,7 +202,7 @@ fi
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 RAW_TOKEN="ghp_abcdefghijklmnopqrstuvwxyz0123456789"
 printf '{"prompt":"token %s"}' "$RAW_TOKEN" | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/.round-current.md")"
 assert_contains "prompt token masked" "（已遮罩）" "$BODY"
 assert_not_contains "raw prompt token absent" "$RAW_TOKEN" "$BODY"
 
@@ -170,9 +210,9 @@ assert_not_contains "raw prompt token absent" "$RAW_TOKEN" "$BODY"
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 LONG="$(awk 'BEGIN { s=""; for (i=0;i<4005;i++) s=s "a"; print s }')"
 printf '{"prompt":"%s"}' "$LONG" | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/.round-current.md")"
 assert_contains "truncation notice" "（後略，已截斷至 4000 字）" "$BODY"
-LEN="$(awk '/^```text$/{p=1;next} /^```$/{p=0;next} p{s=s $0} END{print length(s)}' "$DEVLOG_DIR/devlog.md")"
+LEN="$(awk '/^```text$/{p=1;next} /^```$/{p=0;next} p{s=s $0} END{print length(s)}' "$DEVLOG_DIR/.round-current.md")"
 if [ "$LEN" -le 4000 ]; then
   echo "PASS: fenced body length <= 4000 (got $LEN)"
 else
@@ -184,7 +224,7 @@ fi
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 printf '%s' '{"prompt":"see\n## Round 99\n### Status"}' | bash "$SCRIPT_DIR/round-start.sh"
 # Only one unfenced ## Round (the real heading). Count fence-aware:
-UNFENCED="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/devlog.md")"
+UNFENCED="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/.round-current.md")"
 if [ "$UNFENCED" = "1" ]; then
   echo "PASS: prompt ## Round 99 did not create a second unfenced Round heading"
 else
@@ -192,11 +232,11 @@ else
   FAIL=1
 fi
 
-# --- 9: segment last_seen_cksum is post-skeleton ----------------------------
+# --- 9: segment last_seen_cksum is post-skeleton, tracking .round-current.md
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
 printf '%s\n' '{"last_change_epoch": 1, "last_seen_cksum": "old", "max_silent_seconds": 900}' > "$DEVLOG_DIR/.segment-state"
 printf '%s' "$PROMPT_HELLO" | bash "$SCRIPT_DIR/round-start.sh"
-POST="$(cksum < "$DEVLOG_DIR/devlog.md" | tr -d '\n')"
+POST="$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')"
 SEEN="$(grep -o '"last_seen_cksum"[[:space:]]*:[[:space:]]*"[^"]*"' "$DEVLOG_DIR/.segment-state" | sed 's/.*"last_seen_cksum"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/')"
 if [ "$SEEN" = "$POST" ]; then
   echo "PASS: segment last_seen_cksum matches post-skeleton hash"
@@ -204,6 +244,21 @@ else
   echo "FAIL: last_seen_cksum=$SEEN expected $POST"
   FAIL=1
 fi
+
+# --- 9c: segment-state cksum identity tracks .round-current.md, in isolation
+SEG_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$SEG_DIR"
+mkdir -p "$SEG_DIR/.devlog"
+touch "$SEG_DIR/.devlog/.enabled"
+printf '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 600}\n' > "$SEG_DIR/.devlog/.segment-state"
+
+echo '{"session_id":"s3","prompt":"go"}' | bash "$SCRIPT_DIR/round-start.sh"
+
+STORED_CKSUM="$(json_str_get "$SEG_DIR/.devlog/.segment-state" last_seen_cksum)"
+ACTUAL_CKSUM="$(cksum < "$SEG_DIR/.devlog/.round-current.md" | tr -d '\n')"
+if [ "$STORED_CKSUM" = "$ACTUAL_CKSUM" ]; then echo "PASS: segment-state cksum tracks .round-current.md"; else echo "FAIL: segment-state cksum tracks .round-current.md (got $STORED_CKSUM want $ACTUAL_CKSUM)"; FAIL=1; fi
+rm -rf "$SEG_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 # --- 9b: segment state stores the submitting session id ---------------------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open"
@@ -218,8 +273,8 @@ else
 fi
 
 # --- 10: dangling heal skips a completed last Round, still opens Round 2 ----
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -241,16 +296,18 @@ finished
 DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/.round-current.md"
 printf '%s' '{"prompt":"next"}' | bash "$SCRIPT_DIR/round-start.sh"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
 assert_contains "completed dangling keeps DONE" $'### Status\nDONE' "$BODY"
 assert_not_contains "completed dangling must not stamp Round 1" "INTERRUPTED" "$BODY"
-assert_contains "still opened Round 2" "## Round 2 —" "$BODY"
+assert_contains "still opened Round 2" "## Round 2 —" "$CUR_BODY"
 
-# --- 11: .awaiting-reply matches last Round -> folds as a segment ----------
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state"
+# --- 11: .awaiting-reply matches last Round -> folds as a segment, reopening
+# the Round out of devlog.md and into .round-current.md --------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.checkpoint-state" "$DEVLOG_DIR/.round-current.md"
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 5 — 2026-09-09T12:00:00+08:00
 
@@ -278,20 +335,22 @@ BLOCKED
 EOF
 printf '%s\n' '{"round": 5, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.awaiting-reply"
 printf '%s' '{"prompt":"blue please"}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-UNFENCED_ROUNDS="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/devlog.md")"
+MAIN_BODY="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_not_contains "fold: round 5 no longer in devlog.md" "## Round 5" "$MAIN_BODY"
+UNFENCED_ROUNDS="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/.round-current.md")"
 if [ "$UNFENCED_ROUNDS" = "1" ]; then
   echo "PASS: fold did not open a second Round"
 else
   echo "FAIL: expected 1 unfenced Round heading, got $UNFENCED_ROUNDS"
   FAIL=1
 fi
-assert_contains "folded segment heading" "### 段落 1 -" "$BODY"
-assert_contains "folded segment marks it a reply" "（回覆上一輪的問題）" "$BODY"
-assert_contains "folded segment keeps user's words" "blue please" "$BODY"
+assert_contains "folded segment heading" "### 段落 1 -" "$CUR_BODY"
+assert_contains "folded segment marks it a reply" "（回覆上一輪的問題）" "$CUR_BODY"
+assert_contains "folded segment keeps user's words" "blue please" "$CUR_BODY"
 # segment must land before Summary, not after
-SEG_LINE="$(grep -n '### 段落 1' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
-SUM_LINE="$(grep -n '^### Summary$' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
+SEG_LINE="$(grep -n '### 段落 1' "$DEVLOG_DIR/.round-current.md" | head -1 | cut -d: -f1)"
+SUM_LINE="$(grep -n '^### Summary$' "$DEVLOG_DIR/.round-current.md" | head -1 | cut -d: -f1)"
 if [ "$SEG_LINE" -lt "$SUM_LINE" ]; then
   echo "PASS: folded segment inserted before Summary"
 else
@@ -311,7 +370,7 @@ else
   echo "FAIL: expected .round-open round=5, got $OPEN_N"
   FAIL=1
 fi
-AFTER_HASH="$(cksum < "$DEVLOG_DIR/devlog.md")"
+AFTER_HASH="$(cksum < "$DEVLOG_DIR/.round-current.md")"
 START_HASH="$(cat "$DEVLOG_DIR/.turn-start")"
 if [ "$AFTER_HASH" = "$START_HASH" ]; then
   echo "PASS: .turn-start matches post-fold hash"
@@ -320,16 +379,65 @@ else
   FAIL=1
 fi
 
-# --- 12: second reply on the same Round numbers segments incrementally -----
+# --- 11b (Step 3 brief test): Reply Fold reopens the awaited round into
+# .round-current.md, not editing it in place inside devlog.md — devlog.md
+# should no longer contain it, and .round-current.md should hold exactly
+# that round plus the folded segment. Own isolated fixture. --------------
+FOLD_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$FOLD_DIR"
+mkdir -p "$FOLD_DIR/.devlog"
+touch "$FOLD_DIR/.devlog/.enabled"
+printf '## Round 5 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\n要不要修 A？\n```\n\n### Summary\n問了一題\n\n### Handoff\n#### 現況\n等回覆\n\n### Status\nBLOCKED\n' > "$FOLD_DIR/.devlog/devlog.md"
+printf '{"round": 5}\n' > "$FOLD_DIR/.devlog/.awaiting-reply"
+
+echo '{"session_id":"s1","prompt":"要"}' | bash "$SCRIPT_DIR/round-start.sh"
+
+MAIN_AFTER="$(cat "$FOLD_DIR/.devlog/devlog.md")"
+CURRENT_AFTER="$(cat "$FOLD_DIR/.devlog/.round-current.md" 2>/dev/null || echo '')"
+assert_not_contains "fold: round 5 no longer in devlog.md" "## Round 5" "$MAIN_AFTER"
+assert_contains "fold: round 5 moved into .round-current.md" "## Round 5" "$CURRENT_AFTER"
+assert_contains "fold: folded segment written into .round-current.md" "回覆上一輪的問題" "$CURRENT_AFTER"
+rm -rf "$FOLD_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+
+# --- 12: second reply on the same Round numbers segments incrementally,
+# standalone fixture: devlog.md holds the round already folded once
+# (matching the merged-back-between-turns invariant) -----------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 5 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+what color should the button be?
+```
+
+### 段落 1 - 12:01（回覆上一輪的問題）
+```text
+blue please
+```
+
+### Summary
+Asked the user to pick a color.
+
+### Handoff
+#### 現況
+Waiting on the user's color choice.
+#### 下一步
+Apply the chosen color once they answer.
+
+### Status
+BLOCKED
+EOF
 printf '%s\n' '{"round": 5, "opened_at": "2026-09-09T12:05:00+08:00"}' > "$DEVLOG_DIR/.awaiting-reply"
 printf '%s' '{"prompt":"actually make it green"}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-assert_contains "first segment still present" "### 段落 1 -" "$BODY"
-assert_contains "second segment numbered 2" "### 段落 2 -" "$BODY"
-assert_contains "second segment content" "actually make it green" "$BODY"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "first segment still present" "### 段落 1 -" "$CUR_BODY"
+assert_contains "second segment numbered 2" "### 段落 2 -" "$CUR_BODY"
+assert_contains "second segment content" "actually make it green" "$CUR_BODY"
 
 # --- 13: .awaiting-reply round is stale -> dropped, normal new Round opens -
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start"
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
@@ -348,9 +456,9 @@ DONE
 EOF
 printf '%s\n' '{"round": 99, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.awaiting-reply"
 printf '%s' '{"prompt":"unrelated new request"}' | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-assert_contains "stale marker -> normal new Round 2 opened" "## Round 2 —" "$BODY"
-assert_not_contains "stale marker -> no segment inserted" "### 段落" "$BODY"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "stale marker -> normal new Round 2 opened" "## Round 2 —" "$CUR_BODY"
+assert_not_contains "stale marker -> no segment inserted" "### 段落" "$CUR_BODY"
 if [ -f "$DEVLOG_DIR/.awaiting-reply" ]; then
   echo "FAIL: stale .awaiting-reply should still be consumed"
   FAIL=1
@@ -443,7 +551,7 @@ rm -f "$DEVLOG_DIR/.checkpoint-state"
 
 # --- 16: task-notification prompt folds into the last Round, condensed -----
 NOTIF_PROMPT='<task-notification><task-id>t1</task-id><status>completed</status><summary>Agent \"Fix wave\" finished</summary></task-notification>'
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.checkpoint-state"
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.checkpoint-state" "$DEVLOG_DIR/.round-current.md"
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 7 — 2026-09-09T12:00:00+08:00
 
@@ -467,22 +575,22 @@ DONE
 EOF
 printf '%s\n' '{"rounds_since_checkpoint": 0, "max_silent_rounds": 20, "checkpoint_marker_count": 0}' > "$DEVLOG_DIR/.checkpoint-state"
 printf '{"prompt":"%s"}' "$NOTIF_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-UNFENCED_ROUNDS="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/devlog.md")"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+UNFENCED_ROUNDS="$(awk '/^[ \t]*```/{f=!f} !f && /^## Round /{c++} END{print c+0}' "$DEVLOG_DIR/.round-current.md")"
 if [ "$UNFENCED_ROUNDS" = "1" ]; then
   echo "PASS: task-notification did not open a second Round"
 else
   echo "FAIL: expected 1 unfenced Round heading, got $UNFENCED_ROUNDS"
   FAIL=1
 fi
-assert_contains "task-notification segment heading" "### 段落 1 -" "$BODY"
-assert_contains "task-notification segment marked as background" "（背景任務通知）" "$BODY"
-assert_contains "task-notification segment keeps the condensed summary" 'Agent "Fix wave" finished' "$BODY"
-assert_contains "task-notification segment keeps status" "status=completed" "$BODY"
-assert_contains "task-notification segment keeps task-id" "task-id=t1" "$BODY"
-assert_not_contains "task-notification raw tag not recorded" "<task-notification>" "$BODY"
-SEG_LINE="$(grep -n '### 段落 1' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
-SUM_LINE="$(grep -n '^### Summary$' "$DEVLOG_DIR/devlog.md" | head -1 | cut -d: -f1)"
+assert_contains "task-notification segment heading" "### 段落 1 -" "$CUR_BODY"
+assert_contains "task-notification segment marked as background" "（背景任務通知）" "$CUR_BODY"
+assert_contains "task-notification segment keeps the condensed summary" 'Agent "Fix wave" finished' "$CUR_BODY"
+assert_contains "task-notification segment keeps status" "status=completed" "$CUR_BODY"
+assert_contains "task-notification segment keeps task-id" "task-id=t1" "$CUR_BODY"
+assert_not_contains "task-notification raw tag not recorded" "<task-notification>" "$CUR_BODY"
+SEG_LINE="$(grep -n '### 段落 1' "$DEVLOG_DIR/.round-current.md" | head -1 | cut -d: -f1)"
+SUM_LINE="$(grep -n '^### Summary$' "$DEVLOG_DIR/.round-current.md" | head -1 | cut -d: -f1)"
 if [ "$SEG_LINE" -lt "$SUM_LINE" ]; then
   echo "PASS: task-notification segment inserted before Summary"
 else
@@ -506,12 +614,12 @@ fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
 # --- 17: task-notification with no existing Round opens one, still condensed
-rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start"
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
 printf '{"prompt":"%s"}' "$NOTIF_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
-assert_contains "fresh task-notification opens Round 1" "## Round 1 —" "$BODY"
-assert_contains "fresh task-notification condensed summary" 'Agent "Fix wave" finished' "$BODY"
-assert_not_contains "fresh task-notification raw tag not recorded" "<task-notification>" "$BODY"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "fresh task-notification opens Round 1" "## Round 1 —" "$CUR_BODY"
+assert_contains "fresh task-notification condensed summary" 'Agent "Fix wave" finished' "$CUR_BODY"
+assert_not_contains "fresh task-notification raw tag not recorded" "<task-notification>" "$CUR_BODY"
 
 # --- 18: task-notification during an open span is still suppressed ---------
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start"
@@ -563,8 +671,9 @@ EOF
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
 [ -z "$OUT" ] && echo "PASS: matching 工作區 prints nothing" || { echo "FAIL: match stdout [$OUT]"; FAIL=1; }
 [ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: matching 工作區 writes no marker" || { echo "FAIL: marker on match"; FAIL=1; }
-grep -q '^## Round 2' "$WS/.devlog/devlog.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
+grep -q '^## Round 2' "$WS/.devlog/.round-current.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
 
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 

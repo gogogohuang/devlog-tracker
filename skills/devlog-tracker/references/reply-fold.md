@@ -32,7 +32,9 @@
 **什麼時候該開 Reply Fold（純文字提問跨 turn）：** 確定要用文字問題結束這個 turn 時，在結束 turn 之前：
 
 1. 先用 Edit 在這個 Round 的 `### Summary` 之前插入一個小段落，記下**這次
-   問的問題原文**（跟自動折入答案用同一種格式，方便前後對照）：
+   問的問題原文**（跟自動折入答案用同一種格式，方便前後對照）。這一步的
+   編輯對象是 `.devlog/.round-current.md`——提問當下這一輪還沒收尾，本來就
+   還沒併回 `.devlog/devlog.md`（見 `docs/design/round-current-split.md`）：
 
    `````markdown
    ### 段落 N - HH:MM（Claude 提問）
@@ -56,9 +58,20 @@ CLAUDE_PROJECT_DIR="$(pwd)" bash "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open
 這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
 Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 
+上面第 2 步已經讓這一輪正常收尾（Summary／Handoff／Status 都有效），所以
+這個 turn 結束時它會照一般流程併回 `.devlog/devlog.md`。也就是說，**提問
+出去、答案還沒進來的這段期間**（使用者可能過很久才回覆），這一輪確實已經
+完整躺在 `devlog.md` 的歷史裡，不是懸在 `.devlog/.round-current.md` 裡假裝
+還開著——只有在下一則訊息真的進來、被判定是在回答時，才會被下面的機制短
+暫重新打開，回覆折進去、這個 turn 收尾後又立刻併回去。
+
 **下一則訊息進來之後會自動發生什麼事：** `round-start.sh` 看到
-`.awaiting-reply` 且輪次跟目前最後一個 `## Round` 吻合，就不開新 Round，
-改成在那個 Round 的 `### Summary` 之前插入一個新段落：
+`.awaiting-reply`、且輪次跟 `devlog.md` 目前最後一個 `## Round` 吻合（提問
+時那一輪已經正常收尾過，這時只會存在於 `devlog.md`，不在
+`.devlog/.round-current.md` 裡），就不開新 Round，而是先把 `devlog.md` 裡
+那個 Round 整段搬回 `.devlog/.round-current.md`（`devlog_reopen_last_round`，
+`devlog.md` 那邊同步移除），再改成在那個 Round 的 `### Summary` 之前插入一個
+新段落：
 
 `````markdown
 ### 段落 2 - 14:32（回覆上一輪的問題）

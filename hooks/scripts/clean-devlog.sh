@@ -17,37 +17,45 @@ devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 MAIN="$DEVLOG_FILE"
-[ -f "$MAIN" ] || { echo "devlog.md 不存在" >&2; exit 1; }
-
 ROUND_OPEN="$DEVLOG_DIR/.round-open"
-FOUND_START=""
+ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
+# Post-split, devlog.md may legitimately not exist yet (a project's very
+# first round can still be open, with real content sitting only in
+# .round-current.md) — accept either devlog.md existing or .round-current.md
+# having content to clean.
+[ -f "$MAIN" ] || [ -s "$ROUND_CURRENT" ] || { echo "devlog.md 不存在" >&2; exit 1; }
+
+HAS_OPEN=0
 OPEN=""
 if [ -f "$ROUND_OPEN" ]; then
   OPEN="$(json_int_get "$ROUND_OPEN" round)"
   [ -n "$OPEN" ] || { echo ".round-open 內容無法解析，未清空" >&2; exit 1; }
-  FOUND_START="$(devlog_list_round_starts "$MAIN" | awk -v r="$OPEN" '$2 == r { print $1 }' | tail -1)"
-  [ -n "$FOUND_START" ] || { echo "找不到開著的 Round $OPEN，狀態可能不一致，未清空" >&2; exit 1; }
+  [ -s "$ROUND_CURRENT" ] || { echo "找不到開著的 .round-current.md 內容，狀態可能不一致，未清空" >&2; exit 1; }
+  HAS_OPEN=1
 fi
 
-if [ -n "$FOUND_START" ]; then
-  END="$(devlog_block_end "$MAIN" "$FOUND_START")"
+if [ "$HAS_OPEN" -eq 1 ]; then
+  # Keep the split's invariant intact: the open round's content stays in
+  # .round-current.md (renumbered to Round 1), never in devlog.md. Writing
+  # it into devlog.md here would leave .round-open pointing at a round
+  # that Stop/close-open-round.sh can't find (they only ever look at
+  # .round-current.md), silently disabling enforcement for the rest of
+  # this turn and orphaning recovery on a crash.
   TMP_DIR="$(mktemp -d "$DEVLOG_DIR/.clean.XXXXXX")" || exit 1
   trap 'rm -rf "$TMP_DIR"; devlog_lock_release' EXIT
-  NEW_MAIN="$TMP_DIR/devlog.md"
-  awk -v start="$FOUND_START" -v end="$END" -v open="$OPEN" '
-    NR < start || NR > end { next }
-    NR == start && $0 ~ ("^## Round " open "([^0-9]|$)") {
-      sub("^## Round " open, "## Round 1")
-    }
+  NEW_CURRENT="$TMP_DIR/round-current.md"
+  awk -v open="$OPEN" '
+    NR == 1 && $0 ~ ("^## Round " open "([^0-9]|$)") { sub("^## Round " open, "## Round 1") }
     { print }
-  ' "$MAIN" > "$NEW_MAIN" || exit 1
-  [ -s "$NEW_MAIN" ] && grep -q '^## Round 1' "$NEW_MAIN" || { echo "重寫結果異常，未寫入" >&2; exit 1; }
-  mv "$NEW_MAIN" "$MAIN" || exit 1
+  ' "$ROUND_CURRENT" > "$NEW_CURRENT" || exit 1
+  [ -s "$NEW_CURRENT" ] && grep -q '^## Round 1' "$NEW_CURRENT" || { echo "重寫結果異常，未寫入" >&2; exit 1; }
+  mv "$NEW_CURRENT" "$ROUND_CURRENT" || exit 1
+  rm -f "$MAIN" || exit 1
   rm -rf "$TMP_DIR"
   json_int_set "$ROUND_OPEN" round 1
   KEPT_ROUND=1
 else
-  rm -f "$MAIN" || exit 1
+  rm -f "$MAIN" "$ROUND_CURRENT" || exit 1
   KEPT_ROUND=0
 fi
 

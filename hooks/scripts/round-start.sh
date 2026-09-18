@@ -27,6 +27,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
+ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
 SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
@@ -134,6 +135,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
+  devlog_reopen_last_round "$DEVLOG_FILE" "$ROUND_CURRENT" || : > "$ROUND_CURRENT"
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
   fi
@@ -147,9 +149,9 @@ if [ -n "$FOLD_ROUND" ]; then
 
   TS="$(date +%H:%M 2>/dev/null || echo unknown)"
   FULL_TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
-  START_LINE="$(devlog_list_round_starts "$DEVLOG_FILE" | awk -v r="$FOLD_ROUND" '$2==r{print $1}' | tail -1)"
-  END_LINE="$(devlog_block_end "$DEVLOG_FILE" "$START_LINE")"
-  SEG_N=$(( $(devlog_count_segments "$DEVLOG_FILE" "$START_LINE" "$END_LINE") + 1 ))
+  START_LINE="$(devlog_list_round_starts "$ROUND_CURRENT" | awk 'END { print $1 }')"
+  END_LINE="$(devlog_block_end "$ROUND_CURRENT" "$START_LINE")"
+  SEG_N=$(( $(devlog_count_segments "$ROUND_CURRENT" "$START_LINE" "$END_LINE") + 1 ))
 
   SEG_TMP="$DEVLOG_DIR/.segment-insert.tmp"
   {
@@ -164,8 +166,8 @@ if [ -n "$FOLD_ROUND" ]; then
   } > "$SEG_TMP" 2>/dev/null || true
 
   if [ -f "$SEG_TMP" ]; then
-    devlog_insert_before_summary "$DEVLOG_FILE" "$START_LINE" "$END_LINE" "$SEG_TMP" > "$DEVLOG_FILE.tmp" 2>/dev/null \
-      && mv "$DEVLOG_FILE.tmp" "$DEVLOG_FILE" 2>/dev/null || rm -f "$DEVLOG_FILE.tmp" 2>/dev/null || true
+    devlog_insert_before_summary "$ROUND_CURRENT" "$START_LINE" "$END_LINE" "$SEG_TMP" > "$ROUND_CURRENT.tmp" 2>/dev/null \
+      && mv "$ROUND_CURRENT.tmp" "$ROUND_CURRENT" 2>/dev/null || rm -f "$ROUND_CURRENT.tmp" 2>/dev/null || true
     rm -f "$SEG_TMP" 2>/dev/null || true
   fi
 
@@ -181,6 +183,15 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
   fi
   PROMPT="$(printf '%s' "$PROMPT" | sed 's/```/⟨fence⟩/g')"
   PROMPT="$(printf '%s' "$PROMPT" | redact_prompt)"
+
+  # 救孤兒：正常情況下這裡 .round-current.md 應該已經是空的／不存在（上一輪
+  # 已經正常收尾併回 devlog.md）。如果不是——例如上一次 Stop 或
+  # close-open-round.sh 併入失敗，內容被孤立在這裡卻沒有任何機制知道要去
+  # 救它——在下面用 `>` 蓋掉新 skeleton 之前，先把它搶救併回 devlog.md，
+  # 而不是讓 `>` 直接蓋掉遺失。正常情況（檔案已空/不存在）這裡是 no-op。
+  # 必須放在下面的 LAST_N 掃描之前：這樣被搶救回來的孤兒 Round 才會被算進
+  # 編號，下一輪不會意外沿用它的號碼。
+  devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"
 
   LAST_N=0
   if [ -f "$DEVLOG_FILE" ]; then
@@ -199,7 +210,7 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
   TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
 
   {
-    printf '\n## Round %s — %s\n\n' "$NEXT_N" "$TS"
+    printf '## Round %s — %s\n\n' "$NEXT_N" "$TS"
     printf '### User Input\n'
     printf '```text\n'
     printf '%s\n' "$PROMPT"
@@ -208,15 +219,15 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
       printf '%s\n' "$TRUNC_NOTE"
     fi
     printf '\n### Status\nIN_PROGRESS\n'
-  } >> "$DEVLOG_FILE" 2>/dev/null || true
+  } > "$ROUND_CURRENT" 2>/dev/null || true
 
-  if [ -f "$DEVLOG_FILE" ]; then
+  if [ -f "$ROUND_CURRENT" ]; then
     printf '{"round": %s, "opened_at": "%s", "file": "%s"}\n' "$NEXT_N" "$TS" "${DEVLOG_FILE##*/}" > "$ROUND_OPEN" 2>/dev/null || true
   fi
 fi
 
-if [ -f "$DEVLOG_FILE" ]; then
-  cksum < "$DEVLOG_FILE" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+if [ -f "$ROUND_CURRENT" ]; then
+  cksum < "$ROUND_CURRENT" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
 else
   echo "MISSING" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
 fi
@@ -258,8 +269,8 @@ if [ -f "$SEGMENT_FILE" ]; then
     case "$SEG_NOW" in
       ''|*[!0-9]*) : ;;
       *)
-        if [ -f "$DEVLOG_FILE" ]; then
-          SEG_CUR="$(cksum < "$DEVLOG_FILE" 2>/dev/null | tr -d '\n' || echo '')"
+        if [ -f "$ROUND_CURRENT" ]; then
+          SEG_CUR="$(cksum < "$ROUND_CURRENT" 2>/dev/null | tr -d '\n' || echo '')"
         else
           SEG_CUR="MISSING"
         fi
@@ -267,8 +278,8 @@ if [ -f "$SEGMENT_FILE" ]; then
           json_int_set "$SEGMENT_FILE" last_change_epoch "$SEG_NOW"
           json_str_set "$SEGMENT_FILE" last_seen_cksum "$SEG_CUR"
           SEG_MT=""; SEG_SZ=""
-          if [ -f "$DEVLOG_FILE" ]; then
-            if SEG_ID="$(stat -f '%m %z' "$DEVLOG_FILE" 2>/dev/null || stat -c '%Y %s' "$DEVLOG_FILE" 2>/dev/null || true)"; then
+          if [ -f "$ROUND_CURRENT" ]; then
+            if SEG_ID="$(stat -f '%m %z' "$ROUND_CURRENT" 2>/dev/null || stat -c '%Y %s' "$ROUND_CURRENT" 2>/dev/null || true)"; then
               SEG_MT="${SEG_ID%% *}"
               SEG_SZ="${SEG_ID#* }"
             fi

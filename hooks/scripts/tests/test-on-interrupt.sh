@@ -31,7 +31,8 @@ assert_contains() {
 }
 
 write_open() {
-  cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+  rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-current.md"
+  cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### Status
@@ -45,7 +46,7 @@ for err in rate_limit billing_error account_on_hold; do
   write_open
   echo "{\"error\":\"$err\"}" | bash "$SCRIPT_DIR/on-stop-failure.sh"
   assert_exit "StopFailure $err -> exit 0" 0 $?
-  BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+  BODY="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
   case "$BODY" in
     *INTERRUPTED*) echo "FAIL: $err must not stamp INTERRUPTED"; FAIL=1 ;;
     *) echo "PASS: $err left Status IN_PROGRESS" ;;
@@ -81,9 +82,9 @@ assert_contains "session end reason" "SessionEnd:clear" "$BODY"
 # SessionEnd without marker
 write_open
 rm -f "$DEVLOG_DIR/.round-open"
-BEFORE="$(cat "$DEVLOG_DIR/devlog.md")"
+BEFORE="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 echo '{"reason":"other"}' | bash "$SCRIPT_DIR/on-session-end.sh"
-AFTER="$(cat "$DEVLOG_DIR/devlog.md")"
+AFTER="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 if [ "$BEFORE" = "$AFTER" ]; then
   echo "PASS: SessionEnd without .round-open is a no-op"
 else
@@ -101,7 +102,7 @@ else
   echo "FAIL: .interrupted missing"
   FAIL=1
 fi
-BODY="$(cat "$DEVLOG_DIR/devlog.md")"
+BODY="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || echo '')"
 case "$BODY" in
   *INTERRUPTED*) echo "FAIL: on-tool-failure must not patch devlog.md"; FAIL=1 ;;
   *) echo "PASS: on-tool-failure did not patch devlog.md" ;;
@@ -127,9 +128,12 @@ else
   echo "PASS: disabled -> no .interrupted"
 fi
 
-# SessionEnd on a completed open Round must not stamp
+# SessionEnd on a completed open Round must not stamp, but is still merged
+# into devlog.md (close-open-round.sh always merges; only the INTERRUPTED
+# stamp is skipped when recovered).
 touch "$DEVLOG_DIR/.enabled"
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-current.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -151,19 +155,26 @@ finished
 DONE
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
+printf '\n' >> "$DEVLOG_DIR/.round-current.md"
 echo '{"reason":"clear"}' | bash "$SCRIPT_DIR/on-session-end.sh"
 BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 case "$BODY" in
   *INTERRUPTED*) echo "FAIL: SessionEnd must not stamp a completed Round"; FAIL=1 ;;
   *) echo "PASS: SessionEnd left completed Status DONE" ;;
 esac
+assert_contains "recovered-complete merged into devlog.md" $'### Status\nDONE' "$BODY"
 if [ -f "$DEVLOG_DIR/.round-open" ]; then
   echo "FAIL: SessionEnd recovered-complete should delete .round-open"
   FAIL=1
 else
   echo "PASS: SessionEnd recovered-complete deleted .round-open"
+fi
+if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+  echo "FAIL: SessionEnd recovered-complete should delete .round-current.md"
+  FAIL=1
+else
+  echo "PASS: SessionEnd recovered-complete deleted .round-current.md"
 fi
 
 if [ "$FAIL" -eq 0 ]; then
