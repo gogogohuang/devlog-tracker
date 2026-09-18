@@ -20,11 +20,15 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test cli/"
+    "test": "node --test cli/*.test.js"
   },
   "license": "Apache-2.0",
   "author": {
     "name": "gogogohuang"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gogogohuang/devlog-tracker.git"
   },
   "keywords": [
     "devlog"
