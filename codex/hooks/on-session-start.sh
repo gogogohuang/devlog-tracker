@@ -7,8 +7,9 @@
 #
 # One documented field-name gap: Codex's SessionStart payload may call the
 # "how did this session start" field `how` instead of Claude Code's `source`.
-# We try both and default to "startup" (session-start-devlog.sh treats a
-# missing/unrecognized source as the ordinary startup path).
+# We try both and default to "startup" on purpose: session-start-devlog.sh
+# SKIPS the dangling-round heal when source is missing/unrecognized (same as
+# `compact`); the wrapper forces SRC="startup" so healing runs.
 set -uo pipefail
 _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
@@ -29,7 +30,8 @@ fi
 if command -v jq >/dev/null 2>&1; then
   PAYLOAD="$(jq -n --arg s "$SRC" '{source:$s}')"
 else
-  PAYLOAD="$(printf '{"source":"%s"}' "$SRC")"
+  esc="$(printf '%s' "$SRC" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  PAYLOAD="$(printf '{"source":"%s"}' "$esc")"
 fi
 printf '%s' "$PAYLOAD" | bash "$PLUGIN_SCRIPTS/session-start-devlog.sh"
 exit 0

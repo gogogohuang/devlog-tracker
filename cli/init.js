@@ -11,6 +11,9 @@ function parseArgs(argv) {
   for (const arg of argv) {
     if (arg === '--codex') platforms.push('codex');
     else if (arg === '--cursor') platforms.push('cursor');
+    else if (arg.startsWith('-')) {
+      throw new Error(`Unknown option: ${arg} (supported: --codex, --cursor)`);
+    }
   }
   return { platforms };
 }
@@ -38,7 +41,13 @@ async function run(argv, { repoRoot, targetDir, version }) {
   const selected = platforms.length > 0 ? platforms : await promptPlatforms();
   const vendorRoot = vendor({ repoRoot, targetDir, version });
   for (const name of selected) {
-    PLATFORMS[name].install({ repoRoot, targetDir, vendorRoot });
+    try {
+      PLATFORMS[name].install({ repoRoot, targetDir, vendorRoot });
+    } catch (err) {
+      throw new Error(
+        `Installed files to ${vendorRoot} but failed to configure ${name}: ${String(err.message).replace(/\.$/, '')}. Fix the issue and re-run \`devlog-tracker init\` (safe to re-run).`
+      );
+    }
   }
   return { vendorRoot, platforms: selected };
 }

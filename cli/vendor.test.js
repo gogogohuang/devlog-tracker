@@ -66,3 +66,19 @@ test('re-running vendor overwrites rather than duplicating', () => {
   assert.equal(fs.readFileSync(path.join(vendorRoot, 'commands', 'start.md'), 'utf8'), '# start v2\n');
   assert.equal(fs.readFileSync(path.join(vendorRoot, 'VERSION'), 'utf8'), '0.22.0\n');
 });
+
+test('env.sh escapes shell metacharacters in the vendor path', () => {
+  const repoRoot = tmpdir();
+  const parent = tmpdir();
+  const targetDir = path.join(parent, 'a$(x)"b`c\\d');
+  fs.mkdirSync(targetDir);
+  makeFakeRepo(repoRoot);
+
+  const vendorRoot = vendor({ repoRoot, targetDir, version: '0.21.0' });
+
+  assert.equal(
+    fs.readFileSync(path.join(vendorRoot, 'env.sh'), 'utf8'),
+    `export DEVLOG_TRACKER_ROOT="${vendorRoot.replace(/[\\"$`]/g, '\\$&')}"\n`
+  );
+  assert.ok(fs.readFileSync(path.join(vendorRoot, 'env.sh'), 'utf8').includes('a\\$(x)\\"b\\`c\\\\d'));
+});

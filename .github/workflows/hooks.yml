@@ -20,4 +20,4 @@ jobs:
       - name: Run hook self-checks
         run: bash hooks/scripts/run-tests.sh
       - name: Run CLI unit tests
-        run: node --test cli/*.test.js
+        run: npm test

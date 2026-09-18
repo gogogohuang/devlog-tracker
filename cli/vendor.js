@@ -17,6 +17,11 @@ function copyRecursive(src, dest) {
   fs.copyFileSync(src, dest);
 }
 
+function envShContent(vendorRoot) {
+  const escaped = vendorRoot.replace(/[\\"$`]/g, '\\$&');
+  return `export DEVLOG_TRACKER_ROOT="${escaped}"\n`;
+}
+
 function vendor({ repoRoot, targetDir, version }) {
   const vendorRoot = path.join(targetDir, '.devlog-tracker');
   for (const entry of VENDOR_ENTRIES) {
@@ -25,7 +30,7 @@ function vendor({ repoRoot, targetDir, version }) {
     copyRecursive(src, path.join(vendorRoot, entry));
   }
   fs.writeFileSync(path.join(vendorRoot, 'VERSION'), `${version}\n`);
-  fs.writeFileSync(path.join(vendorRoot, 'env.sh'), `export DEVLOG_TRACKER_ROOT="${vendorRoot}"\n`);
+  fs.writeFileSync(path.join(vendorRoot, 'env.sh'), envShContent(vendorRoot));
   return vendorRoot;
 }
 

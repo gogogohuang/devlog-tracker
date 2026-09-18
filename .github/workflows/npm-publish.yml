@@ -27,6 +27,8 @@ jobs:
         run: |
           npm install -g npm@latest
           npm --version
+      - name: Test
+        run: npm test
       - name: Publish
         if: steps.version-check.outputs.published != steps.version-check.outputs.local
         run: npm publish

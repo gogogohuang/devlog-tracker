@@ -27,13 +27,15 @@
 /plugin install devlog-tracker@devlog-tracker
 ```
 
-### npx（Cursor／Codex 用；Claude Code 也可以，但非主推）
+### npx（Cursor／Codex 用）
+
+Claude Code 請用上面的 `/plugin marketplace add` 安裝方式；這個 CLI 不會設定 Claude Code。
 
 ```bash
 npx devlog-tracker init
 ```
 
-沒帶 `--codex`／`--cursor` 時會互動式問要裝哪個平台；也可以直接指定：
+沒帶 `--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝所有支援的平台（codex + cursor）。也可以直接指定：
 
 ```bash
 npx devlog-tracker init --codex --cursor
@@ -43,6 +45,11 @@ npx devlog-tracker init --codex --cursor
 複製進專案的 `.devlog-tracker/`，並把對應平台的 `hooks.json` 合併進專案（不覆蓋
 其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
 版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+
+`init` 會把這台機器專屬的絕對路徑寫進 `.codex/hooks.json`、`.cursor/hooks.json` 與
+`.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上
+跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與
+產生出來的 hooks.json 加進 `.gitignore`。
 
 ### Cursor（選用）
 
