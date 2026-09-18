@@ -1,6 +1,7 @@
 'use strict';
 const path = require('path');
 const { mergeHooksTemplate } = require('../merge-hooks');
+const { upsertAgentsMd } = require('../agents-md');
 
 function install({ repoRoot, targetDir, vendorRoot }) {
   mergeHooksTemplate({
@@ -8,6 +9,7 @@ function install({ repoRoot, targetDir, vendorRoot }) {
     targetPath: path.join(targetDir, '.codex', 'hooks.json'),
     vendorRoot,
   });
+  upsertAgentsMd(targetDir);
 }
 
 module.exports = { install };
