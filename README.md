@@ -27,6 +27,23 @@
 /plugin install devlog-tracker@devlog-tracker
 ```
 
+### npx（Cursor／Codex 用；Claude Code 也可以，但非主推）
+
+```bash
+npx devlog-tracker init
+```
+
+沒帶 `--codex`／`--cursor` 時會互動式問要裝哪個平台；也可以直接指定：
+
+```bash
+npx devlog-tracker init --codex --cursor
+```
+
+會把 `hooks/scripts/`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/`
+複製進專案的 `.devlog-tracker/`，並把對應平台的 `hooks.json` 合併進專案（不覆蓋
+其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
+版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+
 ### Cursor（選用）
 
 Claude Code 仍是主要安裝方式。若要在 Cursor workspace 使用，先設定

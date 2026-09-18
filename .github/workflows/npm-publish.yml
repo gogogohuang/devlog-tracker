@@ -1,0 +1,28 @@
+name: npm-publish
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Check whether package.json version changed
+        id: version-check
+        run: |
+          PUBLISHED_VERSION="$(npm view devlog-tracker version 2>/dev/null || echo "none")"
+          LOCAL_VERSION="$(node -p "require('./package.json').version")"
+          echo "published=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
+          echo "local=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        if: steps.version-check.outputs.published != steps.version-check.outputs.local
+        run: npm publish

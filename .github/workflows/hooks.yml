@@ -7,6 +7,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
       - name: Shellcheck hook scripts
@@ -16,3 +19,5 @@ jobs:
             hooks/scripts/*.sh hooks/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
       - name: Run hook self-checks
         run: bash hooks/scripts/run-tests.sh
+      - name: Run CLI unit tests
+        run: node --test cli/
