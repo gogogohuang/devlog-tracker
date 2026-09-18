@@ -1,0 +1,32 @@
+{
+  "name": "devlog-tracker",
+  "version": "0.20.0",
+  "description": "npx installer for the devlog-tracker Claude Code plugin's Cursor and Codex adapters.",
+  "bin": {
+    "devlog-tracker": "bin/devlog-tracker.js"
+  },
+  "files": [
+    "bin",
+    "cli",
+    "hooks/scripts",
+    "codex/hooks",
+    "cursor/hooks",
+    "skills",
+    "commands",
+    "codex/hooks.json",
+    "cursor/hooks.json"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test cli/"
+  },
+  "license": "Apache-2.0",
+  "author": {
+    "name": "gogogohuang"
+  },
+  "keywords": [
+    "devlog"
+  ]
+}
