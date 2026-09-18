@@ -25,8 +25,18 @@ async function main(argv) {
     return 0;
   }
   if (command === 'status') {
-    console.error('"status" is not wired up yet.');
-    return 1;
+    const { status } = require('../cli/status');
+    const result = status({ targetDir: process.cwd(), currentVersion: pkg.version });
+    if (!result.installed) {
+      console.log('devlog-tracker is not installed in this project. Run `npx devlog-tracker init`.');
+    } else if (result.upToDate) {
+      console.log(`devlog-tracker ${result.vendoredVersion} is up to date.`);
+    } else {
+      console.log(
+        `devlog-tracker ${result.vendoredVersion} is installed; ${pkg.version} is available. Run \`npx devlog-tracker init\` to upgrade.`
+      );
+    }
+    return 0;
   }
   console.error(`Unknown command: ${command}`);
   return 1;
