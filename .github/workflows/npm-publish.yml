@@ -1,9 +1,7 @@
 name: npm-publish
 on:
-  push:
-    branches: [main]
-    paths:
-      - package.json
+  release:
+    types: [published]
 permissions:
   contents: read
   id-token: write
@@ -16,13 +14,10 @@ jobs:
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
-      - name: Check whether package.json version changed
-        id: version-check
-        run: |
-          PUBLISHED_VERSION="$(npm view devlog-tracker version 2>/dev/null || echo "none")"
-          LOCAL_VERSION="$(node -p "require('./package.json').version")"
-          echo "published=$PUBLISHED_VERSION" >> "$GITHUB_OUTPUT"
-          echo "local=$LOCAL_VERSION" >> "$GITHUB_OUTPUT"
+      - name: Check release tag matches version files
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/sync-version.js --check --tag "$RELEASE_TAG"
       - name: Upgrade npm for OIDC trusted publishing
         run: |
           npm install -g npm@latest
@@ -30,5 +25,10 @@ jobs:
       - name: Test
         run: npm test
       - name: Publish
-        if: steps.version-check.outputs.published != steps.version-check.outputs.local
-        run: npm publish
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "devlog-tracker@$VERSION" version >/dev/null 2>&1; then
+            echo "devlog-tracker@$VERSION is already on npm; skipping publish."
+          else
+            npm publish
+          fi
