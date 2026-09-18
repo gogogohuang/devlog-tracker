@@ -191,8 +191,12 @@ case "$SPAN_HASH_MISS_MSG" in
   *) echo "PASS: expired-span hash-miss message does not forbid a new Round" ;;
 esac
 case "$SPAN_HASH_MISS_MSG" in
-  *"檔案尾端"*'## Round'*) echo "PASS: expired-span hash-miss message says append a Round at EOF" ;;
-  *) echo "FAIL: expired-span hash-miss message should say to append ## Round at 檔案尾端, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
+  *".round-current.md"*'## Round'*) echo "PASS: expired-span hash-miss message points at .round-current.md" ;;
+  *) echo "FAIL: expired-span hash-miss message should point at .round-current.md, got: $SPAN_HASH_MISS_MSG"; FAIL=1 ;;
+esac
+case "$SPAN_HASH_MISS_MSG" in
+  *"檔案尾端"*) echo "FAIL: expired-span hash-miss message still says 檔案尾端 (pre round-current-split wording)"; FAIL=1 ;;
+  *) echo "PASS: expired-span hash-miss message no longer says 檔案尾端" ;;
 esac
 
 # --- Span Mode Scenario 3: ticks at max, devlog IS written this tick ------
