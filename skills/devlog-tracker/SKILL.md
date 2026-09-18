@@ -60,6 +60,7 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 - 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
   收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
+- Cursor／Codex 上沒有 `/devlog-tracker:*` slash 選單時的指令做法：見 README「Cursor（選用）」「Codex（選用）」章節。
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
 

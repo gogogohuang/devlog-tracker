@@ -14,6 +14,10 @@ echo "=== test-adapters.sh ==="
 if ! bash "$DIR/../../cursor/hooks/test-adapters.sh"; then
   FAIL=1
 fi
+echo "=== codex/test-adapters.sh ==="
+if ! bash "$DIR/../../codex/hooks/test-adapters.sh"; then
+  FAIL=1
+fi
 if [ "$FAIL" -ne 0 ]; then
   echo "Some hook self-checks FAILED."
   exit 1

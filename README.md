@@ -51,6 +51,32 @@ bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
 # pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
 ```
 
+### Codex（選用）
+
+Claude Code 仍是主要安裝方式。若要在 Codex CLI 使用，先設定
+`DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `codex/hooks.json` 的
+`hooks` 合併進專案（或 `~/.codex/`）的 `hooks.json`。也可以把整個 `codex/hooks/` 與
+`hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
+
+Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／
+`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在
+Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的
+輪次）不受影響。
+
+Codex 沒有 `/devlog-tracker:*` slash 指令面；hooks 裝好後，請用與 Claude commands
+相同的腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
+`DEVLOG_TRACKER_ROOT`）：
+
+```bash
+export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
+export CLAUDE_PROJECT_DIR="$(pwd)"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
+# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
+```
+
 ## 快速開始
 
 在專案裡下一次：
