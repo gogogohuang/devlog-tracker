@@ -171,7 +171,16 @@ else
   rm -f "$TMP" 2>/dev/null || true
 fi
 if [ "$AWK_RC" -eq 0 ] || [ "$AWK_RC" -eq 3 ]; then
-  devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"
+  # 只有併入真的成功才清掉 .round-open：併入失敗（例如寫入失敗）時保留它，
+  # 讓下一次 dangling-heal（下一則訊息／下次 SessionStart 都會跑到）還有
+  # 機會重試，而不是內容被孤立在 .round-current.md 卻沒有任何機制知道要去
+  # 救它。.interrupted 這個訊號本身已經處理完，兩種結果都清掉。
+  if devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"; then
+    drop_markers
+  else
+    rm -f "$INTERRUPTED_FLAG" 2>/dev/null || true
+  fi
+else
+  drop_markers
 fi
-drop_markers
 exit 0

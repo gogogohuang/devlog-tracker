@@ -43,6 +43,14 @@ assert_contains() {
   esac
 }
 
+assert_not_contains() {
+  local desc="$1" needle="$2" haystack="$3"
+  case "$haystack" in
+    *"$needle"*) echo "FAIL: $desc (expected NOT to contain '$needle')"; FAIL=1 ;;
+    *) echo "PASS: $desc" ;;
+  esac
+}
+
 # Round-current split: enforce-devlog.sh validates .round-current.md now
 # (not devlog.md), and merges it into devlog.md on success. One assertion
 # per "should succeed" case exercises that merge.
@@ -469,14 +477,18 @@ esac
 # .round-current.md's content contains zero "## Round " lines anywhere —
 # matching the pre-split last_round_block()'s `if (start == 0) exit 0`
 # behavior, and the plan's Global Constraints ("解析不到任何 `## Round`：
-# fail-open（不擋）"). Content is still merged into devlog.md (there is
-# nothing round-shaped to validate, but the round is still finished).
+# fail-open（不擋）"). Fixed again on the final whole-branch review: this
+# content must NOT be merged into devlog.md — there is nothing round-shaped
+# here, and merging would silently commit unstructured noise into the
+# permanent historical record. .round-current.md is left in place untouched
+# so a later turn (or round-start.sh's rescue-merge) can still recover it.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 printf '%s\n' "just a note, not a round" > "$DEVLOG_DIR/.round-current.md"
 OUT5="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 RC5=$?
 assert_exit "no ## Round line at all -> fail-open, allowed" 0 "$RC5"
-assert_round_merged "no ## Round line at all" "just a note, not a round"
+assert_contains "no ## Round line at all: .round-current.md left untouched" "just a note, not a round" "$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || true)"
+assert_not_contains "no ## Round line at all: not merged into devlog.md" "just a note, not a round" "$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || true)"
 
 # --- Heading Scenario 6: Checkpoint text must not satisfy headings --------
 # Last Round lacks both headings; a following, trailing "## Checkpoint"

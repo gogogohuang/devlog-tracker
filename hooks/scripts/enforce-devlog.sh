@@ -552,14 +552,31 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
   fi
 fi
 
-rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
 rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
 
 # 這一輪通過所有驗證，正式收尾：把 .round-current.md 併回 devlog.md（併完
 # 就地刪除 .round-current.md）。放在 checkpoint 計數檢查之前，這樣如果這輪
 # 內容裡本來就有 Claude 寫的「## Checkpoint」，併進去之後馬上就會被下面的
 # 數量比對算到，不用再等下一輪。
-devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"
+#
+# 只有 LAST_ROUND 非空（代表上面真的抓到、驗證過一個 `## Round `）才併入。
+# LAST_ROUND 是空的代表整個驗證區塊 fail-open 跳過了（.round-current.md
+# 裡完全沒有 `## Round ` 這一行，例如純雜訊）——這種情況併入只會把未結構化
+# 的內容寫進 devlog.md 的永久歷史，所以刻意保留 .round-current.md 原封不動，
+# 讓之後的輪次或人工介入還能回頭處理，而不是併進去就再也分不出來。
+#
+# .round-open 只有在真的併入成功之後才刪除：devlog_merge_round_current
+# 失敗時（例如寫入失敗）保留 .round-open，讓既有的 dangling-heal 機制
+# （close-open-round.sh，下次 UserPromptSubmit / SessionStart 都會跑到）
+# 之後還有機會重試，而不是內容被孤立在 .round-current.md 卻沒有任何機制
+# 知道要去救它。
+if [ -n "$LAST_ROUND" ]; then
+  if devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"; then
+    rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+  fi
+else
+  rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+fi
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，
 # 讓 span 繼續正常運作而不是每輪都卡在「超過門檻」。

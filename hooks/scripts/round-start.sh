@@ -184,6 +184,15 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
   PROMPT="$(printf '%s' "$PROMPT" | sed 's/```/⟨fence⟩/g')"
   PROMPT="$(printf '%s' "$PROMPT" | redact_prompt)"
 
+  # 救孤兒：正常情況下這裡 .round-current.md 應該已經是空的／不存在（上一輪
+  # 已經正常收尾併回 devlog.md）。如果不是——例如上一次 Stop 或
+  # close-open-round.sh 併入失敗，內容被孤立在這裡卻沒有任何機制知道要去
+  # 救它——在下面用 `>` 蓋掉新 skeleton 之前，先把它搶救併回 devlog.md，
+  # 而不是讓 `>` 直接蓋掉遺失。正常情況（檔案已空/不存在）這裡是 no-op。
+  # 必須放在下面的 LAST_N 掃描之前：這樣被搶救回來的孤兒 Round 才會被算進
+  # 編號，下一輪不會意外沿用它的號碼。
+  devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"
+
   LAST_N=0
   if [ -f "$DEVLOG_FILE" ]; then
     LAST_N="$(awk '

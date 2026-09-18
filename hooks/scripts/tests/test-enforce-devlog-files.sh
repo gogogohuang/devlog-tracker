@@ -37,11 +37,11 @@ assert_exit() {
 # (not devlog.md), and merges it into devlog.md on success. One assertion
 # per "should succeed" case exercises that merge.
 assert_round_merged() {
-  local desc="$1"
+  local desc="$1" marker="${2:-fixture}"
   if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
     echo "FAIL: $desc (.round-current.md should be merged away)"
     FAIL=1
-  elif ! grep -q 'fixture' "$DEVLOG_DIR/devlog.md" 2>/dev/null; then
+  elif ! grep -q "$marker" "$DEVLOG_DIR/devlog.md" 2>/dev/null; then
     echo "FAIL: $desc (devlog.md missing merged content)"
     FAIL=1
   else
