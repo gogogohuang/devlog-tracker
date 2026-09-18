@@ -130,7 +130,7 @@ fi
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
   if [ "$SPAN_VALID" -eq 1 ]; then
-    echo "這一輪尚未寫入 devlog.md。請依 skills/devlog-tracker/SKILL.md 在檔案尾端追加一個新的 ## Round，包含 User Input / Summary / Reply / Handoff / Status。" >&2
+    echo "這一輪尚未寫入。請依 skills/devlog-tracker/SKILL.md 在 .devlog/.round-current.md 建立一個新的 ## Round（編號接在 devlog.md 目前最後一輪之後），包含 User Input / Summary / Reply / Handoff / Status；收尾成功後 hook 會自動併回 devlog.md，不要自己直接寫進 devlog.md。" >&2
   else
     echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Reply / Handoff / Status。不要再新增一個 ## Round。" >&2
   fi
