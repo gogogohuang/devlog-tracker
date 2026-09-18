@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-session-start.sh\""
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-user-prompt-submit.sh\""
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-pre-tool.sh\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-stop.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-session-end.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

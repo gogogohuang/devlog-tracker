@@ -1,0 +1,34 @@
+name: npm-publish
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+      - name: Check release tag matches version files
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/sync-version.js --check --tag "$RELEASE_TAG"
+      - name: Upgrade npm for OIDC trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+      - name: Test
+        run: npm test
+      - name: Publish
+        run: |
+          VERSION="$(node -p "require('./package.json').version")"
+          if npm view "devlog-tracker@$VERSION" version >/dev/null 2>&1; then
+            echo "devlog-tracker@$VERSION is already on npm; skipping publish."
+          else
+            npm publish
+          fi

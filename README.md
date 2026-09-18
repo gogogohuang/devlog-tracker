@@ -1,6 +1,6 @@
 # devlog-tracker
 
-**版本** 0.20.0
+**版本** 0.21.0
 
 在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
@@ -27,6 +27,30 @@
 /plugin install devlog-tracker@devlog-tracker
 ```
 
+### npx（Cursor／Codex 用）
+
+Claude Code 請用上面的 `/plugin marketplace add` 安裝方式；這個 CLI 不會設定 Claude Code。
+
+```bash
+npx devlog-tracker init
+```
+
+沒帶 `--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝所有支援的平台（codex + cursor）。也可以直接指定：
+
+```bash
+npx devlog-tracker init --codex --cursor
+```
+
+會把 `hooks/scripts/`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/`
+複製進專案的 `.devlog-tracker/`，並把對應平台的 `hooks.json` 合併進專案（不覆蓋
+其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
+版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+
+`init` 會把這台機器專屬的絕對路徑寫進 `.codex/hooks.json`、`.cursor/hooks.json` 與
+`.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上
+跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與
+產生出來的 hooks.json 加進 `.gitignore`。
+
 ### Cursor（選用）
 
 Claude Code 仍是主要安裝方式。若要在 Cursor workspace 使用，先設定
@@ -38,6 +62,32 @@ Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘�
 hook 仍依 Cursor 支援的事件執行。
 
 Cursor 沒有 `/devlog-tracker:*` slash 指令面；hooks 裝好後，請用與 Claude commands
+相同的腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
+`DEVLOG_TRACKER_ROOT`）：
+
+```bash
+export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
+export CLAUDE_PROJECT_DIR="$(pwd)"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
+bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
+# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
+```
+
+### Codex（選用）
+
+Claude Code 仍是主要安裝方式。若要在 Codex CLI 使用，先設定
+`DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `codex/hooks.json` 的
+`hooks` 合併進專案（或 `~/.codex/`）的 `hooks.json`。也可以把整個 `codex/hooks/` 與
+`hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
+
+Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／
+`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在
+Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的
+輪次）不受影響。
+
+Codex 沒有 `/devlog-tracker:*` slash 指令面；hooks 裝好後，請用與 Claude commands
 相同的腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
 `DEVLOG_TRACKER_ROOT`）：
 

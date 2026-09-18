@@ -60,6 +60,7 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 - 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
   收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
+- Cursor／Codex 上沒有 `/devlog-tracker:*` slash 選單。若專案是用 `npx devlog-tracker init` 裝的，指令對照就是 `.devlog-tracker/commands/*.md`：先 `source .devlog-tracker/env.sh`，再照使用者意圖對應的那份 `.md` 檔案的步驟做（例如「開始追蹤」對應 `commands/start.md`，「接續上一題」對應 `commands/continue.md`）。手動裝的專案見 README「Cursor（選用）」「Codex（選用）」章節。
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
 
