@@ -411,7 +411,7 @@ Keep is never auto-run.
 
 ## Testing
 
-`hooks/scripts/keep-move.sh` has `hooks/scripts/test-keep-move.sh`
+`hooks/scripts/keep-move.sh` has `hooks/scripts/tests/test-keep-move.sh`
 (assert-and-exit). Topic-split *judgment* still lives in
 `commands/keep.md` (LLM steps); the script only moves contiguous
 ranges after confirm. The keep turn's own Round still has to satisfy
@@ -424,7 +424,7 @@ Stop (`### Summary` / `### Handoff` / Status rules).
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
 | `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` |
-| `hooks/scripts/test-keep-move.sh` | Self-check for `keep-move.sh` |
+| `hooks/scripts/tests/test-keep-move.sh` | Self-check for `keep-move.sh` |
 | `hooks/scripts/session-start-devlog.sh` | Surfaces `## Kept 索引` in the startup/resume/compact/fork excerpt |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |
