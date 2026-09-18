@@ -384,11 +384,13 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 跟 Checkpoint／Span 不同，管的是「開發**過程**踩過的坑」，不是進度或架構——架構
 決策的 SSOT 永遠是 `docs/design/*.md`。預設關閉，隸屬主開關（沒下過
-`/devlog-tracker:start` 會被拒絕）。開著時只有兩種訊號考慮記一筆：這輪 `Status`
-從 `BLOCKED` 解開，或你自行判斷這輪明顯繞了一圈——完全不 hook 強制，寫不寫都不
-影響這一輪能不能收尾。
+`/devlog-tracker:start` 會被拒絕）。開著時有三種訊號考慮記一筆：這輪 `Status`
+從 `BLOCKED` 解開、你自行判斷這輪明顯繞了一圈，或工作區漂移（宣稱跟實際不符）
+累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）時 hook 印
+的一句顧問式建議。三種都完全不 hook 強制寫入本身——寫不寫都不影響這一輪能不能
+收尾。
 
-寫法、per-topic 存檔規則、索引重建，見
+寫法、per-topic 存檔規則、索引重建、漂移計數細節，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
 設計見 `docs/design/lessons-mode.md`）。
 

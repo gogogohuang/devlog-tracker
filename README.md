@@ -79,6 +79,7 @@ bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
 | `/devlog-tracker:lessons-on` | 開啟預設關閉的 Lessons Mode（隸屬主開關，沒 `start` 過會拒絕）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。 |
 | `/devlog-tracker:lessons-off` | 關閉 Lessons Mode，不動任何已寫的 `devlog.lessons.*.md` 或索引。 |
 | `/devlog-tracker:lessons [<topic>]` | 沒給 topic：印 `## Lessons 索引`。給 topic：印該主題檔全文。純讀取，不核對工作區、不等確認。 |
+| `/devlog-tracker:lessons-drift <次數>` | 調整 Lessons Mode「工作區漂移重複發生」機制性提醒的門檻（預設 3 次）。隸屬 Lessons Mode，沒開會回報 `LESSONS_NOT_ENABLED`。 |
 
 ## 強制記錄開著之後
 
@@ -167,7 +168,7 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 
 #### Lessons Mode（預設關閉，不自動）
 
-開著時，Status 從 `BLOCKED` 解開或明顯繞路才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。完全不 hook 強制、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
+開著時，Status 從 `BLOCKED` 解開、明顯繞路，或工作區漂移累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。三種訊號都完全不 hook 強制寫入本身、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
 
 ## 測試
 
