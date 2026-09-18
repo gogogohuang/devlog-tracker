@@ -89,14 +89,18 @@ printf '%s\n' '{"rounds_since_checkpoint": 19, "max_silent_rounds": 20, "checkpo
 OUT="$(bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed)"
 assert_eq "open round: exit 0" 0 "$?"
 assert_eq "open round: stdout" "CLEANED KEPT_ROUND=1" "$OUT"
-grep -q '^# project summary' "$OPEN/.devlog/devlog.md" && { echo "FAIL: project summary survived"; FAIL=1; } || echo "PASS: project summary discarded"
-grep -q '^## Round 1 ' "$OPEN/.devlog/devlog.md" && echo "PASS: open round renumbered to 1" || { echo "FAIL: renumber"; FAIL=1; }
-grep -q '^## Round 2 ' "$OPEN/.devlog/devlog.md" && { echo "FAIL: old round 2 survived"; FAIL=1; } || echo "PASS: old rounds gone"
-[ "$(devlog_list_round_starts "$OPEN/.devlog/devlog.md" | wc -l | tr -d ' ')" = "1" ] && echo "PASS: exactly one real heading remains (fence-aware count)" || { echo "FAIL: heading count"; FAIL=1; }
-grep -q '^please do not touch this fake heading:$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced body preserved verbatim" || { echo "FAIL: fenced body altered"; FAIL=1; }
-grep -q '^## Round 1 fake$' "$OPEN/.devlog/devlog.md" && echo "PASS: fenced fake heading untouched" || { echo "FAIL: fenced fake heading renamed"; FAIL=1; }
-grep -q '^## Round 99 — fake heading$' "$OPEN/.devlog/devlog.md" && echo "PASS: second fenced fake heading untouched" || { echo "FAIL: second fenced fake heading renamed"; FAIL=1; }
-[ ! -e "$OPEN/.devlog/.round-current.md" ] && echo "PASS: .round-current.md cleared" || { echo "FAIL: .round-current.md remains"; FAIL=1; }
+# Round-current split invariant: the surviving round lands in
+# .round-current.md (renumbered to Round 1), and devlog.md is emptied/gone
+# — never the other way around (that would leave .round-open pointing at a
+# round Stop/close-open-round.sh can no longer find).
+[ ! -s "$OPEN/.devlog/devlog.md" ] && echo "PASS: devlog.md emptied/absent (project summary + old rounds discarded)" || { echo "FAIL: devlog.md still has content"; FAIL=1; }
+grep -q '^## Round 1 ' "$OPEN/.devlog/.round-current.md" && echo "PASS: open round renumbered to 1" || { echo "FAIL: renumber"; FAIL=1; }
+grep -q '^## Round 2 ' "$OPEN/.devlog/.round-current.md" && { echo "FAIL: old round 2 survived"; FAIL=1; } || echo "PASS: old rounds gone"
+[ "$(devlog_list_round_starts "$OPEN/.devlog/.round-current.md" | wc -l | tr -d ' ')" = "1" ] && echo "PASS: exactly one real heading remains (fence-aware count)" || { echo "FAIL: heading count"; FAIL=1; }
+grep -q '^please do not touch this fake heading:$' "$OPEN/.devlog/.round-current.md" && echo "PASS: fenced body preserved verbatim" || { echo "FAIL: fenced body altered"; FAIL=1; }
+grep -q '^## Round 1 fake$' "$OPEN/.devlog/.round-current.md" && echo "PASS: fenced fake heading untouched" || { echo "FAIL: fenced fake heading renamed"; FAIL=1; }
+grep -q '^## Round 99 — fake heading$' "$OPEN/.devlog/.round-current.md" && echo "PASS: second fenced fake heading untouched" || { echo "FAIL: second fenced fake heading renamed"; FAIL=1; }
+[ -s "$OPEN/.devlog/.round-current.md" ] && echo "PASS: .round-current.md holds the renumbered round" || { echo "FAIL: .round-current.md empty/missing"; FAIL=1; }
 grep -q '"round": 1' "$OPEN/.devlog/.round-open" && echo "PASS: round-open reset to 1" || { echo "FAIL: round-open"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.span-open" ] && echo "PASS: span-open removed" || { echo "FAIL: span-open remains"; FAIL=1; }
 [ ! -e "$OPEN/.devlog/.interrupted" ] && echo "PASS: interrupted removed" || { echo "FAIL: interrupted remains"; FAIL=1; }
@@ -104,8 +108,8 @@ grep -q '"round": 1' "$OPEN/.devlog/.round-open" && echo "PASS: round-open reset
 grep -q '"rounds_since_checkpoint": 0' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint rounds reset" || { echo "FAIL: checkpoint rounds"; FAIL=1; }
 grep -q '"checkpoint_marker_count": 0' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint marker count reset" || { echo "FAIL: checkpoint marker count"; FAIL=1; }
 grep -q '"max_silent_rounds": 20' "$OPEN/.devlog/.checkpoint-state" && echo "PASS: checkpoint max kept" || { echo "FAIL: checkpoint max"; FAIL=1; }
-PERM="$(perm_of "$OPEN/.devlog/devlog.md")"
-[ "$PERM" != "600" ] && echo "PASS: rewritten devlog.md is not owner-only (mode $PERM)" || { echo "FAIL: rewritten devlog.md is 600"; FAIL=1; }
+PERM="$(perm_of "$OPEN/.devlog/.round-current.md")"
+[ "$PERM" != "600" ] && echo "PASS: rewritten .round-current.md is not owner-only (mode $PERM)" || { echo "FAIL: rewritten .round-current.md is 600"; FAIL=1; }
 
 # no open round (never started / paused): whole file deleted
 NOOPEN="$TMP/noopen"
