@@ -212,9 +212,9 @@ Details:
   freeze a session.
 - **Loop guard unchanged.** `stop_hook_active` still exits 0 on retry, so
   this check, like the hash check, is one opportunity per turn.
-- **Check order:** existing loop guard → enabled → span under-budget pass
-  → hash comparison → **heading check** → span tick reset → checkpoint
-  check.
+- **Check order:** enabled → `.interrupted` short-circuit → existing loop
+  guard → span under-budget pass → hash comparison → **heading check** →
+  span tick reset → checkpoint check.
 
 The hash-miss message should name
 `User Input / Summary / Reply / Handoff / Status`.

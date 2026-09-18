@@ -161,4 +161,4 @@ is left in place so counting resumes where it left off on
 | `hooks/scripts/enforce-devlog.sh` | Detects a new `## Checkpoint` heading (resets the counter) and enforces the threshold after normal round enforcement passes |
 | `commands/start.md` | Creates `.checkpoint-state` alongside `.enabled` |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Round Segments and Checkpoint blocks |
-| `hooks/scripts/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |
+| `hooks/scripts/tests/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |

@@ -234,12 +234,12 @@ to open or close a watch.
 |---|---|
 | `hooks/scripts/round-start.sh` | Reset `last_change_epoch` / `last_seen_cksum` each round |
 | `hooks/scripts/segment-watch.sh` | New PreToolUse checker |
-| `hooks/scripts/test-segment-watch.sh` | Self-check (no `.enabled`; fresh round; expired + Bash blocks; expired + Write `devlog.md` passes; hash change then Bash passes; expired + Write other file blocks; malformed state fail-open) |
+| `hooks/scripts/tests/test-segment-watch.sh` | Self-check (no `.enabled`; fresh round; expired + Bash blocks; expired + Write `devlog.md` passes; hash change then Bash passes; expired + Write other file blocks; malformed state fail-open) |
 | `hooks/hooks.json` | Register PreToolUse → `segment-watch.sh` |
 | `commands/start.md` | Create `.segment-state` if missing (default `600`) |
 | `hooks/scripts/segment-watch-set.sh` | `/devlog-tracker:segment-watch` filesystem side: patch or create `.segment-state`'s `max_silent_seconds` |
 | `commands/segment-watch.md` | Get a time length from the user, convert to seconds, call `segment-watch-set.sh` |
-| `hooks/scripts/test-segment-watch-set.sh` | Self-check for `segment-watch-set.sh` (not started; fresh create; override preserves other fields; malformed-key rebuild; bad/zero/missing arg) |
+| `hooks/scripts/tests/test-segment-watch-set.sh` | Self-check for `segment-watch-set.sh` (not started; fresh create; override preserves other fields; malformed-key rebuild; bad/zero/missing arg) |
 | `skills/devlog-tracker/SKILL.md` | Document the 10-minute valve under Round Segments |
 | `docs/design/checkpoint-mode.md` | Point Round Segments' "mechanism: none" at this valve |
 | `README.md` | Mention the mid-round silence valve |

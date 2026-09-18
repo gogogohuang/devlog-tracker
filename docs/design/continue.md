@@ -103,7 +103,7 @@ excerpt leads Claude to act on `下一步`, it must run this check first.
 | File | Role |
 |---|---|
 | `hooks/scripts/session-start-devlog.sh` | `source=clear` heals then exits without stdout |
-| `hooks/scripts/test-session-start-devlog.sh` | silent clear; resume still injects |
+| `hooks/scripts/tests/test-session-start-devlog.sh` | silent clear; resume still injects |
 | `commands/continue.md` | Authoring instructions, including verify-then-act |
 | `commands/resume.md` | Same verify, then wait for confirm |
 | `skills/devlog-tracker/SKILL.md` | Clear is empty; continue is the resume path; fallback also verifies |
