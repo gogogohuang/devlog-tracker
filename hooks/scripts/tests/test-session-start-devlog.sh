@@ -292,8 +292,33 @@ rm -f "$DEVLOG_DIR/.span-open"
 OUTPUT="$(echo '{"source":"resume"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
 assert_contains "resume still injects Round 1" "Round 1" "$OUTPUT"
 
-# --- Scenario 12: startup does not interrupt a completed last Round ---------
-cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+# --- Scenario 12: startup recovers a genuinely-completed last Round -------
+# (recovered-complete: the round had already finished writing Summary/Handoff
+# before the interrupt signal arrived; close-open-round.sh's "recovered" path
+# — AWK_RC=3 — must detect this via .round-current.md's hash differing from
+# .turn-start, not stamp INTERRUPTED, and still merge the completed round
+# into devlog.md.) Round-current split: this only exercises
+# close-open-round.sh's recovered-detection logic when .round-current.md is
+# actually seeded and hashed into .turn-start — an empty/absent
+# .round-current.md makes close-open-round.sh early-out (drop_markers, exit
+# 0) before that logic ever runs, which was the bug the final whole-branch
+# review found in this scenario: it passed because nothing ran, not because
+# the recovered-detection logic worked.
+: > "$DEVLOG_DIR/devlog.md"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
+## Round 1 — 2026-09-09T12:00:00+08:00
+
+### User Input
+```text
+done
+```
+
+### Status
+IN_PROGRESS
+EOF
+printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
 
 ### User Input
@@ -314,14 +339,17 @@ finished
 ### Status
 DONE
 EOF
-printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
-cksum < "$DEVLOG_DIR/devlog.md" > "$DEVLOG_DIR/.turn-start"
-printf '\n' >> "$DEVLOG_DIR/devlog.md"
 OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
 assert_contains "startup still injects Round 1" "Round 1" "$OUTPUT"
 FILE="$(cat "$DEVLOG_DIR/devlog.md")"
 assert_contains "startup recovered keeps DONE" $'### Status\nDONE' "$FILE"
 assert_not_contains "startup must not stamp a completed Round" "INTERRUPTED" "$FILE"
+if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+  echo "FAIL: startup recovered-complete should merge .round-current.md away"
+  FAIL=1
+else
+  echo "PASS: startup recovered-complete merged .round-current.md into devlog.md"
+fi
 if [ -f "$DEVLOG_DIR/.round-open" ]; then
   echo "FAIL: startup recovered-complete should delete .round-open"
   FAIL=1

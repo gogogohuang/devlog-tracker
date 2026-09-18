@@ -184,14 +184,30 @@ stamp-or-recovered determination) closes and merges first:
 - `/devlog-tracker:continue`, `/devlog-tracker:resume`,
   `/devlog-tracker:compact`, `/devlog-tracker:keep`,
   `/devlog-tracker:status`
-- SessionStart's handoff-excerpt injection
-  (`hooks/scripts/session-start-devlog.sh`)
 - `/devlog-tracker:clean` — with one exception: if a round happens to be
   open when it's invoked, `clean-devlog.sh` reads that round's content
-  from `.round-current.md` and rebuilds it as the new `## Round 1`
-  written back into `devlog.md` (the rest of history is wiped entirely,
-  nothing else is kept), rather than reading the already-wiped
-  `devlog.md` body to figure out which round to preserve.
+  from `.round-current.md`, renumbers it to `## Round 1`, and writes it
+  back into `.round-current.md` (never into `devlog.md`, which is
+  emptied/removed instead) — the rest of history is wiped entirely,
+  nothing else is kept. This keeps the split's invariant intact:
+  `.round-open` still points at round 1, and that round's content still
+  lives only in `.round-current.md`, exactly like any other open round.
+  Stop validates and merges it normally when the turn closes.
+
+**Exception: SessionStart's handoff-excerpt injection**
+(`hooks/scripts/session-start-devlog.sh`) is *not* guaranteed to see only
+merged content. `startup` / `resume` / `fork` heal a dangling
+`.round-open` before printing the excerpt, so by the time it runs
+`.round-current.md` is normally already empty. But `source=compact`
+deliberately skips that heal (see the script's header comment — healing
+would change `.round-current.md`'s hash and let Stop silently pass), so a
+mid-turn auto-compact can genuinely hit this injection while a round is
+still open and its content still sits only in `.round-current.md`. To
+avoid silently dropping the round Claude is in the middle of,
+`session-start-devlog.sh` prints the `devlog.md` excerpt as before and
+then, whenever `.round-current.md` is non-empty (for any of
+startup/resume/compact/fork — harmless no-op in the healed cases), prints
+its content too, clearly labeled as the still-open round.
 
 ## New helpers
 
@@ -214,6 +230,7 @@ stamp-or-recovered determination) closes and merges first:
 | `hooks/scripts/enforce-devlog.sh` | Hashes and does fence-aware bounded-extraction validation against `.round-current.md`; calls `devlog_merge_round_current` on success |
 | `hooks/scripts/close-open-round.sh` | Whether it stamps `INTERRUPTED` or determines the round was recovered, both outcomes call `devlog_merge_round_current` |
 | `hooks/scripts/segment-watch.sh` | Silence detection and the PreToolUse allowlist target both switched to `.round-current.md` |
+| `hooks/scripts/session-start-devlog.sh` | After printing the `devlog.md` excerpt, also prints `.round-current.md`'s content (labeled as the still-open round) whenever it's non-empty — needed for `source=compact`, which skips dangling-heal |
 | `hooks/scripts/clean-devlog.sh` | Reads `.round-current.md` to recover an open round's content |
 | `skills/devlog-tracker/SKILL.md` | 「檔案位置」 gained `.round-current.md`; the mandatory-recording steps and the writing-to-devlog sections now point at `.round-current.md` |
 | `skills/devlog-tracker/references/round-segments.md` | Segment Watch's silence backstop now says Read `.round-current.md` |
