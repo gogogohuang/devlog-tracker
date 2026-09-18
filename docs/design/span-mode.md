@@ -11,9 +11,10 @@ ticks — bounding how much work a mid-span crash can lose.
 ## Motivation
 
 devlog-tracker's Stop hook normally treats every user message as its own
-round: `round-start.sh` records `.devlog/devlog.md`'s content hash at the
-start of each turn, and `enforce-devlog.sh` blocks (exit 2) unless that hash
-has changed by the time Claude tries to end the turn. This is correct for
+round: `round-start.sh` records `.devlog/.round-current.md`'s content hash
+(`.turn-start`) at the start of each turn, and `enforce-devlog.sh` blocks
+(exit 2) unless that hash has changed by the time Claude tries to end the
+turn. This is correct for
 interactive chat, but breaks down for long-running automated work: every
 automated wakeup would otherwise demand a full devlog write or the turn
 gets blocked — for a loop ticking every few minutes over hours, this either
@@ -70,7 +71,8 @@ command is available:
 ### Hook behavior
 
 - **`round-start.sh`** (`UserPromptSubmit`): unchanged existing behavior
-  (record `devlog.md`'s content hash to `.turn-start`), plus: if
+  (record `.round-current.md`'s content hash to `.turn-start`, see
+  `docs/design/round-current-split.md`), plus: if
   `.span-open` exists and its `ticks_since_checkin` is a valid integer,
   increment it by 1.
 - **`enforce-devlog.sh`** (`Stop`): a new check runs after the existing
@@ -146,6 +148,6 @@ Round's User Input can note that it's an automated-continuation closeout
 | `hooks/scripts/round-start.sh` | Increments the tick counter |
 | `hooks/scripts/enforce-devlog.sh` | Checks the counter, enforces the threshold, resets on write |
 | `hooks/scripts/session-start-devlog.sh` | Resume-context note when a span is left open |
-| `hooks/scripts/test-enforce-devlog.sh` | Self-check covering the tick-threshold behavior |
-| `hooks/scripts/test-session-start-devlog.sh` | Self-check covering the resume-note behavior |
+| `hooks/scripts/tests/test-enforce-devlog.sh` | Self-check covering the tick-threshold behavior |
+| `hooks/scripts/tests/test-session-start-devlog.sh` | Self-check covering the resume-note behavior |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Claude (when/how to open, maintain, and close a span) |

@@ -173,7 +173,7 @@ last again.
 | `hooks/scripts/enforce-devlog.sh` + tests | Aligned: Reply / 完成條件 / actionable / 缺件 |
 | `hooks/scripts/close-open-round.sh` | Aligned: Reply stub on interrupt |
 | `.claude-plugin/plugin.json` / `marketplace.json` | Still 0.14.0 wording without L1 Reply／完成條件 (optional) |
-| `commands/keep.md` | Still silent on `## Kept 索引` (pre-existing) |
+| `commands/keep.md` | Was silent on `## Kept 索引` (pre-existing) as of this review; resolved since — `commands/keep.md` now references the index and `keep-move.sh --desc` writes into it (see `docs/design/keep.md`) |
 
 ## Recommendation
 

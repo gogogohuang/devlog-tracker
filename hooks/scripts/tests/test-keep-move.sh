@@ -105,5 +105,23 @@ else
   FAIL=1
 fi
 
+DESC="$TMP/desc"
+mkdir -p "$DESC/.devlog"
+export CLAUDE_PROJECT_DIR="$DESC"
+printf '# project\n\n' > "$DESC/.devlog/devlog.md"
+make_round "$DESC/.devlog/devlog.md" 1 DONE
+make_round "$DESC/.devlog/devlog.md" 2 DONE
+make_round "$DESC/.devlog/devlog.md" 3 IN_PROGRESS
+printf '%s\n' '{"round": 3, "opened_at": "now"}' > "$DESC/.devlog/.round-open"
+bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name with-desc --desc "調整 span 模式的門檻" >/dev/null
+grep -q '調整 span 模式的門檻' "$DESC/.devlog/devlog.md" && echo "PASS: --desc text written into Kept 索引 line" || { echo "FAIL: expected desc text in index line"; FAIL=1; }
+bash "$SCRIPT_DIR/keep-move.sh" --from 2 --to 2 --name no-desc >/dev/null
+LINE_NO_DESC="$(grep 'devlog.no-desc.md' "$DESC/.devlog/devlog.md")"
+case "$LINE_NO_DESC" in
+  *"kept_at "*","*) echo "FAIL: unexpected extra trailing segment without --desc: $LINE_NO_DESC"; FAIL=1 ;;
+  *"kept_at "*) echo "PASS: omitting --desc keeps the plain kept_at-only line" ;;
+  *) echo "FAIL: index line for no-desc missing: $LINE_NO_DESC"; FAIL=1 ;;
+esac
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

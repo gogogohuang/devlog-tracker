@@ -128,7 +128,7 @@ fi
 | File | Role |
 |---|---|
 | `hooks/scripts/enforce-devlog.sh` | New check, placed after existing `下一步` non-empty check |
-| `hooks/scripts/test-enforce-devlog.sh` | New scenarios: pure blacklist phrase → blocked; blacklist phrase inside a longer sentence → allowed; multi-line body → allowed |
+| `hooks/scripts/tests/test-enforce-devlog.sh` | New scenarios: pure blacklist phrase → blocked; blacklist phrase inside a longer sentence → allowed; multi-line body → allowed |
 | `docs/design/summary-handoff.md` | Add one line under Known limitations noting the filler-phrase check |
 | `skills/devlog-tracker/SKILL.md` | One sentence next to the existing "不算完成" writing rule, noting it is now also hook-enforced |
 | `docs/design/next-step-blacklist.md` | This spec |
