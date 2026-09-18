@@ -44,6 +44,11 @@ case "$OUT" in
   *"LESSONS_ENABLED="*) echo "PASS: reports LESSONS_ENABLED" ;;
   *) echo "FAIL: expected LESSONS_ENABLED=..., got $OUT"; FAIL=1 ;;
 esac
+assert_file ".lessons-drift-state created alongside .lessons-enabled" "$TMP_ROOT/.devlog/.lessons-drift-state"
+grep -q '"mismatch_count": 0' "$TMP_ROOT/.devlog/.lessons-drift-state" \
+  && echo "PASS: drift count starts at 0" || { echo "FAIL: drift count not 0"; FAIL=1; }
+grep -q '"threshold": 3' "$TMP_ROOT/.devlog/.lessons-drift-state" \
+  && echo "PASS: drift threshold defaults to 3" || { echo "FAIL: drift threshold not 3"; FAIL=1; }
 
 # --- lessons-off disables, leaves main switch and any lessons files alone --
 echo 'keep me' > "$TMP_ROOT/.devlog/devlog.lessons.foo.md"
@@ -56,6 +61,7 @@ esac
 assert_not_file ".lessons-enabled removed" "$TMP_ROOT/.devlog/.lessons-enabled"
 assert_file "main .enabled untouched" "$TMP_ROOT/.devlog/.enabled"
 assert_file "lessons file untouched" "$TMP_ROOT/.devlog/devlog.lessons.foo.md"
+assert_file ".lessons-drift-state untouched by lessons-off" "$TMP_ROOT/.devlog/.lessons-drift-state"
 
 # --- lessons-off when already off -> reports NOT_ENABLED, no error --------
 OUT="$(bash "$SCRIPT_DIR/lessons-off.sh")"
