@@ -368,9 +368,11 @@ hook 會要求補一段。
 掃描整份 `devlog.md`，把值得留名的主題段落一次分別**搬走**成 `.devlog/devlog.<name>.md`（也可只抽出一段，或合併成全部歷史一個檔）。這不是 compact：compact 把舊的 `DONE` 輪次 append 進 `devlog.archive.md`；keep 寫的是一個主題一個檔，且從不寫 archive。步驟見 `commands/keep.md`。不要自動觸發。
 
 每次搬走都會在 `devlog.md` 尾端留一個 `## Kept 索引` 區塊（自動重建，永遠只有一份），
-每個具名檔一行：`devlog.<name>.md`、搬走的 Round 範圍、`kept_at` 時間戳。SessionStart
-注入的接手摘要會帶上這個索引（不是具名檔的內容），讓「哪個主題被搬去哪個檔」不用翻完整份
-`devlog.md` 或憑印象猜檔名（`docs/design/devlog-as-ssot-assessment.md` Phase 3）。
+每個具名檔一行：`devlog.<name>.md`、搬走的 Round 範圍、`kept_at` 時間戳、一句主題描述
+（`keep-move.sh --desc`，`commands/keep.md` 批次確認時生成的那句；沒帶 `--desc` 或既存
+的舊索引行就沒有這一段）。SessionStart 注入的接手摘要會帶上這個索引（不是具名檔的內容），
+讓「哪個主題被搬去哪個檔」不用翻完整份 `devlog.md` 或憑印象猜檔名
+（`docs/design/devlog-as-ssot-assessment.md` Phase 3）。
 
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 
@@ -379,6 +381,15 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 `IN_PROGRESS`／`INTERRUPTED`／`BLOCKED` 都要核對，提出接續後等使用者確認才做下一步。
 `DONE` 不核對、不開工。新工作仍記錄到 `devlog.md`，不要改寫 keep 檔。SessionStart 不會自動注入具名檔。
 步驟見 `commands/resume.md`。
+
+## 跨檔總覽：`/devlog-tracker:overview`
+
+純讀取，不核對工作區、不等確認（跟 `/devlog-tracker:lessons` 一樣的唯讀風格）。用
+`hooks/scripts/kept-list.sh` 解析 `## Kept 索引` 取出所有 `devlog.<name>.md` 檔名（含存在性
+檢查，磁碟上被手動刪掉的 ghost row 只提一句，不嘗試修復），讀完所有存在的檔案後在對話裡
+產出兩塊：跨主題敘事總覽，以及一節「可能該進 `CLAUDE.md` 的規範候選」（挑得出來才輸出，
+格式貼近 `CLAUDE.md` 條列寫法方便複製）。不寫入任何檔案，包含 `CLAUDE.md` 本身。步驟見
+`commands/overview.md`。
 
 ## Lessons Mode：開發歷程教訓（預設關閉，非架構知識庫）
 

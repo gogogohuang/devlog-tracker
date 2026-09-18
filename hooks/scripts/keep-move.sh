@@ -11,14 +11,17 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 FROM=""
 TO=""
 NAME=""
+DESC=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --from) FROM="${2:-}"; shift 2 ;;
     --to) TO="${2:-}"; shift 2 ;;
     --name) NAME="${2:-}"; shift 2 ;;
+    --desc) DESC="${2:-}"; shift 2 ;;
     *) echo "未知參數：$1" >&2; exit 1 ;;
   esac
 done
+DESC="$(printf '%s' "$DESC" | tr '\n' ' ')"
 case "$FROM:$TO" in *[!0-9:]*|:*) echo "範圍無效" >&2; exit 1 ;; esac
 [ "$FROM" -le "$TO" ] || { echo "範圍起點不可大於終點" >&2; exit 1; }
 
@@ -126,6 +129,7 @@ awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v 
 mv "$NEW_MAIN" "$MAIN" || exit 1
 
 KEPT_LINE="- \`devlog.${NAME}.md\`：Round ${FROM}-${TO}，kept_at ${KEPT_AT}"
+[ -z "$DESC" ] || KEPT_LINE="${KEPT_LINE}，${DESC}"
 KEPT_STRIPPED="$TMP/kept-stripped"
 devlog_strip_kept_index "$MAIN" "$KEPT_STRIPPED"
 EXISTING_KEPT_LINES="$(devlog_kept_index_lines "$MAIN")"

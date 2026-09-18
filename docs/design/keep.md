@@ -324,8 +324,21 @@ one line added:
 
 ```markdown
 ## Kept 索引
-- `devlog.<name>.md`：Round <from>-<to>，kept_at <ISO 8601 timestamp>
+- `devlog.<name>.md`：Round <from>-<to>，kept_at <ISO 8601 timestamp>，<one-line description>
 ```
+
+The trailing `，<one-line description>` segment is optional —
+`keep-move.sh` takes it via `--desc "<text>"`. `commands/keep.md`
+always passes the one-sentence "what this segment is about" it
+already generates and shows in the batch confirmation listing, so
+every keep done through the command carries a description. A bare
+script invocation without `--desc` (e.g. in tests, or a hand run)
+falls back to the plain `kept_at`-only line with no trailing comma —
+existing index lines written before this field existed also stay in
+that plain form; there is no backfill. `/devlog-tracker:overview`
+reads the *files themselves* for its summary, not this description —
+the description is a scan aid on the index line, not the source of
+truth for what happened in the segment.
 
 - **Always rebuilt, never duplicated.** Each run strips the old block
   and reprints every existing line plus the new one, so there is only
@@ -423,8 +436,11 @@ Stop (`### Summary` / `### Handoff` / Status rules).
 |---|---|
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
-| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` |
+| `commands/overview.md` | Steps Claude runs on `/devlog-tracker:overview`: read every kept file, synthesize a cross-topic summary + CLAUDE.md rule candidates |
+| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` (optionally with a `--desc` description) |
 | `hooks/scripts/test-keep-move.sh` | Self-check for `keep-move.sh` |
+| `hooks/scripts/kept-list.sh` | Parses `## Kept 索引` into `FILE=<path> EXISTS=0/1` lines for `/devlog-tracker:overview` |
+| `hooks/scripts/tests/test-kept-list.sh` | Self-check for `kept-list.sh` |
 | `hooks/scripts/session-start-devlog.sh` | Surfaces `## Kept 索引` in the startup/resume/compact/fork excerpt |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |

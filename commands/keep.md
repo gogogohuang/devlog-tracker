@@ -18,6 +18,7 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 2. 用 skills/devlog-tracker 判斷瑣碎程度的同一套訊號，評估每一個候選段落：有檔案異動、有影響後續的決策、有未完成工作、刪掉會接續不上 → 值得留名，列為候選；只有確認、閒聊、重複 → 偏低，直接丟掉，不列入建議清單，繼續留在 `devlog.md`，不用再嘗試併進相鄰段落。段落裡有未收尾的 `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED` Round 可以正常納入候選段落，不要僅因為未收尾就拒絕或把它排除到段落外。
 3. 若一個候選段落都沒有，告知「目前沒有值得分主題留名的段落」，不要建立新檔，結束。
 4. 對每個候選段落，用**那一段的內容**（不是留下的 Round）產生建議 `<name>`：小寫 ASCII kebab-case，2–4 段，只反映主題。不要加日期、不要加 `round-12-18`。例如 `span-mode`、`keep-plan`。這一批裡若兩段的建議 `<name>` 相同，比照步驟 4 的撞名規則先加上 `-2`/`-3` 分開，再一起列出：Round 編號較小（較早）的段落保留原建議名稱，較晚的段落加 `-2`/`-3`。
+5. 同時為每個候選段落生成步驟 3 要顯示的「一句這段在做什麼」。這句話記下來留到步驟 5 用（會原樣寫進 `## Kept 索引` 那一行），不是只顯示過就丟掉；使用者在步驟 3 若修改了範圍或檔名，這句描述不用跟著重新生成，除非該段的主題內容本身也變了。
 
 ## 3. 一次列出全部候選段落，然後停下來等
 
@@ -79,10 +80,10 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 ```bash
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
 CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/keep-move.sh" \
-  --from <from> --to <to> --name "<name>"
+  --from <from> --to <to> --name "<name>" --desc "<這段在做什麼的一句話>"
 ```
 
-`<from>`、`<to>`、`<name>` 必須使用該段步驟 4 確認後的值。腳本是搬移、Checkpoint 歸屬、full keep 重編與 checkpoint counter reset 的唯一實作來源；它一次只認一段範圍，完全不知道這是批次的一部分，`commands/keep.md` 自己負責依序呼叫。
+`<from>`、`<to>`、`<name>` 必須使用該段步驟 4 確認後的值。`<這段在做什麼的一句話>` 用步驟 2.5 記下的那句描述（純文字，不要換行、不要含反引號）；腳本會把它原樣接在 `## Kept 索引` 那一行的 `kept_at` 之後。腳本是搬移、Checkpoint 歸屬、full keep 重編與 checkpoint counter reset 的唯一實作來源；它一次只認一段範圍，完全不知道這是批次的一部分，`commands/keep.md` 自己負責依序呼叫。
 
 任一段的腳本 exit 1：立刻停止整批，原樣顯示那一段的 stderr，不要自行重試刪除，也不要手動補做搬移，也不要繼續跑後面還沒處理的段落。已經成功搬走的段落不要回滾。
 
