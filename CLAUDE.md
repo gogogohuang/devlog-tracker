@@ -7,6 +7,7 @@
 - `.claude-plugin/plugin.json` → `"version"`
 - `.claude-plugin/marketplace.json` → `plugins[0].version`
 - `README.md` → 開頭的 `**版本** X.Y.Z` 那行
+- `package.json` → `"version"`
 
 版號規則（semver 精神，實際上幾乎都是 minor bump）：
 - 新功能／行為變更 → bump minor（`0.14.0` → `0.15.0`）
@@ -29,8 +30,10 @@ from pathlib import Path
 v = "X.Y.Z"  # 換成目標版號
 p = json.loads(Path(".claude-plugin/plugin.json").read_text())
 m = json.loads(Path(".claude-plugin/marketplace.json").read_text())
+n = json.loads(Path("package.json").read_text())
 assert p["version"] == v, p["version"]
 assert m["plugins"][0]["version"] == v, m["plugins"][0]["version"]
+assert n["version"] == v, n["version"]
 assert f"**版本** {v}" in Path("README.md").read_text(), "README version line"
 print("PASS:", v)
 PY
