@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run every hook self-check. Usage: bash hooks/scripts/run-tests.sh
+# Run every hook self-check. Usage: bash core/scripts/run-tests.sh
 set -uo pipefail
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FAIL=0

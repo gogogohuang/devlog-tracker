@@ -8,8 +8,8 @@
 
 ```bash
 shellcheck --external-sources --source-path=SCRIPTDIR -S warning \
-  hooks/scripts/*.sh hooks/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
-bash hooks/scripts/run-tests.sh   # 所有 hook 自檢，含 cursor／codex 轉接層
+  core/scripts/*.sh core/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
+bash core/scripts/run-tests.sh   # 所有 hook 自檢，含 cursor／codex 轉接層
 npm test                          # CLI 與 scripts 的 node 測試
 ```
 

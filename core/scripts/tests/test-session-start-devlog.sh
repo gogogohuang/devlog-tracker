@@ -2,7 +2,7 @@
 # Self-check for session-start-devlog.sh, including the Span Mode
 # resume-context note. No framework — plain assert-and-exit, matching this
 # repo's existing style. Run directly:
-#   bash hooks/scripts/test-session-start-devlog.sh
+#   bash core/scripts/tests/test-session-start-devlog.sh
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -181,7 +181,7 @@ echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "after compact skip-heal, Stop still enforces (hash equal) -> exit 2" 2 $?
 
 # --- Scenario 7: hooks.json SessionStart matcher includes fork -------------
-HOOKS_JSON="$SCRIPT_DIR/../hooks.json"
+HOOKS_JSON="$SCRIPT_DIR/../../hooks/hooks.json"
 if grep -q '"matcher": "startup|resume|clear|compact|fork"' "$HOOKS_JSON"; then
   echo "PASS: SessionStart matcher includes fork"
 else

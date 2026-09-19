@@ -8,7 +8,7 @@
   "files": [
     "bin",
     "cli",
-    "hooks/scripts",
+    "core/scripts",
     "codex/hooks",
     "cursor/hooks",
     "skills",

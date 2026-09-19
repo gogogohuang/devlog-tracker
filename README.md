@@ -245,7 +245,7 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 ## 測試
 
 ```
-bash hooks/scripts/run-tests.sh
+bash core/scripts/run-tests.sh
 ```
 
 含 Cursor adapter。
