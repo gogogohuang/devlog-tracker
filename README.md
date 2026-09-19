@@ -46,6 +46,11 @@ npx devlog-tracker init --codex --cursor
 其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
 版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
 
+裝 Codex 時，`init` 還會在專案根目錄的 `AGENTS.md` 加上（或更新）一段以
+`<!-- devlog-tracker:begin/end -->` 包住的說明，告訴 Codex 沒有 slash 指令時該讀
+`.devlog-tracker/commands/*.md`。區塊外的內容不會動，重跑 `init` 只會換掉區塊本身；
+區塊裡只有相對路徑，可以 commit。
+
 `init` 會把這台機器專屬的絕對路徑寫進 `.codex/hooks.json`、`.cursor/hooks.json` 與
 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上
 跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與
