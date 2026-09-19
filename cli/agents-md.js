@@ -16,11 +16,15 @@ const BLOCK = `${BEGIN}
 | 使用者說 | 讀這份 |
 |---|---|
 | 開始追蹤 / start | \`commands/start.md\` |
-| 接續上一題 / continue（換過工具或 \`/clear\` 之後） | \`commands/continue.md\` |
 | 暫停 / pause | \`commands/pause.md\` |
 | 狀態 / status | \`commands/status.md\` |
+| 接續上一題 / continue（換過工具或 \`/clear\` 之後） | \`commands/continue.md\` |
 | 歸檔 / compact | \`commands/compact.md\` |
-| 保存主題 / keep、接續具名檔 / resume | \`commands/keep.md\`、\`commands/resume.md\` |
+| 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
+| 保存主題 / keep、接續具名檔 / resume、跨主題總覽 / overview | \`commands/keep.md\`、\`commands/resume.md\`、\`commands/overview.md\` |
+| 長任務定期記錄 / span | \`commands/span.md\` |
+| 調整沉默門檻 / checkpoint、segment-watch | \`commands/checkpoint.md\`、\`commands/segment-watch.md\` |
+| 開發歷程教訓 / lessons、lessons-on、lessons-off、lessons-drift | \`commands/lessons.md\`、\`commands/lessons-on.md\`、\`commands/lessons-off.md\`、\`commands/lessons-drift.md\` |
 
 寫 devlog 的格式與規則見 \`.devlog-tracker/skills/devlog-tracker/SKILL.md\`。每輪結束前必須把當輪寫進 \`.devlog/\`；已 \`start\` 的專案，Stop hook 會擋沒寫完的輪次。
 ${END}

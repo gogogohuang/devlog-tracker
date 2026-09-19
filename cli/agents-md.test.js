@@ -40,6 +40,14 @@ test('is idempotent and replaces the block in place', () => {
   assert.equal(once.split(BEGIN).length, 2);
 });
 
+test('block mentions every command doc so Codex has an entry for each', () => {
+  const commandsDir = path.join(__dirname, '..', 'commands');
+  const text = fs.readFileSync(upsertAgentsMd(tmp()), 'utf8');
+  for (const file of fs.readdirSync(commandsDir).filter((f) => f.endsWith('.md'))) {
+    assert.ok(text.includes(`commands/${file}`), `AGENTS.md block is missing commands/${file}`);
+  }
+});
+
 test('init --codex writes AGENTS.md; --cursor alone does not', async () => {
   const repoRoot = path.join(__dirname, '..');
   const withCodex = tmp();
