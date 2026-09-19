@@ -46,8 +46,10 @@ npx devlog-tracker init --codex --cursor
 其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
 版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
 
-裝 Codex 時，`init` 會從 `.devlog-tracker/commands/*.md` 產生對應的專案指令到
-`.codex/prompts/`，例如以 `/prompts:devlog-start` 啟動追蹤。也會在專案根目錄的
+裝 Codex 時，`init` 會從 `.devlog-tracker/commands/*.md` 產生對應的專案 skill 到
+`.agents/skills/devlog-<名稱>/SKILL.md`，例如在 Codex 打 `$devlog-start`（或用 `/skills`
+選）啟動追蹤。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——
+Codex 不讀專案層級的 custom prompts。也會在專案根目錄的
 `AGENTS.md` 加上（或更新）一段以 `<!-- devlog-tracker:begin/end -->` 包住的 fallback
 說明。區塊外的內容不會動，重跑 `init` 只會換掉區塊本身；區塊裡只有相對路徑，可以 commit。
 
@@ -106,9 +108,8 @@ Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFail
 Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的
 輪次）不受影響。
 
-Codex 使用 `/prompts:devlog-<名稱>`（例如 `/prompts:devlog-start`）執行指令；它們會
-讀與 Claude commands 相同的內容。若使用的 Codex 環境沒有載入 custom prompts，仍可直接
-使用以下腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
+Codex 使用 `$devlog-<名稱>`（例如 `$devlog-start`）執行指令；它們會讀與 Claude
+commands 相同的內容。若使用的 Codex 環境沒有載入專案 skills，仍可直接使用以下腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
 `DEVLOG_TRACKER_ROOT`）：
 
 ```bash
