@@ -33,7 +33,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=devlog-path.sh
 . "$HOOKS_DIR/devlog-path.sh"
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
 SPAN_FILE="$DEVLOG_DIR/.span-open"

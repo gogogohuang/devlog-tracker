@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # User-invoked: /devlog-tracker:start filesystem side.
 set -uo pipefail
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 mkdir -p "$DEVLOG_DIR" || exit 1
 if [ ! -f "$DEVLOG_DIR/.enabled" ]; then

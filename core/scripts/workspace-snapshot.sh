@@ -7,7 +7,7 @@
 #
 # Usage (sourced): workspace_snapshot "$PROJECT_DIR"
 # Usage (executed): bash workspace-snapshot.sh [dir]
-#   dir defaults to ${CLAUDE_PROJECT_DIR:-.}
+#   dir defaults to ${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}
 # Echoes 1 line (clean / non-git / detached-clean / unborn-clean) or 2 lines
 # (dirty / detached-dirty / unborn-dirty). Never fails: any git command error
 # degrades toward "非 git 工作區", matching this hook suite's fail-open design.
@@ -65,5 +65,5 @@ workspace_snapshot() {
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-  workspace_snapshot "${1:-${CLAUDE_PROJECT_DIR:-.}}"
+  workspace_snapshot "${1:-${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}}"
 fi
