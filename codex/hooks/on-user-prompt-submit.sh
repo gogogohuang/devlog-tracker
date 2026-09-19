@@ -10,6 +10,6 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../core/scripts" && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
-export CLAUDE_PROJECT_DIR="$ROOT"
+export DEVLOG_PROJECT_DIR="$ROOT"
 printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/round-start.sh"
 exit 0
