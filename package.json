@@ -1,6 +1,6 @@
 {
   "name": "devlog-tracker",
-  "version": "0.22.1",
+  "version": "0.23.0",
   "description": "npx installer for the devlog-tracker Claude Code plugin's Cursor and Codex adapters.",
   "bin": {
     "devlog-tracker": "bin/devlog-tracker.js"
