@@ -66,8 +66,28 @@ json_str_field() {
     echo
     return 0
   fi
-  raw="$(printf '%s' "$json" | grep -o "\"${key}\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" 2>/dev/null | head -1 || echo '')"
-  printf '%s' "$raw" | sed -E "s/^.*\"${key}\"[[:space:]]*:[[:space:]]*\"//; s/\"$//"
+  # 值要吃得下 \" 這類跳脫序列，否則含引號的 prompt 會在第一個 \" 被截斷；
+  # 抓出來之後再還原 \n \t \r \" \\ \/（\uXXXX 不處理，原樣保留）。
+  local pat='"'"${key}"'"[[:space:]]*:[[:space:]]*"([^"\\]|\\.)*"'
+  raw="$(printf '%s' "$json" | grep -oE "$pat" 2>/dev/null | head -1 || echo '')"
+  printf '%s' "$raw" | sed -E "s/^\"${key}\"[[:space:]]*:[[:space:]]*\"//; s/\"$//" | awk '
+    BEGIN { ORS = "" }
+    {
+      s = $0; out = ""
+      while (length(s) > 0) {
+        c = substr(s, 1, 1)
+        if (c == "\\" && length(s) > 1) {
+          n = substr(s, 2, 1)
+          if (n == "n") out = out "\n"
+          else if (n == "t") out = out "\t"
+          else if (n == "r") out = out "\r"
+          else if (n == "u") out = out "\\u"
+          else out = out n
+          s = substr(s, 3)
+        } else { out = out c; s = substr(s, 2) }
+      }
+      print out
+    }'
   echo
 }
 

@@ -51,6 +51,8 @@ npx devlog-tracker init --codex --cursor
 `.devlog-tracker/commands/*.md`。區塊外的內容不會動，重跑 `init` 只會換掉區塊本身；
 區塊裡只有相對路徑，可以 commit。
 
+裝完 Codex 之後，第一次還要在 Codex 裡核准這些 hook，否則不會記錄（見下方〈Codex（選用）〉的「hook 需要審核」）。
+
 `init` 會把這台機器專屬的絕對路徑寫進 `.codex/hooks.json`、`.cursor/hooks.json` 與
 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上
 跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與
@@ -86,6 +88,18 @@ Claude Code 仍是主要安裝方式。若要在 Codex CLI 使用，先設定
 `DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `codex/hooks.json` 的
 `hooks` 合併進專案（或 `~/.codex/`）的 `hooks.json`。也可以把整個 `codex/hooks/` 與
 `hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
+
+**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被
+直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成
+`trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
+
+- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定
+  有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
+- 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust`
+  可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的
+  自動化環境。
+- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的
+  User Input skeleton；沒有就代表 hook 沒被執行。
 
 Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／
 `is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在

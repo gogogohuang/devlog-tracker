@@ -49,6 +49,23 @@ assert_eq "str field null" "" "$(json_str_field "$INPUT" reason)"
 INPUT='not json'
 assert_eq "str field malformed" "" "$(json_str_field "$INPUT" reason)"
 
+# Escaped characters must survive with and without jq (the no-jq path is a
+# grep/awk fallback). NOJQ_BIN is a PATH holding only the tools the fallback
+# needs, so `command -v jq` fails inside it.
+NOJQ_BIN="$(mktemp -d)"
+trap 'rm -f "$TMP"; rm -rf "$NOJQ_BIN"' EXIT
+for b in grep sed awk head tr cat; do
+  for d in /usr/bin /bin; do [ -x "$d/$b" ] && { ln -s "$d/$b" "$NOJQ_BIN/$b"; break; }; done
+done
+INPUT='{"session_id":"s","prompt":"say \"hi\" \\ back\/slash\ttab 你好","after":"ok"}'
+EXPECT_PROMPT="$(printf 'say "hi" \\ back/slash\ttab 你好')"
+for mode in jq nojq; do
+  if [ "$mode" = nojq ]; then P="$NOJQ_BIN"; else P="$PATH"; fi
+  [ "$mode" = jq ] && ! command -v jq >/dev/null 2>&1 && continue
+  assert_eq "[$mode] escaped quote/backslash/tab prompt" "$EXPECT_PROMPT" "$(PATH="$P" json_str_field "$INPUT" prompt)"
+  assert_eq "[$mode] field after escaped one" "ok" "$(PATH="$P" json_str_field "$INPUT" after)"
+done
+
 assert_eq "slugify basic" "foo-bar" "$(slugify 'foo bar')"
 assert_eq "slugify collapses runs" "foo-bar" "$(slugify 'foo   bar')"
 assert_eq "slugify trims edges" "foo" "$(slugify ' foo ')"
