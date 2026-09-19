@@ -40,19 +40,27 @@ test('is idempotent and replaces the block in place', () => {
   assert.equal(once.split(BEGIN).length, 2);
 });
 
-test('block mentions every command doc so Codex has an entry for each', () => {
+test('block mentions every command doc and Codex prompt naming convention', () => {
   const commandsDir = path.join(__dirname, '..', 'commands');
   const text = fs.readFileSync(upsertAgentsMd(tmp()), 'utf8');
   for (const file of fs.readdirSync(commandsDir).filter((f) => f.endsWith('.md'))) {
     assert.ok(text.includes(`commands/${file}`), `AGENTS.md block is missing commands/${file}`);
   }
+  assert.ok(text.includes('/prompts:devlog-start'));
 });
 
-test('init --codex writes AGENTS.md; --cursor alone does not', async () => {
+test('init --codex writes AGENTS.md and custom prompts; --cursor alone does not', async () => {
   const repoRoot = path.join(__dirname, '..');
   const withCodex = tmp();
   await run(['--codex'], { repoRoot, targetDir: withCodex, version: '0.0.0' });
   assert.ok(fs.existsSync(path.join(withCodex, 'AGENTS.md')));
+  for (const file of fs.readdirSync(path.join(repoRoot, 'commands')).filter((file) => file.endsWith('.md'))) {
+    const prompt = fs.readFileSync(
+      path.join(withCodex, '.codex', 'prompts', `devlog-${path.basename(file, '.md')}.md`),
+      'utf8'
+    );
+    assert.match(prompt, /\$ARGUMENTS/);
+  }
 
   const cursorOnly = tmp();
   await run(['--cursor'], { repoRoot, targetDir: cursorOnly, version: '0.0.0' });

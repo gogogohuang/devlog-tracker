@@ -8,16 +8,16 @@ const END = '<!-- devlog-tracker:end -->';
 const BLOCK = `${BEGIN}
 ## devlog-tracker
 
-這個專案用 devlog-tracker 在 \`.devlog/devlog.md\` 維護逐輪紀錄（Claude Code 與 Codex 共用同一份）。Codex 沒有 \`/devlog-tracker:*\` slash 指令，請照下面對照做：
+這個專案用 devlog-tracker 在 \`.devlog/devlog.md\` 維護逐輪紀錄（Claude Code 與 Codex 共用同一份）。Codex 指令在 \`.codex/prompts/\`，以 \`/prompts:devlog-<名稱>\` 執行；若 slash command 不可用，請照下面對照做：
 
 1. 先 \`source .devlog-tracker/env.sh\`（設定 \`DEVLOG_TRACKER_ROOT\`）。
 2. 依使用者意圖讀對應的 \`.devlog-tracker/commands/<名稱>.md\`，照裡面的步驟做（腳本在 \`.devlog-tracker/hooks/scripts/\`，執行時 \`CLAUDE_PROJECT_DIR\` 設成專案根目錄）。
 
 | 使用者說 | 讀這份 |
 |---|---|
-| 開始追蹤 / start | \`commands/start.md\` |
-| 暫停 / pause | \`commands/pause.md\` |
-| 狀態 / status | \`commands/status.md\` |
+| 開始追蹤 / start | \`/prompts:devlog-start\`；\`commands/start.md\` |
+| 暫停 / pause | \`/prompts:devlog-pause\`；\`commands/pause.md\` |
+| 狀態 / status | \`/prompts:devlog-status\`；\`commands/status.md\` |
 | 接續上一題 / continue（換過工具或 \`/clear\` 之後） | \`commands/continue.md\` |
 | 歸檔 / compact | \`commands/compact.md\` |
 | 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
