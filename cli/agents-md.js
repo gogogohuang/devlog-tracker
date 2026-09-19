@@ -5,7 +5,8 @@ const path = require('path');
 const BEGIN = '<!-- devlog-tracker:begin -->';
 const END = '<!-- devlog-tracker:end -->';
 
-const BLOCK = `${BEGIN}
+function codexBlock() {
+  return `${BEGIN}
 ## devlog-tracker
 
 這個專案用 devlog-tracker 在 \`.devlog/devlog.md\` 維護逐輪紀錄（Claude Code 與 Codex 共用同一份）。Codex 指令是 \`.agents/skills/devlog-<名稱>/\` 底下的 skill，用 \`/skills\` 選或打 \`$devlog-<名稱>\` 執行；若 skill 不可用，請照下面對照做：
@@ -29,23 +30,28 @@ const BLOCK = `${BEGIN}
 寫 devlog 的格式與規則見 \`.devlog-tracker/skills/devlog-tracker/SKILL.md\`。每輪結束前必須把當輪寫進 \`.devlog/\`；已 \`start\` 的專案，Stop hook 會擋沒寫完的輪次。
 ${END}
 `;
+}
 
-function upsertAgentsMd(targetDir) {
-  const filePath = path.join(targetDir, 'AGENTS.md');
+function upsertMarkdown(targetDir, { fileName = 'AGENTS.md', block = codexBlock() } = {}) {
+  const filePath = path.join(targetDir, fileName);
   const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
   const begin = existing.indexOf(BEGIN);
   const end = existing.indexOf(END);
 
   let next;
   if (begin !== -1 && end > begin) {
-    next = existing.slice(0, begin) + BLOCK + existing.slice(end + END.length).replace(/^\n/, '');
+    next = existing.slice(0, begin) + block + existing.slice(end + END.length).replace(/^\n/, '');
   } else if (existing.trim() === '') {
-    next = BLOCK;
+    next = block;
   } else {
-    next = `${existing.replace(/\n*$/, '\n')}\n${BLOCK}`;
+    next = `${existing.replace(/\n*$/, '\n')}\n${block}`;
   }
   if (next !== existing) fs.writeFileSync(filePath, next);
   return filePath;
 }
 
-module.exports = { upsertAgentsMd, BEGIN, END };
+function upsertAgentsMd(targetDir) {
+  return upsertMarkdown(targetDir, { fileName: 'AGENTS.md', block: codexBlock() });
+}
+
+module.exports = { upsertAgentsMd, upsertMarkdown, codexBlock, BEGIN, END };
