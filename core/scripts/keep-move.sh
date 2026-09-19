@@ -33,7 +33,7 @@ NAME="$(slugify "$NAME")"
   || { echo "檔名無效" >&2; exit 1; }
 [ "${#NAME}" -le 64 ] || { echo "檔名超過 64 字元" >&2; exit 1; }
 
-devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 MAIN="$DEVLOG_FILE"

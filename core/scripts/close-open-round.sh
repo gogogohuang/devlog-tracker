@@ -32,7 +32,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=devlog-md.sh
 . "$SCRIPT_DIR/devlog-md.sh"
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 ROUND_OPEN="$DEVLOG_DIR/.round-open"

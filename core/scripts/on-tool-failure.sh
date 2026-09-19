@@ -2,7 +2,7 @@
 # PostToolUseFailure: remember user Esc so Stop can stamp without blocking.
 set -uo pipefail
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
 [ -f "$ENABLED_FLAG" ] || exit 0

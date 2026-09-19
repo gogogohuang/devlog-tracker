@@ -14,7 +14,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=devlog-path.sh
 . "$SCRIPT_DIR/devlog-path.sh"
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 MAIN="$DEVLOG_FILE"
 

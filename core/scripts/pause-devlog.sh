@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 if [ ! -f "$DEVLOG_DIR/.enabled" ]; then
   echo "NOT_ENABLED"

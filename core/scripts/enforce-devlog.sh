@@ -37,7 +37,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # 足以涵蓋 Claude Code 實際送出的 stop_hook_active 欄位形狀），兩種環境都要生效。
 INPUT="$(cat 2>/dev/null || true)"
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 # 沒下過 /devlog-tracker:start，代表這個專案沒啟動強制記錄，直接放行。
 # 這是唯一的判斷依據——不猜這輪是否呼叫了某個 skill，也不解析 transcript。
 # 這個 gate 放在路徑解析之前，沒啟用時就不必付 git rev-parse 的成本；

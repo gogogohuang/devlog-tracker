@@ -24,7 +24,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/detect-pending-question.sh"
 # shellcheck source=devlog-path.sh
 . "$HOOKS_DIR/devlog-path.sh"
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
 ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"

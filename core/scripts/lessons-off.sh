@@ -4,7 +4,7 @@
 # or the "## Lessons 索引" block (docs/design/lessons-mode.md), same
 # non-destructive posture as pause-devlog.sh toward devlog.md.
 set -uo pipefail
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 if [ ! -f "$DEVLOG_DIR/.lessons-enabled" ]; then
   echo "NOT_ENABLED"

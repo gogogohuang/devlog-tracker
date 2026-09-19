@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
-DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+DEVLOG_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}/.devlog"
 if [ ! -e "$DEVLOG_DIR/.span-open" ]; then
   echo "NOT_OPEN"
   exit 0

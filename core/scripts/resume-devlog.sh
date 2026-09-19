@@ -20,7 +20,7 @@ NAME="$(slugify "$NAME")"
 [ -n "$NAME" ] && [ "$NAME" != "archive" ] && [ "${#NAME}" -le 64 ] \
   || { echo "INVALID_NAME" >&2; exit 1; }
 
-DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
+DEVLOG_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}/.devlog"
 FILE="$DEVLOG_DIR/devlog.$NAME.md"
 if [ ! -f "$FILE" ]; then
   candidates=""

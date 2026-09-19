@@ -7,7 +7,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-lock.sh"
 . "$SCRIPT_DIR/devlog-path.sh"
 
-devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 MAIN="$DEVLOG_FILE"

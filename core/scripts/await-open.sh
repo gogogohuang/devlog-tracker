@@ -9,7 +9,7 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=devlog-path.sh
 . "$SCRIPT_DIR/devlog-path.sh"
 
-devlog_resolve_paths "${CLAUDE_PROJECT_DIR:-.}"
+devlog_resolve_paths "${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$DEVLOG_DIR/.enabled" ] || { echo "NOT_ENABLED"; exit 1; }
 [ ! -e "$DEVLOG_DIR/.awaiting-reply" ] || { echo "ALREADY_OPEN"; exit 1; }
 ROUND=""

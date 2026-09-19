@@ -26,7 +26,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-PROJECT_DIR="${CLAUDE_PROJECT_DIR:-.}"
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 MAIN="$DEVLOG_FILE"
 
