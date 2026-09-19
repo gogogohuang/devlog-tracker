@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Claude-invoked only (docs/design/lessons-mode.md), never wired into
-# hooks/hooks.json — same posture as keep-move.sh. Appends one free-prose
+# claude/hooks.json — same posture as keep-move.sh. Appends one free-prose
 # entry to .devlog/devlog.lessons.<topic>.md (creating it if new), then
 # rebuilds the trailing "## Lessons 索引" block in devlog.md.
 set -uo pipefail

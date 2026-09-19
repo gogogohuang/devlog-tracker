@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start-devlog.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/session-start-devlog.sh\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/round-start.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/round-start.sh\""
           }
         ]
       }
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/segment-watch.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/segment-watch.sh\""
           }
         ]
       }
@@ -36,7 +36,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/on-tool-failure.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/on-tool-failure.sh\""
           }
         ]
       }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/on-stop-failure.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/on-stop-failure.sh\""
           }
         ]
       }
@@ -56,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/on-session-end.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/on-session-end.sh\""
           }
         ]
       }
@@ -66,7 +66,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/enforce-devlog.sh\""
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/enforce-devlog.sh\""
           }
         ]
       }

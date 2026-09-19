@@ -6,6 +6,7 @@
     "name": "gogogohuang"
   },
   "license": "Apache-2.0",
+  "hooks": "./claude/hooks.json",
   "keywords": [
     "devlog"
   ]

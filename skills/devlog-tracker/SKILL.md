@@ -130,7 +130,7 @@ Claude 主動宣告「接下來會有一串自動續接」時才放寬，且用 
 
 ## 自動接續與 `/clear`
 
-這個 plugin 內建一個 SessionStart hook（`hooks/hooks.json` + `core/scripts/session-start-devlog.sh`），
+這個 plugin 內建一個 SessionStart hook（`claude/hooks.json` + `core/scripts/session-start-devlog.sh`），
 matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume、`/compact`、`/fork`**
 時會自動讀檔注入；**`/clear` 不會注入**——對話清空就是空的。
 

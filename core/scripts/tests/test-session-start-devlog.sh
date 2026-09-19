@@ -181,7 +181,7 @@ echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "after compact skip-heal, Stop still enforces (hash equal) -> exit 2" 2 $?
 
 # --- Scenario 7: hooks.json SessionStart matcher includes fork -------------
-HOOKS_JSON="$SCRIPT_DIR/../../hooks/hooks.json"
+HOOKS_JSON="$SCRIPT_DIR/../../claude/hooks.json"
 if grep -q '"matcher": "startup|resume|clear|compact|fork"' "$HOOKS_JSON"; then
   echo "PASS: SessionStart matcher includes fork"
 else
