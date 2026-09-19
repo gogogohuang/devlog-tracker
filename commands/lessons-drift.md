@@ -5,8 +5,8 @@ description: 調整 Lessons Mode「工作區漂移重複發生」機制性提醒
 取得使用者要設定的次數（正整數）；沒帶就先問，不要用預設值硬猜。跑：
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/lessons-drift-set.sh" <次數>
+PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/lessons-drift-set.sh" <次數>
 ```
 
 不要自己手改 `.devlog/.lessons-drift-state`。

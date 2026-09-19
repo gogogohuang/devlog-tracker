@@ -83,7 +83,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 
 開關啟動之後，才會進入下面這套強制流程：
 
-1. 使用者送出新訊息時，`UserPromptSubmit` hook（`hooks/scripts/round-start.sh`）
+1. 使用者送出新訊息時，`UserPromptSubmit` hook（`core/scripts/round-start.sh`）
    若開關開著，就在 `.devlog/.round-current.md` 寫入這一輪的 skeleton（`### User Input`
    + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。`.turn-start` 雜湊是
    **寫完 skeleton 之後**才對 `.round-current.md` 拍的，所以 Stop 仍能判斷 Claude
@@ -93,7 +93,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
    把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。這一輪還開著的時候，編輯的對象
    是 `.devlog/.round-current.md`，不是 `devlog.md`——這一輪還沒併回去之前，
    `devlog.md` 完全看不到它。
-3. `Stop` hook（`hooks/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
+3. `Stop` hook（`core/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
    缺少 `### Summary` / `### Reply` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
    `.round-open`，並把 `.round-current.md` 的內容併回 `devlog.md` 尾端、清空
    `.round-current.md`（設計見 `docs/design/round-current-split.md`）。
@@ -130,7 +130,7 @@ Claude 主動宣告「接下來會有一串自動續接」時才放寬，且用 
 
 ## 自動接續與 `/clear`
 
-這個 plugin 內建一個 SessionStart hook（`hooks/hooks.json` + `hooks/scripts/session-start-devlog.sh`），
+這個 plugin 內建一個 SessionStart hook（`hooks/hooks.json` + `core/scripts/session-start-devlog.sh`），
 matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume、`/compact`、`/fork`**
 時會自動讀檔注入；**`/clear` 不會注入**——對話清空就是空的。
 
@@ -228,7 +228,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   `現況` 幾乎每輪都該有。`工作區`、`完成條件` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
   但 `DONE` 若 `檔案` 有內容（宣稱動過／commit 過檔案），`工作區` 一樣必寫且會被 Stop hook 機器核對，
   避免「已 commit 完成」卻其實沒 commit 這種宣稱跟實際不符沒人發現。
-  `完成條件` 要寫到下一輪能對照判斷「可否 DONE」（例如「`bash hooks/scripts/tests/test-foo.sh` 全過」），
+  `完成條件` 要寫到下一輪能對照判斷「可否 DONE」（例如「`bash core/scripts/tests/test-foo.sh` 全過」），
   不要只寫「功能完成」。`下一步` 要具體到下一輪打開就能做（路徑／反引號指令／skill 名），寫「繼續完成」不算完成；
   `IN_PROGRESS` 時 Stop 會做輕量可執行檢查（見下）。`BLOCKED` 的 `現況` 或 `下一步` 必須寫「缺什麼、出現長怎樣」。
 - **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式；`rev-parse --short HEAD` 失敗但 `git symbolic-ref --short HEAD` 抓得到分支名（尚無 commit，例如剛 `git init`）用 unborn 格式；兩者都失敗才是非 git。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
@@ -239,9 +239,9 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   - detached 有未提交：第一行 `HEAD detached @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   - unborn（尚無 commit）乾淨：`main @ (尚無 commit)，工作樹乾淨`（一行）
   - unborn（尚無 commit）有未提交：第一行 `main @ (尚無 commit)`，第二行 `未提交：src/a.ts, hooks/foo.sh`
-  （七種格式的機器生產者只有 `hooks/scripts/workspace-snapshot.sh`。寫入照上面手寫；Stop 用同一 function 核對。改格式時改 SKILL 與該腳本，不要在 continue.md 再抄一份。）
+  （七種格式的機器生產者只有 `core/scripts/workspace-snapshot.sh`。寫入照上面手寫；Stop 用同一 function 核對。改格式時改 SKILL 與該腳本，不要在 continue.md 再抄一份。）
   `INTERRUPTED` stub 不寫這一節。`IN_PROGRESS`／`BLOCKED` 收尾時，Stop hook 會自己算一次
-  即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`hooks/scripts/workspace-snapshot.sh`，
+  即時 git 快照，跟這一節逐字比對，不符就擋下來並印出正確內容（`core/scripts/workspace-snapshot.sh`，
   docs/design/devlog-as-ssot-assessment.md Phase 1）；`DONE` 若「檔案」有內容一樣核對——只有
   沒動檔的 `DONE` 與 `INTERRUPTED` 不受影響。
   接手跑 `workspace-snapshot.sh`（`PLUGIN_ROOT` 同其他指令），stdout 就是要對的快照，不要手編（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。腳本找不到才退回上面七種格式手編。
@@ -253,7 +253,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   涵蓋所有髒檔——跨輪殘留、還沒 commit 的舊檔案不算這輪漏列）。Rename 一律回報成
   刪除+新增，不是第四類。`.devlog/` 路徑不算進比對。看不懂的行（沒有照這個格式寫）會被擋下來，
   不是 fail-open——這是 Claude 該產生的格式，不是可有可無的宣告。細節見
-  `docs/design/files-verify.md`（`hooks/scripts/files-snapshot.sh`）。
+  `docs/design/files-verify.md`（`core/scripts/files-snapshot.sh`）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」與「完成條件」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -322,7 +322,7 @@ Reply Fold 讓它折進同一個 Round。
 
 **提問前**（純文字跨 turn；結束 turn 之前）：先用 Edit 在 `### Summary` 之前插入一段
 `### 段落（Claude 提問）` 記下問題原文，再跑
-`${CLAUDE_PLUGIN_ROOT}/hooks/scripts/await-open.sh` 標記「下一則訊息大概是在
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh` 標記「下一則訊息大概是在
 回答這個 Round」。使用者回答時 `round-start.sh` 會自動折成對應段落，不用手動
 處理。連續多輪一問一答（例如 grilling）時不必每題重寫 Summary／Reply／Handoff／
 Status，只有整場問答真正結束才收尾一次。
@@ -386,7 +386,7 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 ## 跨檔總覽：`/devlog-tracker:overview`
 
 純讀取，不核對工作區、不等確認（跟 `/devlog-tracker:lessons` 一樣的唯讀風格）。用
-`hooks/scripts/kept-list.sh` 解析 `## Kept 索引` 取出所有 `devlog.<name>.md` 檔名（含存在性
+`core/scripts/kept-list.sh` 解析 `## Kept 索引` 取出所有 `devlog.<name>.md` 檔名（含存在性
 檢查，磁碟上被手動刪掉的 ghost row 只提一句，不嘗試修復），讀完所有存在的檔案後在對話裡
 產出兩塊：跨主題敘事總覽，以及一節「可能該進 `CLAUDE.md` 的規範候選」（挑得出來才輸出，
 格式貼近 `CLAUDE.md` 條列寫法方便複製）。不寫入任何檔案，包含 `CLAUDE.md` 本身。步驟見

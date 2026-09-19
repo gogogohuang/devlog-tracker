@@ -11,7 +11,7 @@ const BLOCK = `${BEGIN}
 這個專案用 devlog-tracker 在 \`.devlog/devlog.md\` 維護逐輪紀錄（Claude Code 與 Codex 共用同一份）。Codex 指令是 \`.agents/skills/devlog-<名稱>/\` 底下的 skill，用 \`/skills\` 選或打 \`$devlog-<名稱>\` 執行；若 skill 不可用，請照下面對照做：
 
 1. 先 \`source .devlog-tracker/env.sh\`（設定 \`DEVLOG_TRACKER_ROOT\`）。
-2. 依使用者意圖讀對應的 \`.devlog-tracker/commands/<名稱>.md\`，照裡面的步驟做（腳本在 \`.devlog-tracker/hooks/scripts/\`，執行時 \`CLAUDE_PROJECT_DIR\` 設成專案根目錄）。
+2. 依使用者意圖讀對應的 \`.devlog-tracker/commands/<名稱>.md\`，照裡面的步驟做（腳本在 \`.devlog-tracker/core/scripts/\`，執行時 \`DEVLOG_PROJECT_DIR\` 設成專案根目錄）。
 
 | 使用者說 | 讀這份 |
 |---|---|
