@@ -40,27 +40,35 @@ test('is idempotent and replaces the block in place', () => {
   assert.equal(once.split(BEGIN).length, 2);
 });
 
-test('block mentions every command doc and Codex prompt naming convention', () => {
+test('block mentions every command doc and Codex skill naming convention', () => {
   const commandsDir = path.join(__dirname, '..', 'commands');
   const text = fs.readFileSync(upsertAgentsMd(tmp()), 'utf8');
   for (const file of fs.readdirSync(commandsDir).filter((f) => f.endsWith('.md'))) {
     assert.ok(text.includes(`commands/${file}`), `AGENTS.md block is missing commands/${file}`);
   }
-  assert.ok(text.includes('/prompts:devlog-start'));
+  assert.ok(text.includes('$devlog-start'));
 });
 
-test('init --codex writes AGENTS.md and custom prompts; --cursor alone does not', async () => {
+test('init --codex writes AGENTS.md and project skills; --cursor alone does not', async () => {
   const repoRoot = path.join(__dirname, '..');
   const withCodex = tmp();
   await run(['--codex'], { repoRoot, targetDir: withCodex, version: '0.0.0' });
   assert.ok(fs.existsSync(path.join(withCodex, 'AGENTS.md')));
   for (const file of fs.readdirSync(path.join(repoRoot, 'commands')).filter((file) => file.endsWith('.md'))) {
-    const prompt = fs.readFileSync(
-      path.join(withCodex, '.codex', 'prompts', `devlog-${path.basename(file, '.md')}.md`),
-      'utf8'
-    );
-    assert.match(prompt, /\$ARGUMENTS/);
+    const name = `devlog-${path.basename(file, '.md')}`;
+    const skill = fs.readFileSync(path.join(withCodex, '.agents', 'skills', name, 'SKILL.md'), 'utf8');
+    assert.match(skill, new RegExp(`^---\\nname: ${name}\\ndescription: ".+"\\n---\\n`));
   }
+  assert.ok(!fs.existsSync(path.join(withCodex, '.codex', 'prompts')));
+
+  const upgraded = tmp();
+  const legacy = path.join(upgraded, '.codex', 'prompts');
+  fs.mkdirSync(legacy, { recursive: true });
+  fs.writeFileSync(path.join(legacy, 'devlog-start.md'), 'old');
+  fs.writeFileSync(path.join(legacy, 'mine.md'), 'keep');
+  await run(['--codex'], { repoRoot, targetDir: upgraded, version: '0.0.0' });
+  assert.ok(!fs.existsSync(path.join(legacy, 'devlog-start.md')));
+  assert.ok(fs.existsSync(path.join(legacy, 'mine.md')));
 
   const cursorOnly = tmp();
   await run(['--cursor'], { repoRoot, targetDir: cursorOnly, version: '0.0.0' });

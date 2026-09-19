@@ -19,7 +19,7 @@ NODE_BIN="$(command -v node)"
 [ -f "$PROJECT/.devlog-tracker/VERSION" ] && echo "PASS: vendored VERSION exists" || { echo "FAIL: no VERSION"; FAIL=1; }
 [ -f "$PROJECT/.devlog-tracker/env.sh" ] && echo "PASS: vendored env.sh exists" || { echo "FAIL: no env.sh"; FAIL=1; }
 [ -f "$PROJECT/.codex/hooks.json" ] && echo "PASS: .codex/hooks.json written" || { echo "FAIL: no .codex/hooks.json"; FAIL=1; }
-[ -f "$PROJECT/.codex/prompts/devlog-start.md" ] && echo "PASS: Codex start prompt written" || { echo "FAIL: no Codex start prompt"; FAIL=1; }
+[ -f "$PROJECT/.agents/skills/devlog-start/SKILL.md" ] && echo "PASS: Codex start skill written" || { echo "FAIL: no Codex start skill"; FAIL=1; }
 [ -f "$PROJECT/.cursor/hooks.json" ] && echo "PASS: .cursor/hooks.json written" || { echo "FAIL: no .cursor/hooks.json"; FAIL=1; }
 
 # re-running must not duplicate entries
