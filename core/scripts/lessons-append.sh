@@ -73,6 +73,9 @@ for f in "$DEVLOG_DIR"/devlog.lessons.*.md; do
   n="$(grep -c '^## ' "$f" 2>/dev/null || echo 0)"
   case "$n" in ''|*[!0-9]*) n=0 ;; esac
   [ "$n" -gt 0 ] || continue
+  if [ "$leaf" = "devlog.lessons.$TOPIC.md" ]; then
+    THIS_TOPIC_COUNT="$n"
+  fi
   last_ln="$(grep -n '^## ' "$f" | tail -1 | cut -d: -f1)"
   updated_at="$(sed -n "${last_ln}p" "$f" | sed -E 's/^## //')"
   title="$(awk -v start="$last_ln" 'NR>start && $0 ~ /[^[:space:]]/ {print; exit}' "$f")"
@@ -91,3 +94,6 @@ devlog_strip_lessons_index "$MAIN" "$STRIPPED"
 } > "$STRIPPED.new" && mv "$STRIPPED.new" "$MAIN" || exit 1
 
 printf 'PATH=.devlog/devlog.lessons.%s.md\n' "$TOPIC"
+if [ -n "${THIS_TOPIC_COUNT:-}" ] && [ $((THIS_TOPIC_COUNT % 3)) -eq 0 ]; then
+  printf '[Lessons Mode 提示] 這個主題已經累積 %s 則。可考慮升級成 docs/design/*.md 的正式決策，不強制。\n' "$THIS_TOPIC_COUNT"
+fi

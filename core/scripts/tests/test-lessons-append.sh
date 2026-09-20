@@ -134,5 +134,15 @@ case "$INDEX_BLOCK3" in
   *) echo "FAIL: expected title truncated at first 。, got: $INDEX_BLOCK3"; FAIL=1 ;;
 esac
 
+# --- Topic-repeat advisory: prints on every 3rd entry in the same topic ----
+OUT_R1="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "repeat-topic" --text "第一次。")"
+case "$OUT_R1" in *"[Lessons Mode 提示]"*) echo "FAIL: unexpected advisory on 1st entry: $OUT_R1"; FAIL=1 ;; *) echo "PASS: no advisory on 1st entry" ;; esac
+OUT_R2="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "repeat-topic" --text "第二次。")"
+case "$OUT_R2" in *"[Lessons Mode 提示]"*) echo "FAIL: unexpected advisory on 2nd entry: $OUT_R2"; FAIL=1 ;; *) echo "PASS: no advisory on 2nd entry" ;; esac
+OUT_R3="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "repeat-topic" --text "第三次。")"
+case "$OUT_R3" in *"[Lessons Mode 提示] 這個主題已經累積 3 則"*) echo "PASS: advisory on 3rd entry" ;; *) echo "FAIL: expected advisory on 3rd entry, got: $OUT_R3"; FAIL=1 ;; esac
+OUT_R4="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "repeat-topic" --text "第四次。")"
+case "$OUT_R4" in *"[Lessons Mode 提示]"*) echo "FAIL: unexpected advisory on 4th entry: $OUT_R4"; FAIL=1 ;; *) echo "PASS: no advisory on 4th entry" ;; esac
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
