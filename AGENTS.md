@@ -33,7 +33,7 @@ npm test                          # CLI 與 scripts 的 node 測試
 - `package.json` → `"version"`（唯一的版本來源）
 - `.claude-plugin/plugin.json` → `"version"`
 - `.claude-plugin/marketplace.json` → `plugins[0].version`
-- `README.md` → 開頭的 `**版本** X.Y.Z` 那行
+- `README.md` → 開頭的 `**Version** X.Y.Z` 那行；`README.zh-TW.md` → 開頭的 `**版本** X.Y.Z` 那行
 
 後三個由 `scripts/sync-version.js` 依 `package.json` 自動同步（掛在 `package.json` 的 `"version"` lifecycle script，`pnpm version` 會執行它並把結果併進同一個版本 commit）。
 
