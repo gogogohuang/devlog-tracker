@@ -30,10 +30,10 @@ OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
 case "$OUT" in *"LESSONS=yes"*) pass "lessons on when flag present" ;; *) fail "lessons on when flag present [$OUT]" ;; esac
 rm -f "$TMP/.devlog/.lessons-enabled"
 
-printf '%s\n' '{"mismatch_count": 1, "threshold": 3}' > "$TMP/.devlog/.lessons-drift-state"
+printf '%s\n' '{"count": 1, "threshold": 3}' > "$TMP/.devlog/.lessons-advisory-state"
 OUT="$(bash "$SCRIPT_DIR/status-devlog.sh")"
-case "$OUT" in *"LESSONS_DRIFT=1/3"*) pass "lessons drift status line" ;; *) fail "lessons drift status line [$OUT]" ;; esac
-rm -f "$TMP/.devlog/.lessons-drift-state"
+case "$OUT" in *"LESSONS_ADVISORY=1/3"*) pass "lessons advisory status line" ;; *) fail "lessons advisory status line [$OUT]" ;; esac
+rm -f "$TMP/.devlog/.lessons-advisory-state"
 
 OUT="$(bash "$SCRIPT_DIR/span-open.sh")"
 [ "$OUT" = "OPENED=1" ] && pass "span opened" || fail "span open [$OUT]"

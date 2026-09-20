@@ -44,11 +44,21 @@ case "$OUT" in
   *"LESSONS_ENABLED="*) echo "PASS: reports LESSONS_ENABLED" ;;
   *) echo "FAIL: expected LESSONS_ENABLED=..., got $OUT"; FAIL=1 ;;
 esac
-assert_file ".lessons-drift-state created alongside .lessons-enabled" "$TMP_ROOT/.devlog/.lessons-drift-state"
-grep -q '"mismatch_count": 0' "$TMP_ROOT/.devlog/.lessons-drift-state" \
-  && echo "PASS: drift count starts at 0" || { echo "FAIL: drift count not 0"; FAIL=1; }
-grep -q '"threshold": 3' "$TMP_ROOT/.devlog/.lessons-drift-state" \
-  && echo "PASS: drift threshold defaults to 3" || { echo "FAIL: drift threshold not 3"; FAIL=1; }
+assert_file ".lessons-advisory-state created alongside .lessons-enabled" "$TMP_ROOT/.devlog/.lessons-advisory-state"
+grep -q '"count": 0' "$TMP_ROOT/.devlog/.lessons-advisory-state" \
+  && echo "PASS: advisory count starts at 0" || { echo "FAIL: advisory count not 0"; FAIL=1; }
+grep -q '"threshold": 3' "$TMP_ROOT/.devlog/.lessons-advisory-state" \
+  && echo "PASS: advisory threshold defaults to 3" || { echo "FAIL: advisory threshold not 3"; FAIL=1; }
+
+# --- lessons-on migrates an old .lessons-drift-state on re-run -------------
+rm -f "$TMP_ROOT/.devlog/.lessons-advisory-state"
+printf '%s\n' '{"mismatch_count": 2, "threshold": 7}' > "$TMP_ROOT/.devlog/.lessons-drift-state"
+OUT="$(bash "$SCRIPT_DIR/lessons-on.sh")"
+assert_exit "lessons-on migrates old state file -> 0" 0 $?
+assert_file "migration produced .lessons-advisory-state" "$TMP_ROOT/.devlog/.lessons-advisory-state"
+assert_not_file "migration removed .lessons-drift-state" "$TMP_ROOT/.devlog/.lessons-drift-state"
+grep -q '"count": 2' "$TMP_ROOT/.devlog/.lessons-advisory-state" && echo "PASS: migrated count preserved" || { echo "FAIL: migrated count lost"; FAIL=1; }
+grep -q '"threshold": 7' "$TMP_ROOT/.devlog/.lessons-advisory-state" && echo "PASS: migrated threshold preserved" || { echo "FAIL: migrated threshold lost"; FAIL=1; }
 
 # --- lessons-off disables, leaves main switch and any lessons files alone --
 echo 'keep me' > "$TMP_ROOT/.devlog/devlog.lessons.foo.md"
@@ -61,7 +71,7 @@ esac
 assert_not_file ".lessons-enabled removed" "$TMP_ROOT/.devlog/.lessons-enabled"
 assert_file "main .enabled untouched" "$TMP_ROOT/.devlog/.enabled"
 assert_file "lessons file untouched" "$TMP_ROOT/.devlog/devlog.lessons.foo.md"
-assert_file ".lessons-drift-state untouched by lessons-off" "$TMP_ROOT/.devlog/.lessons-drift-state"
+assert_file ".lessons-advisory-state untouched by lessons-off" "$TMP_ROOT/.devlog/.lessons-advisory-state"
 
 # --- lessons-off when already off -> reports NOT_ENABLED, no error --------
 OUT="$(bash "$SCRIPT_DIR/lessons-off.sh")"
