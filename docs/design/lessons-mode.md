@@ -15,7 +15,7 @@ the *system being developed*.
 |---|---|---|---|
 | Manages | quiet ticks during automated continuation | periodic cross-round progress digest | cross-time process pitfalls, opt-in |
 | Default | off (opened per task) | on once `.enabled` is set | **off**, separate opt-in even after `.enabled` |
-| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved, or a self-judged detour, or cumulative workspace-drift mismatches (mechanical, see below) |
+| Trigger | Claude declares a span | round count threshold | BLOCKED→resolved or a self-judged detour (self-judged); cumulative workspace-drift or BLOCKED-round signals sharing one mechanical counter, plus a separate one-shot mechanical BLOCKED→resolved print (see below) |
 | Enforced by hook? | yes (tick budget) | yes (round budget) | **no** — fully Claude's discretion |
 | Storage | `devlog.md` inline | `devlog.md` inline (`## Checkpoint`) | separate per-topic files |
 
@@ -271,14 +271,17 @@ If a topic file does grow large in practice, revisit then — not now.
 - A user-tunable "how many silent Rounds before nudging a lessons entry"
   counter — unlike Checkpoint Mode, there is no silent-count nudge here at
   all; writing is opt-in per Round, not periodically demanded.
-  **Revised** (see 「機制性訊號：工作區漂移重複發生」above): this bullet
+  **Revised** (see 「機制性訊號：共用計數器」above): this bullet
   excluded a *round-silence* counter specifically, mirroring Checkpoint
-  Mode's shape. It did not anticipate a differently-shaped signal —
-  cumulative 工作區-mismatch occurrences — which already has an
+  Mode's shape. It did not anticipate differently-shaped signals —
+  cumulative 工作區-mismatch occurrences, and separately, cumulative
+  `BLOCKED`-round occurrences — each of which already has an
   unambiguous, existing machine signal (`.workspace-mismatch`,
-  `docs/design/continue.md`) that round-silence never had. A count-based
-  *advisory print only* is added for that one case; round-silence counting
-  and self-judged detours are otherwise unchanged by this revision.
+  `docs/design/continue.md`; and the just-closed round's `### Status`
+  value, respectively) that round-silence never had. A count-based
+  *advisory print only*, sharing one counter/threshold across both
+  sources, is added for those cases; round-silence counting and
+  self-judged detours are otherwise unchanged by this revision.
 
 ## Files
 
