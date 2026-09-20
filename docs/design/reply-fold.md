@@ -45,7 +45,7 @@ transcript inspection.
 
 ## Mechanism
 
-### `hooks/scripts/await-open.sh`
+### `core/scripts/await-open.sh`
 
 A small script, modeled on `span-open.sh`, that Claude runs directly via
 Bash right after finishing a Round's Summary/Handoff/Status — no slash
@@ -191,9 +191,9 @@ present with content, exactly as before.
 
 | File | Role |
 |---|---|
-| `hooks/scripts/await-open.sh` | Writes `.devlog/.awaiting-reply` for the current Round |
-| `hooks/scripts/tests/test-await-open.sh` | Self-check for `await-open.sh` |
-| `hooks/scripts/round-start.sh` | Reads/consumes `.awaiting-reply`; folds a matching reply into the last Round instead of opening a new one; also detects and condenses task-notification prompts, folding them the same way |
-| `hooks/scripts/tests/test-round-start.sh` | Self-check covering fold-match, fold-miss, checkpoint-counter behavior, and task-notification condensing/folding |
-| `hooks/scripts/pause-devlog.sh` | Also deletes `.awaiting-reply` on pause |
+| `core/scripts/await-open.sh` | Writes `.devlog/.awaiting-reply` for the current Round |
+| `core/scripts/tests/test-await-open.sh` | Self-check for `await-open.sh` |
+| `core/scripts/round-start.sh` | Reads/consumes `.awaiting-reply`; folds a matching reply into the last Round instead of opening a new one; also detects and condenses task-notification prompts, folding them the same way |
+| `core/scripts/tests/test-round-start.sh` | Self-check covering fold-match, fold-miss, checkpoint-counter behavior, and task-notification condensing/folding |
+| `core/scripts/pause-devlog.sh` | Also deletes `.awaiting-reply` on pause |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Claude (when to open the marker, how a folded segment looks, the `AskUserQuestion` distinction) |

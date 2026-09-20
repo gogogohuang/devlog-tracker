@@ -166,7 +166,7 @@ New command `/devlog-tracker:lessons [<topic>]`:
 
 ## Write mechanism
 
-`hooks/scripts/lessons-append.sh --topic <topic> --text <text>`:
+`core/scripts/lessons-append.sh --topic <topic> --text <text>`:
 
 1. `[ -f .devlog/.enabled ]` else exit 1 (`NOT_ENABLED`).
 2. `[ -f .devlog/.lessons-enabled ]` else exit 1 (`LESSONS_NOT_ENABLED`).
@@ -179,7 +179,7 @@ New command `/devlog-tracker:lessons [<topic>]`:
    `devlog.md` (strip old block if present, append the freshly derived
    one at the end of the file).
 
-This script is **never wired into `hooks/hooks.json`** — nothing calls it
+This script is **never wired into `claude/hooks.json`** — nothing calls it
 automatically. Claude invokes it directly at Round close, the same way
 `keep-move.sh` is only ever invoked by `commands/keep.md`, not a hook.
 Failing to call it is not an error; there is no enforcement path that
@@ -245,16 +245,16 @@ If a topic file does grow large in practice, revisit then — not now.
 | `commands/lessons-on.md` | `/devlog-tracker:lessons-on`: create `.lessons-enabled`, refuse if `.enabled` absent |
 | `commands/lessons-off.md` | `/devlog-tracker:lessons-off`: remove `.lessons-enabled` only |
 | `commands/lessons.md` | `/devlog-tracker:lessons [<topic>]`: index or full-file read |
-| `hooks/scripts/lessons-on.sh` / `lessons-off.sh` | Flag-file scripts, mirroring `start-devlog.sh` / `pause-devlog.sh` |
-| `hooks/scripts/lessons-append.sh` | Create/append a topic file; rebuild `## Lessons 索引` |
-| `hooks/scripts/session-start-devlog.sh` | Track `last_lessons` alongside `last_kept`; surface `## Lessons 索引` in the excerpt |
+| `core/scripts/lessons-on.sh` / `lessons-off.sh` | Flag-file scripts, mirroring `start-devlog.sh` / `pause-devlog.sh` |
+| `core/scripts/lessons-append.sh` | Create/append a topic file; rebuild `## Lessons 索引` |
+| `core/scripts/session-start-devlog.sh` | Track `last_lessons` alongside `last_kept`; surface `## Lessons 索引` in the excerpt |
 | `skills/devlog-tracker/SKILL.md` | New section: what Lessons Mode is, the two trigger signals, that it is opt-in and never hook-enforced |
 | `docs/design/lessons-mode.md` | This spec |
 | `commands/lessons-drift.md` | `/devlog-tracker:lessons-drift <次數>`: adjust the drift-nudge threshold |
-| `hooks/scripts/lessons-drift-set.sh` | Sets `.lessons-drift-state`'s `threshold`, mirroring `checkpoint-set.sh` |
-| `hooks/scripts/round-start.sh` | Also increments/reads `.lessons-drift-state` inside the existing mismatch block |
-| `hooks/scripts/lessons-on.sh` | Also creates `.lessons-drift-state` with defaults if missing |
-| `hooks/scripts/status-devlog.sh` | Also prints `LESSONS_DRIFT=<count>/<threshold>` |
+| `core/scripts/lessons-drift-set.sh` | Sets `.lessons-drift-state`'s `threshold`, mirroring `checkpoint-set.sh` |
+| `core/scripts/round-start.sh` | Also increments/reads `.lessons-drift-state` inside the existing mismatch block |
+| `core/scripts/lessons-on.sh` | Also creates `.lessons-drift-state` with defaults if missing |
+| `core/scripts/status-devlog.sh` | Also prints `LESSONS_DRIFT=<count>/<threshold>` |
 
-No `hooks/hooks.json` changes beyond what `session-start-devlog.sh` already
+No `claude/hooks.json` changes beyond what `session-start-devlog.sh` already
 does — `lessons-append.sh` is Claude-invoked only, same as `keep-move.sh`.

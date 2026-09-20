@@ -54,7 +54,7 @@ it from `devlog.md` in the same step), rather than copying it.
 ## When content merges back into `devlog.md`
 
 Two places perform the merge, both by calling the new
-`devlog_merge_round_current(devlog, current)` in `hooks/scripts/devlog-md.sh`
+`devlog_merge_round_current(devlog, current)` in `core/scripts/devlog-md.sh`
 (appends `current`'s content to `devlog`'s tail, separated by one blank
 line, then deletes `current`; a no-op if `current` is absent or empty):
 
@@ -195,7 +195,7 @@ stamp-or-recovered determination) closes and merges first:
   Stop validates and merges it normally when the turn closes.
 
 **Exception: SessionStart's handoff-excerpt injection**
-(`hooks/scripts/session-start-devlog.sh`) is *not* guaranteed to see only
+(`core/scripts/session-start-devlog.sh`) is *not* guaranteed to see only
 merged content. `startup` / `resume` / `fork` heal a dangling
 `.round-open` before printing the excerpt, so by the time it runs
 `.round-current.md` is normally already empty. But `source=compact`
@@ -211,7 +211,7 @@ its content too, clearly labeled as the still-open round.
 
 ## New helpers
 
-`hooks/scripts/devlog-md.sh` gained two functions:
+`core/scripts/devlog-md.sh` gained two functions:
 
 - `devlog_merge_round_current(devlog, current)`: appends `current`'s
   content to `devlog`'s tail (one blank-line separator) and deletes
@@ -225,13 +225,13 @@ its content too, clearly labeled as the still-open round.
 
 | File | Role |
 |---|---|
-| `hooks/scripts/devlog-md.sh` | New `devlog_merge_round_current` / `devlog_reopen_last_round` |
-| `hooks/scripts/round-start.sh` | Opening a new round and executing the Reply Fold both write into `.round-current.md`; round numbering and Reply Fold detection still read `devlog.md` |
-| `hooks/scripts/enforce-devlog.sh` | Hashes and does fence-aware bounded-extraction validation against `.round-current.md`; calls `devlog_merge_round_current` on success |
-| `hooks/scripts/close-open-round.sh` | Whether it stamps `INTERRUPTED` or determines the round was recovered, both outcomes call `devlog_merge_round_current` |
-| `hooks/scripts/segment-watch.sh` | Silence detection and the PreToolUse allowlist target both switched to `.round-current.md` |
-| `hooks/scripts/session-start-devlog.sh` | After printing the `devlog.md` excerpt, also prints `.round-current.md`'s content (labeled as the still-open round) whenever it's non-empty — needed for `source=compact`, which skips dangling-heal |
-| `hooks/scripts/clean-devlog.sh` | Reads `.round-current.md` to recover an open round's content |
+| `core/scripts/devlog-md.sh` | New `devlog_merge_round_current` / `devlog_reopen_last_round` |
+| `core/scripts/round-start.sh` | Opening a new round and executing the Reply Fold both write into `.round-current.md`; round numbering and Reply Fold detection still read `devlog.md` |
+| `core/scripts/enforce-devlog.sh` | Hashes and does fence-aware bounded-extraction validation against `.round-current.md`; calls `devlog_merge_round_current` on success |
+| `core/scripts/close-open-round.sh` | Whether it stamps `INTERRUPTED` or determines the round was recovered, both outcomes call `devlog_merge_round_current` |
+| `core/scripts/segment-watch.sh` | Silence detection and the PreToolUse allowlist target both switched to `.round-current.md` |
+| `core/scripts/session-start-devlog.sh` | After printing the `devlog.md` excerpt, also prints `.round-current.md`'s content (labeled as the still-open round) whenever it's non-empty — needed for `source=compact`, which skips dangling-heal |
+| `core/scripts/clean-devlog.sh` | Reads `.round-current.md` to recover an open round's content |
 | `skills/devlog-tracker/SKILL.md` | 「檔案位置」 gained `.round-current.md`; the mandatory-recording steps and the writing-to-devlog sections now point at `.round-current.md` |
 | `skills/devlog-tracker/references/round-segments.md` | Segment Watch's silence backstop now says Read `.round-current.md` |
 | `skills/devlog-tracker/references/reply-fold.md` | Documents that folding actually happens against `.round-current.md`, and the reopen mechanism |

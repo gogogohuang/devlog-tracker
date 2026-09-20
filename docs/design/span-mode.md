@@ -145,9 +145,9 @@ Round's User Input can note that it's an automated-continuation closeout
 
 | File | Role |
 |---|---|
-| `hooks/scripts/round-start.sh` | Increments the tick counter |
-| `hooks/scripts/enforce-devlog.sh` | Checks the counter, enforces the threshold, resets on write |
-| `hooks/scripts/session-start-devlog.sh` | Resume-context note when a span is left open |
-| `hooks/scripts/tests/test-enforce-devlog.sh` | Self-check covering the tick-threshold behavior |
-| `hooks/scripts/tests/test-session-start-devlog.sh` | Self-check covering the resume-note behavior |
+| `core/scripts/round-start.sh` | Increments the tick counter |
+| `core/scripts/enforce-devlog.sh` | Checks the counter, enforces the threshold, resets on write |
+| `core/scripts/session-start-devlog.sh` | Resume-context note when a span is left open |
+| `core/scripts/tests/test-enforce-devlog.sh` | Self-check covering the tick-threshold behavior |
+| `core/scripts/tests/test-session-start-devlog.sh` | Self-check covering the resume-note behavior |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Claude (when/how to open, maintain, and close a span) |

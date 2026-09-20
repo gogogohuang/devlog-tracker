@@ -83,7 +83,7 @@ broad — this is not user-configurable in v1):
 
 ## Implementation sketch
 
-Lives in `hooks/scripts/enforce-devlog.sh`, immediately after the existing
+Lives in `core/scripts/enforce-devlog.sh`, immediately after the existing
 `IN_PROGRESS`/`BLOCKED` → `#### 下一步` non-empty check (see
 `heading-substance-plan.md` Task 2). Reuses the same `section_body` /
 `awk` helper already defined there — no new file.
@@ -127,8 +127,8 @@ fi
 
 | File | Role |
 |---|---|
-| `hooks/scripts/enforce-devlog.sh` | New check, placed after existing `下一步` non-empty check |
-| `hooks/scripts/tests/test-enforce-devlog.sh` | New scenarios: pure blacklist phrase → blocked; blacklist phrase inside a longer sentence → allowed; multi-line body → allowed |
+| `core/scripts/enforce-devlog.sh` | New check, placed after existing `下一步` non-empty check |
+| `core/scripts/tests/test-enforce-devlog.sh` | New scenarios: pure blacklist phrase → blocked; blacklist phrase inside a longer sentence → allowed; multi-line body → allowed |
 | `docs/design/summary-handoff.md` | Add one line under Known limitations noting the filler-phrase check |
 | `skills/devlog-tracker/SKILL.md` | One sentence next to the existing "不算完成" writing rule, noting it is now also hook-enforced |
 | `docs/design/next-step-blacklist.md` | This spec |

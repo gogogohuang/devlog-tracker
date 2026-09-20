@@ -20,7 +20,7 @@ from `devlog.md` after the named file is written and verified.
 
 This is a slash command only. No new hooks. SessionStart still injects
 only `.devlog/devlog.md`. The underlying move primitive
-(`hooks/scripts/keep-move.sh`) still only knows how to move one
+(`core/scripts/keep-move.sh`) still only knows how to move one
 contiguous range into one named file — `commands/keep.md` calls it
 once per confirmed segment.
 
@@ -350,7 +350,7 @@ truth for what happened in the segment.
   later deleted by hand, its index line is not removed automatically —
   a ghost row is a known limitation, not a bug to fix here.
 - **SessionStart surfaces this block, not the named files' content.**
-  `hooks/scripts/session-start-devlog.sh` includes the current
+  `core/scripts/session-start-devlog.sh` includes the current
   `## Kept 索引` in the startup/resume/compact/fork excerpt so the next
   Claude knows a topic was kept and which file to `/devlog-tracker:resume`
   it from, without ever auto-injecting a keep file's body.
@@ -424,7 +424,7 @@ Keep is never auto-run.
 
 ## Testing
 
-`hooks/scripts/keep-move.sh` has `hooks/scripts/tests/test-keep-move.sh`
+`core/scripts/keep-move.sh` has `core/scripts/tests/test-keep-move.sh`
 (assert-and-exit). Topic-split *judgment* still lives in
 `commands/keep.md` (LLM steps); the script only moves contiguous
 ranges after confirm. The keep turn's own Round still has to satisfy
@@ -437,18 +437,18 @@ Stop (`### Summary` / `### Handoff` / Status rules).
 | `commands/keep.md` | Steps Claude runs on `/devlog-tracker:keep` |
 | `commands/resume.md` | Reads a named keep file on explicit `/devlog-tracker:resume` |
 | `commands/overview.md` | Steps Claude runs on `/devlog-tracker:overview`: read every kept file, synthesize a cross-topic summary + CLAUDE.md rule candidates |
-| `hooks/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` (optionally with a `--desc` description) |
-| `hooks/scripts/tests/test-keep-move.sh` | Self-check for `keep-move.sh` |
-| `hooks/scripts/kept-list.sh` | Parses `## Kept 索引` into `FILE=<path> EXISTS=0/1` lines for `/devlog-tracker:overview` |
-| `hooks/scripts/tests/test-kept-list.sh` | Self-check for `kept-list.sh` |
-| `hooks/scripts/session-start-devlog.sh` | Surfaces `## Kept 索引` in the startup/resume/compact/fork excerpt |
+| `core/scripts/keep-move.sh` | Moves contiguous Round/Checkpoint ranges after confirm; rebuilds `## Kept 索引` (optionally with a `--desc` description) |
+| `core/scripts/tests/test-keep-move.sh` | Self-check for `keep-move.sh` |
+| `core/scripts/kept-list.sh` | Parses `## Kept 索引` into `FILE=<path> EXISTS=0/1` lines for `/devlog-tracker:overview` |
+| `core/scripts/tests/test-kept-list.sh` | Self-check for `kept-list.sh` |
+| `core/scripts/session-start-devlog.sh` | Surfaces `## Kept 索引` in the startup/resume/compact/fork excerpt |
 | `skills/devlog-tracker/SKILL.md` | Short pointer: when keep exists, that it moves, that it is not compact, that it can split by topic |
 | `README.md` | User-facing mention next to start / pause / compact |
 | `.claude-plugin/plugin.json` | Plugin description lists keep |
 | `.claude-plugin/marketplace.json` | Same description |
 | `docs/design/keep.md` | This spec |
 
-No `hooks/hooks.json` changes (user-invoked script only).
+No `claude/hooks.json` changes (user-invoked script only).
 
 ## Non-goals
 

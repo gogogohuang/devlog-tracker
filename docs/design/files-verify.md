@@ -2,7 +2,7 @@
 
 Devlog SSOT Phase 4. Extends the write-time verification `#### 工作區`
 already gets (`docs/design/devlog-as-ssot-assessment.md`, Phase 1 —
-`hooks/scripts/workspace-snapshot.sh`) to the other Handoff field that
+`core/scripts/workspace-snapshot.sh`) to the other Handoff field that
 makes a factual claim about the tree: `#### 檔案`. Today `#### 工作區`
 is machine-verified against live git; `#### 檔案` is free prose nobody
 checks — a round can say "新增 a.ts、b.ts" while `a.ts` was never
@@ -209,10 +209,10 @@ the grammar `files-snapshot.sh` outputs, same as `#### 工作區`.
 
 | File | Role |
 |---|---|
-| `hooks/scripts/files-snapshot.sh` | New: `files_snapshot(dir[, hash])` |
-| `hooks/scripts/tests/test-files-snapshot.sh` | New: unit tests for both branches, `.devlog/` exclusion, rename-as-delete+add |
-| `hooks/scripts/enforce-devlog.sh` | Sources the helper; parses `#### 檔案` blocks; blocks on format violation or mismatch |
-| `hooks/scripts/tests/test-enforce-devlog-files.sh` | New: integration tests (mirrors `test-enforce-devlog-workspace.sh`'s structure) |
+| `core/scripts/files-snapshot.sh` | New: `files_snapshot(dir[, hash])` |
+| `core/scripts/tests/test-files-snapshot.sh` | New: unit tests for both branches, `.devlog/` exclusion, rename-as-delete+add |
+| `core/scripts/enforce-devlog.sh` | Sources the helper; parses `#### 檔案` blocks; blocks on format violation or mismatch |
+| `core/scripts/tests/test-enforce-devlog-files.sh` | New: integration tests (mirrors `test-enforce-devlog-workspace.sh`'s structure) |
 | `skills/devlog-tracker/SKILL.md` | `#### 檔案` writing rule becomes the block grammar; note hook now verifies it |
 | `docs/design/devlog-as-ssot-assessment.md` | Add Phase 4 row; note what it does/doesn't close (path-level `#### 檔案` honesty; still not prose truthfulness, still not live SSOT) |
 | `README.md` | One line under "強制記錄開著之後" alongside the existing 工作區 mention |

@@ -70,7 +70,7 @@ Each feature plan is self-contained (TDD where behavior changes, exact files, ex
 
 ### 7. CI shellcheck + edge tests
 
-**In:** Add shellcheck step to `.github/workflows/hooks.yml` (scripts under `hooks/scripts/` and `cursor/hooks/`). Extend self-checks for Cursor no-jq `session_id`, selected redact negatives, and any new helpers from prior code plans if not already covered there.
+**In:** Add shellcheck step to `.github/workflows/hooks.yml` (scripts under `core/scripts/` and `cursor/hooks/`). Extend self-checks for Cursor no-jq `session_id`, selected redact negatives, and any new helpers from prior code plans if not already covered there.
 
 **Out:** Flaky multi-process lock stress; macOS CI matrix (optional later).
 
