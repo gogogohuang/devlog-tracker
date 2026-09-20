@@ -11,4 +11,5 @@ PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
 DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
 ```
 ```
-把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態；`LESSONS_DRIFT=<count>/<threshold>`：Lessons Mode 開著時，工作區漂移不符的累積次數／門檻）。不要改任何檔。`NOT_STARTED` 就說還沒 `/devlog-tracker:start`。
+把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態；`LESSONS_ADVISORY=<count>/<threshold>`：Lessons Mode 開著時，機制性訊號（工作區漂移不符、或
+BLOCKED 輪次累積）的共用累積次數／門檻）。不要改任何檔。`NOT_STARTED` 就說還沒 `/devlog-tracker:start`。

@@ -261,6 +261,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   會在下面多印一行 `[reason: ...]`（例如 `[reason: dangling:next_prompt]`），這是 hook 自己的
   除錯代號、用方括號標記成內部 metadata，特意不用 HTML 註解（會被 Markdown 渲染器整段隱藏，
   之後要 debug 反而看不到），不算違反「只寫一個值」——看到這行不用當成錯誤，Claude 也不用去動它。
+- 若 Lessons Mode 開著（`.lessons-enabled` 存在）：寫這個 Status 前，想一下這輪算不算「從
+  `BLOCKED` 解開」或「明顯繞了一圈才找到對的做法」——符合任一種就考慮用 `lessons-append.sh`
+  記一筆，非強制。前者下一輪開始時 hook 也會機械印一句提示（見下面「Lessons Mode」一節），
+  後者完全仰賴這裡的自我檢查，hook 判斷不到。
 - `INTERRUPTED` 只由 hook 在意外中斷時寫上（非 usage 的 API 錯誤、SessionEnd、
   下次 SessionStart（startup / resume / clear / fork）或下一則訊息發現 `.round-open` 還在）。
   mid-turn 取消（例如 Esc）通常也是走這條延後路徑；`PostToolUseFailure` 的 `is_interrupt`
@@ -396,13 +400,16 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 跟 Checkpoint／Span 不同，管的是「開發**過程**踩過的坑」，不是進度或架構——架構
 決策的 SSOT 永遠是 `docs/design/*.md`。預設關閉，隸屬主開關（沒下過
-`/devlog-tracker:start` 會被拒絕）。開著時有三種訊號考慮記一筆：這輪 `Status`
-從 `BLOCKED` 解開、你自行判斷這輪明顯繞了一圈，或工作區漂移（宣稱跟實際不符）
-累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）時 hook 印
-的一句顧問式建議。三種都完全不 hook 強制寫入本身——寫不寫都不影響這一輪能不能
-收尾。
+`/devlog-tracker:start` 會被拒絕）。開著時有兩種自我判斷訊號考慮記一筆：這輪
+`Status` 從 `BLOCKED` 解開、你自行判斷這輪明顯繞了一圈——這兩種完全仰賴你自己
+想起來，hook 不強制、不追蹤。另外有兩種機制性訊號，由 hook 累積計數、達門檻只印
+一句顧問式建議（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調，兩種共用
+同一個門檻）：工作區漂移（宣稱跟實際不符）累積達門檻、或 Status 是 `BLOCKED` 的
+輪次累積達門檻；另外「上一輪從 `BLOCKED` 解開」這個轉變，下一輪開始時 hook 也會
+機械印一句提示（不經過門檻計數，偵測到就印）。以上全部都完全不 hook 強制寫入
+本身——寫不寫都不影響這一輪能不能收尾。
 
-寫法、per-topic 存檔規則、索引重建、漂移計數細節，見
+寫法、per-topic 存檔規則、索引重建、機制性訊號細節，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
 設計見 `docs/design/lessons-mode.md`）。
 

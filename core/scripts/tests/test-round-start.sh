@@ -674,6 +674,10 @@ OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh"
 grep -q '^## Round 2' "$WS/.devlog/.round-current.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
 
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+# This fixture is reused below by the drift-only counter assertions (1 -> 2 ->
+# reset-at-3). Its ### Status must stay non-BLOCKED: if it were BLOCKED, the
+# BLOCKED-round bump would also fire on the same invocation and double-count
+# the shared counter, breaking those assertions with a confusing failure.
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
@@ -708,35 +712,35 @@ MARKER="$(cat "$WS/.devlog/.workspace-mismatch")"
 # --- lessons drift counter: mechanical nudge on repeated mismatch --------
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch"
 touch "$WS/.devlog/.lessons-enabled"
-printf '%s\n' '{"mismatch_count": 0, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+printf '%s\n' '{"count": 0, "threshold": 3}' > "$WS/.devlog/.lessons-advisory-state"
 
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
 assert_not_contains "drift count 1/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
-grep -q '"mismatch_count": 1' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 1" || { echo "FAIL: drift count not 1"; FAIL=1; }
+grep -q '"count": 1' "$WS/.devlog/.lessons-advisory-state" && echo "PASS: drift count -> 1" || { echo "FAIL: drift count not 1"; FAIL=1; }
 
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
 assert_not_contains "drift count 2/3: no nudge yet" "[Lessons Mode 提示]" "$OUT"
-grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count -> 2" || { echo "FAIL: drift count not 2"; FAIL=1; }
+grep -q '"count": 2' "$WS/.devlog/.lessons-advisory-state" && echo "PASS: drift count -> 2" || { echo "FAIL: drift count not 2"; FAIL=1; }
 
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
 assert_contains "drift count hits threshold: prints nudge" "[Lessons Mode 提示]" "$OUT"
-grep -q '"mismatch_count": 0' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count reset after nudge" || { echo "FAIL: drift count not reset"; FAIL=1; }
+grep -q '"count": 0' "$WS/.devlog/.lessons-advisory-state" && echo "PASS: drift count reset after nudge" || { echo "FAIL: drift count not reset"; FAIL=1; }
 
 # without .lessons-enabled: no counting, no nudge, state file untouched
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled"
-printf '%s\n' '{"mismatch_count": 2, "threshold": 3}' > "$WS/.devlog/.lessons-drift-state"
+printf '%s\n' '{"count": 2, "threshold": 3}' > "$WS/.devlog/.lessons-advisory-state"
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
 assert_not_contains "lessons off: no nudge even near threshold" "[Lessons Mode 提示]" "$OUT"
-grep -q '"mismatch_count": 2' "$WS/.devlog/.lessons-drift-state" && echo "PASS: drift count untouched when lessons off" || { echo "FAIL: drift count changed when lessons off"; FAIL=1; }
-rm -f "$WS/.devlog/.lessons-drift-state" "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+grep -q '"count": 2' "$WS/.devlog/.lessons-advisory-state" && echo "PASS: drift count untouched when lessons off" || { echo "FAIL: drift count changed when lessons off"; FAIL=1; }
+rm -f "$WS/.devlog/.lessons-advisory-state" "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 
 # --- lessons drift counter: upgrade path — .lessons-enabled exists (from
-# before this branch) but .lessons-drift-state was never created. round-start.sh
+# before this branch) but .lessons-advisory-state was never created. round-start.sh
 # must create it with defaults and still act on this same invocation's
 # mismatch, not require a second message ------------------------------------
-rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch" "$WS/.devlog/.lessons-drift-state"
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch" "$WS/.devlog/.lessons-advisory-state"
 touch "$WS/.devlog/.lessons-enabled"
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
@@ -761,11 +765,11 @@ do x
 IN_PROGRESS
 EOF
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
-[ -f "$WS/.devlog/.lessons-drift-state" ] && echo "PASS: upgrade path creates .lessons-drift-state on first drift" || { echo "FAIL: .lessons-drift-state not created for pre-existing lessons-enabled"; FAIL=1; }
-grep -q '"mismatch_count": 1' "$WS/.devlog/.lessons-drift-state" 2>/dev/null && echo "PASS: newly-created state already counted this invocation's mismatch (1)" || { echo "FAIL: mismatch_count not 1 in newly-created state"; FAIL=1; }
-grep -q '"threshold": 3' "$WS/.devlog/.lessons-drift-state" 2>/dev/null && echo "PASS: newly-created state has default threshold 3" || { echo "FAIL: threshold not 3 in newly-created state"; FAIL=1; }
+[ -f "$WS/.devlog/.lessons-advisory-state" ] && echo "PASS: upgrade path creates .lessons-advisory-state on first drift" || { echo "FAIL: .lessons-advisory-state not created for pre-existing lessons-enabled"; FAIL=1; }
+grep -q '"count": 1' "$WS/.devlog/.lessons-advisory-state" 2>/dev/null && echo "PASS: newly-created state already counted this invocation's mismatch (1)" || { echo "FAIL: count not 1 in newly-created state"; FAIL=1; }
+grep -q '"threshold": 3' "$WS/.devlog/.lessons-advisory-state" 2>/dev/null && echo "PASS: newly-created state has default threshold 3" || { echo "FAIL: threshold not 3 in newly-created state"; FAIL=1; }
 assert_not_contains "upgrade path: no nudge yet on first-ever drift (1 < 3)" "[Lessons Mode 提示]" "$OUT"
-rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled" "$WS/.devlog/.lessons-drift-state"
+rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.lessons-enabled" "$WS/.devlog/.lessons-advisory-state"
 
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
@@ -815,6 +819,193 @@ rm -f "$WS/.devlog/.workspace-mismatch"
 printf '%s' '{"prompt":"tick"}' | bash "$SCRIPT_DIR/round-start.sh" >/dev/null
 [ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: span skip writes no marker" || { echo "FAIL: span marker"; FAIL=1; }
 rm -f "$WS/.devlog/.span-open"
+
+# --- BLOCKED-round accumulation shares the advisory counter -----------------
+BLK_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$BLK_DIR"
+mkdir -p "$BLK_DIR/.devlog"
+touch "$BLK_DIR/.devlog/.enabled" "$BLK_DIR/.devlog/.lessons-enabled"
+printf '%s\n' '{"count": 0, "threshold": 3}' > "$BLK_DIR/.devlog/.lessons-advisory-state"
+cat > "$BLK_DIR/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-20T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+waiting
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
+#### 下一步
+apply the answer
+
+### Status
+BLOCKED
+EOF
+OUT="$(printf '%s' '{"prompt":"next"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "BLOCKED round 1/3: no advisory yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"count": 1' "$BLK_DIR/.devlog/.lessons-advisory-state" && echo "PASS: BLOCKED round bumped counter to 1" || { echo "FAIL: counter not bumped to 1"; FAIL=1; }
+
+rm -f "$BLK_DIR/.devlog/.round-open" "$BLK_DIR/.devlog/.round-current.md"
+cat >> "$BLK_DIR/.devlog/devlog.md" <<'EOF'
+
+## Round 2 — 2026-09-20T00:05:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+waiting
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
+#### 下一步
+apply the answer
+
+### Status
+BLOCKED
+EOF
+OUT="$(printf '%s' '{"prompt":"next again"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "BLOCKED round 2/3: no advisory yet" "[Lessons Mode 提示]" "$OUT"
+grep -q '"count": 2' "$BLK_DIR/.devlog/.lessons-advisory-state" && echo "PASS: BLOCKED round bumped counter to 2" || { echo "FAIL: counter not bumped to 2"; FAIL=1; }
+
+rm -f "$BLK_DIR/.devlog/.round-open" "$BLK_DIR/.devlog/.round-current.md"
+cat >> "$BLK_DIR/.devlog/devlog.md" <<'EOF'
+
+## Round 3 — 2026-09-20T00:10:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+waiting
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
+#### 下一步
+apply the answer
+
+### Status
+BLOCKED
+EOF
+OUT="$(printf '%s' '{"prompt":"next once more"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "BLOCKED round 3/3: hits threshold" "[Lessons Mode 提示]" "$OUT"
+grep -q '"count": 0' "$BLK_DIR/.devlog/.lessons-advisory-state" && echo "PASS: counter reset after threshold" || { echo "FAIL: counter not reset"; FAIL=1; }
+rm -rf "$BLK_DIR"
+
+# --- BLOCKED->resolved: mechanical, one-shot print, not counted -------------
+RES_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$RES_DIR"
+mkdir -p "$RES_DIR/.devlog"
+touch "$RES_DIR/.devlog/.enabled" "$RES_DIR/.devlog/.lessons-enabled"
+cat > "$RES_DIR/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-20T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+waiting
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
+#### 下一步
+apply the answer
+
+### Status
+BLOCKED
+
+## Round 2 — 2026-09-20T00:05:00+08:00
+
+### Summary
+resolved it
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+OUT="$(printf '%s' '{"prompt":"whats next"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "BLOCKED->resolved prints a one-shot advisory" "上一輪從 BLOCKED 解開了" "$OUT"
+[ ! -f "$RES_DIR/.devlog/.lessons-advisory-state" ] && echo "PASS: resolved-transition print does not touch the shared counter" || { echo "FAIL: resolved-transition print created/touched the counter file"; FAIL=1; }
+
+# resolved print requires two rounds of history: with only one round of
+# history (regardless of its own status) there's no "second-to-last" round
+# to compare against.
+rm -rf "$RES_DIR"
+RES2_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$RES2_DIR"
+mkdir -p "$RES2_DIR/.devlog"
+touch "$RES2_DIR/.devlog/.enabled" "$RES2_DIR/.devlog/.lessons-enabled"
+cat > "$RES2_DIR/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-20T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+done
+
+### Status
+DONE
+EOF
+OUT="$(printf '%s' '{"prompt":"go"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "cold start (one round of history): no resolved print" "上一輪從 BLOCKED 解開了" "$OUT"
+rm -rf "$RES2_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+
+# --- without .lessons-enabled: BLOCKED accumulation does not run at all ----
+NOLES_DIR="$(mktemp -d)"
+export CLAUDE_PROJECT_DIR="$NOLES_DIR"
+mkdir -p "$NOLES_DIR/.devlog"
+touch "$NOLES_DIR/.devlog/.enabled"
+cat > "$NOLES_DIR/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-20T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 現況
+waiting
+#### 完成條件
+缺的外部輸入已出現，且可觀察條件達成。
+#### 下一步
+apply the answer
+
+### Status
+BLOCKED
+EOF
+OUT="$(printf '%s' '{"prompt":"next"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "lessons off: no BLOCKED-accumulation advisory" "[Lessons Mode 提示]" "$OUT"
+[ ! -f "$NOLES_DIR/.devlog/.lessons-advisory-state" ] && echo "PASS: lessons off leaves no advisory-state file" || { echo "FAIL: advisory-state file created while lessons off"; FAIL=1; }
+rm -rf "$NOLES_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
