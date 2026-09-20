@@ -144,5 +144,13 @@ case "$OUT_R3" in *"[Lessons Mode 提示] 這個主題已經累積 3 則"*) echo
 OUT_R4="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "repeat-topic" --text "第四次。")"
 case "$OUT_R4" in *"[Lessons Mode 提示]"*) echo "FAIL: unexpected advisory on 4th entry: $OUT_R4"; FAIL=1 ;; *) echo "PASS: no advisory on 4th entry" ;; esac
 
+# --- New-topic hint: lists existing topics, only on first-ever append -----
+OUT_NEW="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "brand-new-topic" --text "第一次，全新主題。")"
+case "$OUT_NEW" in *"NEW_TOPIC"*"既有主題："*) echo "PASS: new-topic hint lists existing topics" ;; *) echo "FAIL: expected NEW_TOPIC hint, got: $OUT_NEW"; FAIL=1 ;; esac
+case "$OUT_NEW" in *"repeat-topic"*) echo "PASS: new-topic hint includes a real existing topic name" ;; *) echo "FAIL: expected existing topic name in hint, got: $OUT_NEW"; FAIL=1 ;; esac
+
+OUT_AGAIN="$(bash "$SCRIPT_DIR/lessons-append.sh" --topic "brand-new-topic" --text "第二次，同一個主題。")"
+case "$OUT_AGAIN" in *"NEW_TOPIC"*) echo "FAIL: unexpected NEW_TOPIC hint on repeat append: $OUT_AGAIN"; FAIL=1 ;; *) echo "PASS: no NEW_TOPIC hint once the topic already exists" ;; esac
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

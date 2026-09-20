@@ -52,8 +52,10 @@ trap 'devlog_lock_release' EXIT
 TARGET="$DEVLOG_DIR/devlog.lessons.$TOPIC.md"
 TS="$(date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
 
+IS_NEW_TOPIC=0
 if [ ! -f "$TARGET" ]; then
   printf '# Lessons: %s\n\n- source: `.devlog/devlog.md`\n' "$TOPIC" > "$TARGET" || exit 1
+  IS_NEW_TOPIC=1
 fi
 {
   printf '\n## %s\n' "$TS"
@@ -66,6 +68,7 @@ fi
 # heading in that file, truncated at the first 。/. (whichever comes
 # first); no truncation if neither appears.
 INDEX_LINES=""
+OTHER_TOPICS=""
 shopt -s nullglob
 for f in "$DEVLOG_DIR"/devlog.lessons.*.md; do
   [ -f "$f" ] || continue
@@ -75,6 +78,10 @@ for f in "$DEVLOG_DIR"/devlog.lessons.*.md; do
   [ "$n" -gt 0 ] || continue
   if [ "$leaf" = "devlog.lessons.$TOPIC.md" ]; then
     THIS_TOPIC_COUNT="$n"
+  else
+    OTHER_TOPIC_NAME="${leaf#devlog.lessons.}"
+    OTHER_TOPIC_NAME="${OTHER_TOPIC_NAME%.md}"
+    OTHER_TOPICS="${OTHER_TOPICS:+$OTHER_TOPICS, }${OTHER_TOPIC_NAME}"
   fi
   last_ln="$(grep -n '^## ' "$f" | tail -1 | cut -d: -f1)"
   updated_at="$(sed -n "${last_ln}p" "$f" | sed -E 's/^## //')"
@@ -96,4 +103,7 @@ devlog_strip_lessons_index "$MAIN" "$STRIPPED"
 printf 'PATH=.devlog/devlog.lessons.%s.md\n' "$TOPIC"
 if [ -n "${THIS_TOPIC_COUNT:-}" ] && [ $((THIS_TOPIC_COUNT % 3)) -eq 0 ]; then
   printf '[Lessons Mode 提示] 這個主題已經累積 %s 則。可考慮升級成 docs/design/*.md 的正式決策，不強制。\n' "$THIS_TOPIC_COUNT"
+fi
+if [ "$IS_NEW_TOPIC" -eq 1 ] && [ -n "${OTHER_TOPICS:-}" ]; then
+  printf 'NEW_TOPIC。既有主題：%s（如果內容其實屬於這些主題之一，改用 --topic 該名稱重跑，避免同一件事分裂成兩個檔案）。\n' "$OTHER_TOPICS"
 fi
