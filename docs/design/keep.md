@@ -138,6 +138,20 @@ The confirmation reply may combine any of:
 - `改第 N 段檔名 <name>` — change one candidate's filename.
 - `移除第 N 段` — drop that candidate; its Rounds stay in `devlog.md`,
   untouched, available for a future keep run.
+- `摘要第 N 段` — opt-in, off by default. After that segment is moved
+  verbatim by `keep-move.sh` (unchanged — this never touches the
+  script's mechanical move), Claude re-reads the resulting
+  `devlog.<name>.md` and rewrites only the free-prose bodies (`###
+  Summary`, `### Reply`, `#### 決策`, `#### 現況`) per Round into a
+  terser narrative. Round headers, `### User Input`, `#### 工作區`,
+  `#### 檔案`, `#### 完成條件`, `#### 下一步`, `### Status`, and `##
+  Kept 索引` are never touched — those are exactly the fields
+  `resume`/`continue` byte-compare against live git or that Stop
+  already machine-verified, and a segment can still contain an
+  unresolved `IN_PROGRESS`/`BLOCKED`/`INTERRUPTED` Round that a later
+  `resume` needs to verify against. No external LLM call — the
+  calling agent does the rewrite itself, the same way Stop already
+  leaves prose quality to Claude rather than scoring it.
 - `全部歷史合併成一個檔 <name>` — discard the topic split entirely and
   fall back to the pre-split behavior: every historical Round (still
   excluding the open Round) as a single named file. This is the only

@@ -1280,6 +1280,36 @@ EOF
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "BLOCKED with 缺件句式 -> allowed" 0 $?
 
+# --- Lock contention: another live session holds .devlog/.lock -----------
+# Must block (exit 2, distinct message) instead of proceeding to read/merge
+# a devlog.md that the other session might be mid-write on, and must leave
+# .round-current.md / devlog.md untouched so the retry has something to
+# validate.
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+append_minimal_round 102 "2026-09-15T10:04:00+08:00"
+PRE_ROUND_CURRENT="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || true)"
+PRE_DEVLOG="$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || true)"
+sleep 5 &
+LOCK_HOLDER_PID=$!
+mkdir "$DEVLOG_DIR/.lock"
+echo "$LOCK_HOLDER_PID" > "$DEVLOG_DIR/.lock/pid"
+CONTENTION_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
+assert_exit "another live session holds the lock -> blocked" 2 $?
+case "$CONTENTION_MSG" in
+  *"$LOCK_HOLDER_PID"*) echo "PASS: contention message names the holder pid" ;;
+  *) echo "FAIL: expected holder pid $LOCK_HOLDER_PID in message, got: $CONTENTION_MSG"; FAIL=1 ;;
+esac
+assert_contains "lock contention: .round-current.md left untouched" "$PRE_ROUND_CURRENT" "$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || true)"
+[ "$(cat "$DEVLOG_DIR/devlog.md" 2>/dev/null || true)" = "$PRE_DEVLOG" ] \
+  && echo "PASS: lock contention: devlog.md left untouched" \
+  || { echo "FAIL: devlog.md should be untouched while the lock is contended"; FAIL=1; }
+kill "$LOCK_HOLDER_PID" 2>/dev/null || true
+wait "$LOCK_HOLDER_PID" 2>/dev/null || true
+rm -rf "$DEVLOG_DIR/.lock"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "retry once the lock is free -> allowed (no lasting side effect)" 0 $?
+assert_round_merged "retry once the lock is free" "fixture"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
