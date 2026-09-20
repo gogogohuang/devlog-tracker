@@ -674,6 +674,10 @@ OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh"
 grep -q '^## Round 2' "$WS/.devlog/.round-current.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
 
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
+# This fixture is reused below by the drift-only counter assertions (1 -> 2 ->
+# reset-at-3). Its ### Status must stay non-BLOCKED: if it were BLOCKED, the
+# BLOCKED-round bump would also fire on the same invocation and double-count
+# the shared counter, breaking those assertions with a confusing failure.
 cat > "$WS/.devlog/devlog.md" <<EOF
 ## Round 1 — 2026-09-11T00:00:00+08:00
 

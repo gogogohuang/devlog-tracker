@@ -84,6 +84,9 @@ Skipping it is not an error and produces no warning.
   略過不寫，這一輪的收尾完全不受影響。
 - **累積而非連續**：計數不要求連續發生，任何時間點的訊號都算一次；`.lessons-advisory-state`
   跨 Round 持續存在，只有達門檻印完那次才歸零。
+- **同一次呼叫裡兩個來源都觸發，算兩次**：如果工作區漂移不符跟剛收尾的 BLOCKED 輪次剛好
+  在同一次 `round-start.sh` 呼叫裡都發生，計數器會在這次呼叫裡被加兩次——這是上面「任何
+  時間點的訊號都算一次」這個簡化本來就允許的結果，不是 bug。
 - **只在 Lessons Mode 開著時計數**：`.lessons-enabled` 不存在時，`round-start.sh`
   完全不碰 `.lessons-advisory-state`——沒開 Lessons Mode 就沒有任何額外開銷或提示。
 - **狀態檔建立時機**：`/devlog-tracker:lessons-on` 每次執行時，若 `.lessons-advisory-state`
@@ -95,8 +98,9 @@ Skipping it is not an error and produces no warning.
 
 這個狀態檔以前只有工作區漂移一種來源，叫 `.lessons-drift-state`（欄位
 `mismatch_count`）。加入 BLOCKED 累積這第二種來源後改名成語意中性的
-`.lessons-advisory-state`（欄位 `count`）。既有專案不會歸零重來：`round-start.sh` 跟
-`lessons-drift-set.sh` 在讀寫新檔之前，都會先呼叫共用的 `lessons_advisory_migrate`
+`.lessons-advisory-state`（欄位 `count`）。既有專案不會歸零重來：`round-start.sh`、
+`lessons-on.sh` 跟 `lessons-drift-set.sh` 在讀寫新檔之前，都會先呼叫共用的
+`lessons_advisory_migrate`
 （`core/scripts/lessons-advisory-state.sh`）——只有新檔不存在且舊檔存在時才搬遷（讀舊欄位、
 寫新檔、刪舊檔），冪等、只在 `.lessons-enabled` 存在時處理。
 
@@ -113,6 +117,13 @@ Skipping it is not an error and produces no warning.
 Claude 的對話 context，只有 `round-start.sh`（UserPromptSubmit）的 stdout 不論 exit code
 都會被注入 context——所以這個訊號必須放在下一輪開始時印，而不是在 BLOCKED 解開的那一輪
 Stop 當下。
+
+**摺疊（fold）情境下的邊角案例**：`round-start.sh` 裡讀取「剛收尾那一輪」`### Status`
+來判斷 BLOCKED 累積計數（見上面「機制性訊號：共用計數器」來源二）跟這裡的 BLOCKED→解開
+偵測，都跑在 `FOLD_ROUND` 真正把上一輪重新打開、之後再收尾成新 Status 之前——也就是說在
+一次 `.awaiting-reply` 摺疊週期裡，同一輪有可能在真正收尾前就先被讀到、算過一次。實務上
+影響有界：頂多讓共用計數器多算一次，或讓這裡「一次性」的提示理論上不只印一次，純屬顧問
+性質，不是資料正確性問題，這一版先不為此加 `FOLD_ROUND` 判斷。
 
 ## Storage: per-topic files, mirroring `keep`
 
@@ -258,6 +269,9 @@ If a topic file does grow large in practice, revisit then — not now.
   兩輪歷史紀錄才能判斷——剛開 Lessons Mode 或 devlog.md 只有一輪歷史時不會出現。
 - **共用計數器達門檻時無法分辨來源**——工作區漂移跟 BLOCKED 輪次累積打同一個計數器，印出的
   建議不會說是哪一種（或兩者都有貢獻），這是刻意的簡化（見「機制性訊號：共用計數器」）。
+- **No cross-topic search.** `/devlog-tracker:lessons <topic>` requires
+  knowing (or reading the index for) the topic name; there is no
+  full-text search across all lesson files.
 
 ## Non-goals
 
@@ -293,7 +307,7 @@ If a topic file does grow large in practice, revisit then — not now.
 | `core/scripts/lessons-on.sh` / `lessons-off.sh` | Flag-file scripts, mirroring `start-devlog.sh` / `pause-devlog.sh` |
 | `core/scripts/lessons-append.sh` | Create/append a topic file; rebuild `## Lessons 索引` |
 | `core/scripts/session-start-devlog.sh` | Track `last_lessons` alongside `last_kept`; surface `## Lessons 索引` in the excerpt |
-| `skills/devlog-tracker/SKILL.md` | New section: what Lessons Mode is, the two trigger signals, that it is opt-in and never hook-enforced |
+| `skills/devlog-tracker/SKILL.md` | New section: what Lessons Mode is, the four trigger signals (two self-judged, two mechanical sharing one counter, plus a separate uncounted BLOCKED→resolved print), that it is opt-in and never hook-enforced |
 | `docs/design/lessons-mode.md` | This spec |
 | `commands/lessons-drift.md` | `/devlog-tracker:lessons-drift <次數>`: adjust the drift-nudge threshold |
 | `core/scripts/lessons-advisory-state.sh` | Shared `lessons_advisory_migrate`/`lessons_advisory_bump` helpers, sourced by `round-start.sh` and `lessons-drift-set.sh` |

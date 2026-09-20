@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Sourced by round-start.sh / lessons-drift-set.sh. Owns the shared
+# Sourced by round-start.sh / lessons-on.sh / lessons-drift-set.sh. Owns the shared
 # `.lessons-advisory-state` file (docs/design/lessons-mode.md 「機制性訊號：
 # 共用計數器」): a `count`/`threshold` pair fed by more than one mechanical
 # signal (workspace drift, accumulated BLOCKED rounds), so the file and
