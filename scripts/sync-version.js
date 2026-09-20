@@ -3,7 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const README_LINE = /^\*\*版本\*\* \S+$/m;
+const README_FILES = [
+  { file: 'README.md', label: 'Version', line: /^\*\*Version\*\* \S+$/m },
+  { file: 'README.zh-TW.md', label: '版本', line: /^\*\*版本\*\* \S+$/m },
+];
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -26,12 +29,14 @@ function syncVersion(root) {
   market.plugins[0].version = version;
   writeJson(marketFile, market);
 
-  const readmeFile = path.join(root, 'README.md');
-  const readme = fs.readFileSync(readmeFile, 'utf8');
-  if (!README_LINE.test(readme)) {
-    throw new Error('README.md has no "**版本** X.Y.Z" line to update');
+  for (const { file, label, line } of README_FILES) {
+    const readmeFile = path.join(root, file);
+    const readme = fs.readFileSync(readmeFile, 'utf8');
+    if (!line.test(readme)) {
+      throw new Error(`${file} has no "**${label}** X.Y.Z" line to update`);
+    }
+    fs.writeFileSync(readmeFile, readme.replace(line, `**${label}** ${version}`));
   }
-  fs.writeFileSync(readmeFile, readme.replace(README_LINE, `**版本** ${version}`));
 
   return version;
 }
@@ -48,10 +53,12 @@ function checkVersion(root, { tag } = {}) {
   if (market.plugins[0].version !== version) {
     problems.push(`.claude-plugin/marketplace.json is ${market.plugins[0].version}, package.json is ${version}`);
   }
-  const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
-  const readmeLine = readme.match(README_LINE);
-  if (!readmeLine || readmeLine[0] !== `**版本** ${version}`) {
-    problems.push(`README.md version line is not ${version}`);
+  for (const { file, label, line } of README_FILES) {
+    const readme = fs.readFileSync(path.join(root, file), 'utf8');
+    const readmeLine = readme.match(line);
+    if (!readmeLine || readmeLine[0] !== `**${label}** ${version}`) {
+      problems.push(`${file} version line is not ${version}`);
+    }
   }
   if (tag !== undefined && tag !== `v${version}`) {
     problems.push(`tag ${tag} does not match package.json version v${version}`);
