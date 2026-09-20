@@ -4,11 +4,11 @@ description: 查看這個專案 devlog 強制記錄是否開著、span / checkpo
 
 跑：
 ```bash
-先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
 
 ```bash
-PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
-CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/status-devlog.sh"
+PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
 ```
 ```
 把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態；`LESSONS_DRIFT=<count>/<threshold>`：Lessons Mode 開著時，工作區漂移不符的累積次數／門檻）。不要改任何檔。`NOT_STARTED` 就說還沒 `/devlog-tracker:start`。

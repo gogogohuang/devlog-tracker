@@ -75,7 +75,7 @@ The rename happens under the existing `devlog-lock.sh` mutual exclusion
 (`devlog_with_lock`) to avoid a race between two concurrent hook
 invocations both trying to migrate at once.
 
-## `hooks/scripts/devlog-path.sh` (new file)
+## `core/scripts/devlog-path.sh` (new file)
 
 A new sourced helper, parallel to `devlog-md.sh` (content parsing) and
 `devlog-lock.sh` (write serialization) rather than folded into either —
@@ -112,25 +112,25 @@ needs to know branch logic exists.
 
 | File | Change |
 |---|---|
-| `hooks/scripts/devlog-path.sh` | **New.** `devlog_resolve_paths`, branch detection, sanitizing, migration. |
-| `hooks/scripts/tests/test-devlog-path.sh` | **New.** Unit tests: main/master passthrough, feature-branch mapping, slash sanitization, detached-HEAD fallback, non-git fallback, migration rename, migration is a no-op on second call. |
-| `hooks/scripts/round-start.sh` | Replace hardcoded `DEVLOG_DIR`/`DEVLOG_FILE` with `devlog_resolve_paths`. |
-| `hooks/scripts/enforce-devlog.sh` | Same. |
-| `hooks/scripts/segment-watch.sh` | Same. |
-| `hooks/scripts/session-start-devlog.sh` | Same. |
-| `hooks/scripts/close-open-round.sh` | Same. |
-| `hooks/scripts/pause-devlog.sh` | Same. |
-| `hooks/scripts/checkpoint-set.sh` | Same. |
-| `hooks/scripts/segment-watch-set.sh` | Same. |
-| `hooks/scripts/lessons-on.sh` / `lessons-off.sh` / `lessons-append.sh` / `lessons-read.sh` | Same (each currently reads/writes `MAIN="$DEVLOG_DIR/devlog.md"` for the "## Lessons 索引" rebuild). |
-| `hooks/scripts/keep-move.sh` | Same (`MAIN`). |
-| `hooks/scripts/compact-devlog.sh` | Same (`MAIN`). |
-| `hooks/scripts/clean-devlog.sh` | Same (`MAIN`). |
-| `hooks/scripts/status-devlog.sh` | Same. |
-| `hooks/scripts/span-open.sh` / `span-close.sh` | Same. |
-| `hooks/scripts/on-tool-failure.sh` | Same. |
-| `hooks/scripts/resume-devlog.sh` | Same (this script already computes a *different* `devlog.<name>.md` for an explicit `--name`; only its `DEVLOG_DIR` line is affected, not its own naming logic). |
-| `hooks/scripts/await-open.sh` | Same. |
+| `core/scripts/devlog-path.sh` | **New.** `devlog_resolve_paths`, branch detection, sanitizing, migration. |
+| `core/scripts/tests/test-devlog-path.sh` | **New.** Unit tests: main/master passthrough, feature-branch mapping, slash sanitization, detached-HEAD fallback, non-git fallback, migration rename, migration is a no-op on second call. |
+| `core/scripts/round-start.sh` | Replace hardcoded `DEVLOG_DIR`/`DEVLOG_FILE` with `devlog_resolve_paths`. |
+| `core/scripts/enforce-devlog.sh` | Same. |
+| `core/scripts/segment-watch.sh` | Same. |
+| `core/scripts/session-start-devlog.sh` | Same. |
+| `core/scripts/close-open-round.sh` | Same. |
+| `core/scripts/pause-devlog.sh` | Same. |
+| `core/scripts/checkpoint-set.sh` | Same. |
+| `core/scripts/segment-watch-set.sh` | Same. |
+| `core/scripts/lessons-on.sh` / `lessons-off.sh` / `lessons-append.sh` / `lessons-read.sh` | Same (each currently reads/writes `MAIN="$DEVLOG_DIR/devlog.md"` for the "## Lessons 索引" rebuild). |
+| `core/scripts/keep-move.sh` | Same (`MAIN`). |
+| `core/scripts/compact-devlog.sh` | Same (`MAIN`). |
+| `core/scripts/clean-devlog.sh` | Same (`MAIN`). |
+| `core/scripts/status-devlog.sh` | Same. |
+| `core/scripts/span-open.sh` / `span-close.sh` | Same. |
+| `core/scripts/on-tool-failure.sh` | Same. |
+| `core/scripts/resume-devlog.sh` | Same (this script already computes a *different* `devlog.<name>.md` for an explicit `--name`; only its `DEVLOG_DIR` line is affected, not its own naming logic). |
+| `core/scripts/await-open.sh` | Same. |
 | `skills/devlog-tracker/SKILL.md` | Document branch-scoped file location under "檔案位置". |
 | `README.md` | Mention branch-scoped devlog files where the four relaxation mechanisms / file layout are described. |
 

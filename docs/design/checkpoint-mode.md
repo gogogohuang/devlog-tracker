@@ -157,8 +157,8 @@ is left in place so counting resumes where it left off on
 
 | File | Role |
 |---|---|
-| `hooks/scripts/round-start.sh` | Increments `rounds_since_checkpoint` (skipping ticks silently passed by an open span) |
-| `hooks/scripts/enforce-devlog.sh` | Detects a new `## Checkpoint` heading (resets the counter) and enforces the threshold after normal round enforcement passes |
+| `core/scripts/round-start.sh` | Increments `rounds_since_checkpoint` (skipping ticks silently passed by an open span) |
+| `core/scripts/enforce-devlog.sh` | Detects a new `## Checkpoint` heading (resets the counter) and enforces the threshold after normal round enforcement passes |
 | `commands/start.md` | Creates `.checkpoint-state` alongside `.enabled` |
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions for Round Segments and Checkpoint blocks |
-| `hooks/scripts/tests/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |
+| `core/scripts/tests/test-enforce-devlog.sh` | Self-check covering the checkpoint threshold (block, reset, paused during an open span) |

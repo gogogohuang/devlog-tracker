@@ -8,17 +8,18 @@
 
 ```bash
 shellcheck --external-sources --source-path=SCRIPTDIR -S warning \
-  hooks/scripts/*.sh hooks/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
-bash hooks/scripts/run-tests.sh   # 所有 hook 自檢，含 cursor／codex 轉接層
+  core/scripts/*.sh core/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
+bash core/scripts/run-tests.sh   # 所有 hook 自檢，含 cursor／codex 轉接層
 npm test                          # CLI 與 scripts 的 node 測試
 ```
 
 ## 結構
 
-- `hooks/scripts/`：核心邏輯（bash），Claude Code hook 直接呼叫。
-- `codex/hooks/`、`cursor/hooks/`：薄轉接層，只把各平台的 JSON 轉成核心腳本的輸入輸出。改核心腳本的行為後，要確認 `run-tests.sh` 裡兩邊的 `test-adapters.sh` 仍通過。
-- `cli/`、`bin/`：`npx devlog-tracker init|status`，把上述檔案 vendoring 進使用者專案。
-- `commands/`、`skills/`：Claude Code 的指令與 skill 文件；`init` 也會複製給 Codex／Cursor 讀。
+- `core/scripts/`：核心邏輯（bash），三個平台的 hook 都直接或間接呼叫它。環境變數優先讀中立名稱（`DEVLOG_PROJECT_DIR`、`DEVLOG_TRACKER_ROOT`），相容 fallback 到 Claude Code 的 `CLAUDE_PROJECT_DIR`、`CLAUDE_PLUGIN_ROOT`。核心腳本吃的 stdin JSON 格式沿用 Claude Code hook payload 的形狀；Codex／Cursor 轉接層負責把各自平台的 JSON 轉成這個形狀。
+- `claude/hooks.json`：Claude Code plugin 的 hooks 設定，`.claude-plugin/plugin.json` 的 `"hooks"` 欄位指向它。
+- `codex/hooks/`、`cursor/hooks/`：薄轉接層，只把各平台的 JSON 轉成核心腳本的輸入輸出，並把結果轉回各平台預期的格式。改核心腳本的行為後，要確認 `run-tests.sh` 裡兩邊的 `test-adapters.sh` 仍通過。
+- `cli/`、`bin/`：`npx devlog-tracker init|status`，把 `core/`、`claude/`、`codex/`、`cursor/`、`commands/`、`skills/` vendoring 進使用者專案，支援 `--claude`／`--codex`／`--cursor`。
+- `commands/`、`skills/`：三個平台共用的指令與 skill 文件來源；`init` 依平台各自轉成 `.claude/skills/`、`.agents/skills/`，或 Claude plugin 直接讀 `commands/`。
 
 ## 文件
 

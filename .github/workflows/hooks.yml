@@ -16,8 +16,8 @@ jobs:
         run: |
           # -S warning: skip info/style noise (SC2015 assert idioms, SC2181, etc.)
           shellcheck --external-sources --source-path=SCRIPTDIR -S warning \
-            hooks/scripts/*.sh hooks/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
+            core/scripts/*.sh core/scripts/tests/*.sh cursor/hooks/*.sh codex/hooks/*.sh
       - name: Run hook self-checks
-        run: bash hooks/scripts/run-tests.sh
+        run: bash core/scripts/run-tests.sh
       - name: Run CLI unit tests
         run: npm test

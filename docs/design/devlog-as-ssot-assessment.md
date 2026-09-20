@@ -49,7 +49,7 @@ act from the file + live git **and must write the turn back**.
 
 ## What Stop enforces at close (L1 branch)
 
-`hooks/scripts/enforce-devlog.sh` (working tree on this branch).
+`core/scripts/enforce-devlog.sh` (working tree on this branch).
 
 A turn cannot end until the last Round has:
 
@@ -170,8 +170,8 @@ last again.
 | `docs/design/recording-moments.md` | Aligned: verbatim-first User Input |
 | `docs/design/reply-fold.md` + skill reference | Aligned: AskUserQuestion in-round 段落 |
 | `README.md` | Aligned: L1 framing + Round shape |
-| `hooks/scripts/enforce-devlog.sh` + tests | Aligned: Reply / 完成條件 / actionable / 缺件 |
-| `hooks/scripts/close-open-round.sh` | Aligned: Reply stub on interrupt |
+| `core/scripts/enforce-devlog.sh` + tests | Aligned: Reply / 完成條件 / actionable / 缺件 |
+| `core/scripts/close-open-round.sh` | Aligned: Reply stub on interrupt |
 | `.claude-plugin/plugin.json` / `marketplace.json` | Still 0.14.0 wording without L1 Reply／完成條件 (optional) |
 | `commands/keep.md` | Was silent on `## Kept 索引` (pre-existing) as of this review; resolved since — `commands/keep.md` now references the index and `keep-move.sh --desc` writes into it (see `docs/design/keep.md`) |
 
@@ -203,9 +203,9 @@ Kept 索引; plugin description Mentions for Reply／完成條件 after merge.
 | `docs/design/reply-fold.md` | Plain-text fold + AskUserQuestion 段落 |
 | `docs/design/next-step-blacklist.md` | Filler blacklist (non-semantic) |
 | `README.md` | Product surface; L1 framing |
-| `hooks/scripts/enforce-devlog.sh` | Stop checks |
-| `hooks/scripts/close-open-round.sh` | INTERRUPTED stubs incl. Reply |
-| `hooks/scripts/workspace-snapshot.sh` | `工作區` producer |
-| `hooks/scripts/files-snapshot.sh` | `檔案` producer |
+| `core/scripts/enforce-devlog.sh` | Stop checks |
+| `core/scripts/close-open-round.sh` | INTERRUPTED stubs incl. Reply |
+| `core/scripts/workspace-snapshot.sh` | `工作區` producer |
+| `core/scripts/files-snapshot.sh` | `檔案` producer |
 | `commands/continue.md` | Verify-then-act + write-back |
 | `commands/resume.md` | Verify, wait, then write-back on confirm |

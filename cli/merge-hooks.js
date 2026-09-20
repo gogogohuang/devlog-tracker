@@ -30,9 +30,12 @@ function readExisting(targetPath) {
   return parsed;
 }
 
-function mergeHooksTemplate({ templatePath, targetPath, vendorRoot }) {
+function mergeHooksTemplate({ templatePath, targetPath, vendorRoot, placeholders = ['${DEVLOG_TRACKER_ROOT}'] }) {
   const escapedRoot = JSON.stringify(vendorRoot).slice(1, -1);
-  const rawTemplate = fs.readFileSync(templatePath, 'utf8').split('${DEVLOG_TRACKER_ROOT}').join(escapedRoot);
+  let rawTemplate = fs.readFileSync(templatePath, 'utf8');
+  for (const placeholder of placeholders) {
+    rawTemplate = rawTemplate.split(placeholder).join(escapedRoot);
+  }
   const template = JSON.parse(rawTemplate);
 
   const existing = readExisting(targetPath);

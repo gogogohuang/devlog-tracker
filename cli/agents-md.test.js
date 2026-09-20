@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { upsertAgentsMd, BEGIN, END } = require('./agents-md');
+const { upsertAgentsMd, upsertMarkdown, BEGIN, END } = require('./agents-md');
 const { run } = require('./init');
 
 function tmp() {
@@ -73,4 +73,24 @@ test('init --codex writes AGENTS.md and project skills; --cursor alone does not'
   const cursorOnly = tmp();
   await run(['--cursor'], { repoRoot, targetDir: cursorOnly, version: '0.0.0' });
   assert.ok(!fs.existsSync(path.join(cursorOnly, 'AGENTS.md')));
+});
+
+test('upsertMarkdown writes to a custom file name with a custom block', () => {
+  const targetDir = tmp();
+
+  const filePath = upsertMarkdown(targetDir, {
+    fileName: 'CLAUDE.md',
+    block: `${BEGIN}\n## custom\n${END}\n`,
+  });
+
+  assert.equal(filePath, path.join(targetDir, 'CLAUDE.md'));
+  assert.equal(fs.readFileSync(filePath, 'utf8'), `${BEGIN}\n## custom\n${END}\n`);
+});
+
+test('upsertAgentsMd keeps writing AGENTS.md by default (back-compat)', () => {
+  const targetDir = tmp();
+
+  const filePath = upsertAgentsMd(targetDir);
+
+  assert.equal(filePath, path.join(targetDir, 'AGENTS.md'));
 });

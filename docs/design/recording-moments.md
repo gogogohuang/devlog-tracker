@@ -286,7 +286,7 @@ deleting `.span-open`). Do not rewrite the skeleton Round; it stays
 
 ## Shared helper
 
-`hooks/scripts/close-open-round.sh`, invoked by other hook scripts
+`core/scripts/close-open-round.sh`, invoked by other hook scripts
 (not a second copy of the awk):
 
 - No-op unless `.enabled` and `.round-open` exist and `devlog.md` is
@@ -419,15 +419,15 @@ compact rules. Do not invent a second compact mechanism.
 
 | File | Role |
 |---|---|
-| `hooks/scripts/round-start.sh` | Skeleton append, dangling heal, hash after write, existing span/checkpoint/segment |
-| `hooks/scripts/enforce-devlog.sh` | Interrupt short-circuit, then hash + headings; delete `.round-open` on success |
-| `hooks/scripts/close-open-round.sh` | Shared `INTERRUPTED` patch |
-| `hooks/scripts/on-stop-failure.sh` | Skip usage errors; else close-open |
-| `hooks/scripts/on-session-end.sh` | Close-open with SessionEnd reason |
-| `hooks/scripts/on-tool-failure.sh` | Set `.interrupted` when `is_interrupt` |
-| `hooks/scripts/session-start-devlog.sh` | Heal then inject context, except `source=clear` (heal only, empty stdout) |
-| `hooks/hooks.json` | Register StopFailure, SessionEnd, PostToolUseFailure |
-| `hooks/scripts/test-*.sh` | Cases listed above |
+| `core/scripts/round-start.sh` | Skeleton append, dangling heal, hash after write, existing span/checkpoint/segment |
+| `core/scripts/enforce-devlog.sh` | Interrupt short-circuit, then hash + headings; delete `.round-open` on success |
+| `core/scripts/close-open-round.sh` | Shared `INTERRUPTED` patch |
+| `core/scripts/on-stop-failure.sh` | Skip usage errors; else close-open |
+| `core/scripts/on-session-end.sh` | Close-open with SessionEnd reason |
+| `core/scripts/on-tool-failure.sh` | Set `.interrupted` when `is_interrupt` |
+| `core/scripts/session-start-devlog.sh` | Heal then inject context, except `source=clear` (heal only, empty stdout) |
+| `claude/hooks.json` | Register StopFailure, SessionEnd, PostToolUseFailure |
+| `core/scripts/test-*.sh` | Cases listed above |
 | `skills/devlog-tracker/SKILL.md` | Same-Round edit, `INTERRUPTED`, timing |
 | `commands/start.md` | Mention submit-time skeleton |
 | `commands/pause.md` | Delete `.round-open` / `.interrupted` |

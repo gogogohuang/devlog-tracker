@@ -4,10 +4,10 @@ description: 開啟 Lessons Mode（開發歷程教訓，預設關閉）。隸屬
 
 請執行：
 
-1. 先決定 plugin 根目錄（有 `CLAUDE_PLUGIN_ROOT` 用它；否則用 `DEVLOG_TRACKER_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+1. 先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
    ```bash
-   PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-${DEVLOG_TRACKER_ROOT:-}}"
-   CLAUDE_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/hooks/scripts/lessons-on.sh"
+   PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+   DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/lessons-on.sh"
    ```
    不要自己用手建 `.lessons-enabled`。
 2. stdout 是 `NOT_ENABLED`：告知這個專案還沒下過 `/devlog-tracker:start`，Lessons Mode 隸屬主開關，沒有 Round/Status 紀錄可判斷「BLOCKED→解開」，請先 `/devlog-tracker:start` 再開這個。

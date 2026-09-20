@@ -77,7 +77,7 @@ else
   echo "FAIL: sessionEnd 'why' fallback"; FAIL=1
 fi
 
-# fail-open: when ../../hooks/scripts is missing, preTool/stop wrappers must allow (exit 0)
+# fail-open: when ../../core/scripts is missing, preTool/stop wrappers must allow (exit 0)
 ORPHAN="$TMP/orphan"
 mkdir -p "$ORPHAN/codex/hooks"
 cp "$SCRIPT_DIR/on-pre-tool.sh" "$SCRIPT_DIR/on-stop.sh" "$SCRIPT_DIR/project-dir.sh" "$ORPHAN/codex/hooks/"
@@ -86,7 +86,7 @@ for W in on-pre-tool on-stop; do
   printf '{"cwd":"%s"}' "$ORPHAN" | bash "$ORPHAN/codex/hooks/$W.sh" >/dev/null 2>/dev/null
   RC=$?
   set -e
-  if [ "$RC" -eq 0 ]; then echo "PASS: $W fails open without hooks/scripts (exit 0)"; else echo "FAIL: $W orphan exit [$RC]"; FAIL=1; fi
+  if [ "$RC" -eq 0 ]; then echo "PASS: $W fails open without core/scripts (exit 0)"; else echo "FAIL: $W orphan exit [$RC]"; FAIL=1; fi
 done
 
 # sessionStart: payload with neither "how" nor "source" falls back to startup and still injects

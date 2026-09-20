@@ -58,7 +58,7 @@ pick up old work. Only continue (or start, which only summarises).
 Handoff `#### 工作區` is a claim. It becomes a fact only after this
 turn's encoded snapshot matches it (or after a mismatch is recorded).
 
-Run `hooks/scripts/workspace-snapshot.sh` the same way `commands/continue.md`
+Run `core/scripts/workspace-snapshot.sh` the same way `commands/continue.md`
 step 5.1 does (`PLUGIN_ROOT` + `CLAUDE_PROJECT_DIR`). stdout is the live
 snapshot — the only machine encoding of the five formats in
 `skills/devlog-tracker/SKILL.md` (`#### 工作區`). Do not re-run git or
@@ -102,8 +102,8 @@ excerpt leads Claude to act on `下一步`, it must run this check first.
 
 | File | Role |
 |---|---|
-| `hooks/scripts/session-start-devlog.sh` | `source=clear` heals then exits without stdout |
-| `hooks/scripts/tests/test-session-start-devlog.sh` | silent clear; resume still injects |
+| `core/scripts/session-start-devlog.sh` | `source=clear` heals then exits without stdout |
+| `core/scripts/tests/test-session-start-devlog.sh` | silent clear; resume still injects |
 | `commands/continue.md` | Authoring instructions, including verify-then-act |
 | `commands/resume.md` | Same verify, then wait for confirm |
 | `skills/devlog-tracker/SKILL.md` | Clear is empty; continue is the resume path; fallback also verifies |

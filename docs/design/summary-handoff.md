@@ -130,7 +130,7 @@ subsections use the Chinese labels above, in that fixed order.
    in `skills/devlog-tracker/SKILL.md` (`#### 工作區`) — not respelled
    here. Interrupt stubs omit `工作區`. The Stop hook requires this
    heading to match a live git snapshot when Status is `IN_PROGRESS` or
-   `BLOCKED` (`hooks/scripts/workspace-snapshot.sh`). Continue / resume
+   `BLOCKED` (`core/scripts/workspace-snapshot.sh`). Continue / resume
    encode live git in that same format set, then compare that snapshot
    to this block before acting on `下一步` (`docs/design/continue.md`).
 4. **Status is only the enum.**
@@ -226,9 +226,9 @@ The hash-miss message should name
 | `skills/devlog-tracker/SKILL.md` | Authoring instructions: format, writing rules, Status, trivial rounds, span closing Round, L1 write-back |
 | `README.md` | Feature blurb and SSOT / L1 framing |
 | `commands/continue.md` | Verify-then-act + write-back |
-| `hooks/scripts/enforce-devlog.sh` | Heading / order / L1 lint after a successful hash comparison |
-| `hooks/scripts/close-open-round.sh` | Interrupt stubs include Reply |
-| `hooks/scripts/tests/test-enforce-devlog.sh` | Coverage for Reply / 完成條件 / actionable / BLOCKED 缺件 |
+| `core/scripts/enforce-devlog.sh` | Heading / order / L1 lint after a successful hash comparison |
+| `core/scripts/close-open-round.sh` | Interrupt stubs include Reply |
+| `core/scripts/tests/test-enforce-devlog.sh` | Coverage for Reply / 完成條件 / actionable / BLOCKED 缺件 |
 | `docs/design/summary-handoff.md` | This spec |
 | `docs/design/devlog-as-ssot-assessment.md` | L1 scope vs non-goals |
 
@@ -245,13 +245,13 @@ not off `### Response`.
   `#### 下一步`. Actionable lint and BLOCKED 缺件 checks are pattern-based,
   not semantic scoring of prose quality. `IN_PROGRESS` / `BLOCKED` also
   require `#### 工作區` to match a git snapshot the hook computes itself
-  (`hooks/scripts/workspace-snapshot.sh`,
+  (`core/scripts/workspace-snapshot.sh`,
   `docs/design/devlog-as-ssot-assessment.md` Phase 1) — content-verified,
   not just presence-checked. `DONE` requires it too when `#### 檔案` is
   non-empty (a round claiming file changes); a trivial `DONE` with no
   `#### 檔案`, and `INTERRUPTED`, do not require it.
   A non-empty `#### 檔案`, independent of Status, is likewise
-  content-verified against git (`hooks/scripts/files-snapshot.sh`,
+  content-verified against git (`core/scripts/files-snapshot.sh`,
   `docs/design/files-verify.md`) — commit blocks exactly, the trailing
   uncommitted block as a one-directional subset check; a body that
   doesn't parse into the block grammar blocks the turn rather than
