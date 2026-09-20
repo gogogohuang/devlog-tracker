@@ -1,45 +1,47 @@
 # devlog-tracker
 
-**版本** 0.28.0
+*English | [繁體中文](README.zh-TW.md)*
 
-在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
+**Version** 0.28.0
 
-## 這是什麼
+Maintains a `.devlog/devlog.md` in your project, turning each conversation round's requests, decisions, and outcomes into a permanent record. A conversation disappears the moment you `/clear` or switch sessions; this file fills that gap so work can pause and resume. Nothing is touched until you explicitly run `/devlog-tracker:start` — installing the plugin alone doesn't create or modify any files.
 
-把「這輪做了什麼、決定了什麼、下一步是什麼」寫進專案內的 `devlog.md`。Stop hook 保證每輪都寫完才放行；沒明確 `/devlog-tracker:start` 前不會建立或改動 `.devlog/`。
+## What this is
 
-`devlog.md` 只管**跨 session 的交接連續性**（決策軌跡、目前卡點、完成條件、下一步），並作為 **L1**（人觸發 continue／開 session 注入後，agent 只靠 SSOT 接手，且必須把本輪狀態**寫回**本檔）的主入口。不是整個專案的單一真相來源：
+Writes "what this round did, what was decided, what's next" into the project's `devlog.md`. A Stop hook guarantees every round is fully written before it's allowed to end; nothing under `.devlog/` is created or changed before an explicit `/devlog-tracker:start`.
 
-- 程式碼／檔案狀態的真相仍是 git
-- 完整逐字過程的真相是對話 transcript（`/clear` 後不存在）
-- 設計決策的真相是 `docs/design/*.md`
+`devlog.md` is only responsible for **cross-session handoff continuity** (the decision trail, current blockers, completion criteria, next steps), and serves as the main entry point for **L1** — after a human-triggered continue or a session-start injection, the agent picks up relying solely on this SSOT, and must **write back** this round's state into this file. It is not the single source of truth for the whole project:
 
-這份檔案只是取代「終端機一 clear 就沒了」的缺口，讓工作可以隨時中斷、隨時接續。L2（無人喚醒）與 L3（跨機共享 `.devlog/`）不在範圍；細節見 [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)。
+- The source of truth for code/file state is still git
+- The source of truth for the full verbatim process is the conversation transcript (gone after `/clear`)
+- The source of truth for design decisions is `docs/design/*.md`
 
-每輪收尾固定寫 `Summary`／`Reply`（對使用者說過的話）／`Handoff`（含未完成時的 `完成條件`）／`Status`。接手＝核對工作區 → 做下一步 → **寫回**；讀而不寫算交接失敗。
+This file simply replaces the gap left by "the terminal clears and it's gone," so work can be interrupted and picked back up at any time. L2 (unattended wake-ups) and L3 (cross-machine shared `.devlog/`) are out of scope; see [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md) for details.
 
-## 安裝
+Every round wraps up with a fixed `Summary`/`Reply` (what was told to the user)/`Handoff` (including `Completion criteria` when unfinished)/`Status`. Picking up work means: check the workspace → do the next step → **write back**; reading without writing counts as a failed handoff.
 
-三個平台對等，各自獨立安裝；同一個專案要用哪個或哪幾個都可以，但同一個平台**不要同時**用 plugin marketplace 跟 `npx init` 兩條路線，會讓 hook 觸發兩次。
+## Install
+
+The three platforms are peers, each installed independently; a given project can use one or several, but the same platform should **not** use both the plugin marketplace and `npx init` at once — that fires the hook twice.
 
 ### Claude Code
 
-**方式一：plugin marketplace（會自動更新）**
+**Option 1: plugin marketplace (auto-updates)**
 
 ```
 /plugin marketplace add gogogohuang/devlog-tracker
 /plugin install devlog-tracker@devlog-tracker
 ```
 
-指令用 `/devlog-tracker:*`（例如 `/devlog-tracker:start`）。
+Commands are under `/devlog-tracker:*` (e.g. `/devlog-tracker:start`).
 
-**方式二：npx（vendor 進專案，版本可鎖定）**
+**Option 2: npx (vendored into the project, version pinnable)**
 
 ```bash
 npx devlog-tracker init --claude
 ```
 
-會把 hooks 合併進 `.claude/settings.local.json`（不是 `settings.json`——合併後的指令路徑含這台機器的絕對路徑，不該 commit；`settings.local.json` 是 Claude Code 預設 gitignore 的檔案），並把 `commands/*.md` 轉成 `.claude/skills/devlog-<名稱>/SKILL.md`，用 `/devlog-<名稱>` 執行；同時在 `CLAUDE.md` 加上一段 `<!-- devlog-tracker:begin/end -->` fallback 說明。
+Merges the hooks into `.claude/settings.local.json` (not `settings.json` — the merged command paths contain this machine's absolute paths and shouldn't be committed; `settings.local.json` is gitignored by Claude Code by default), and converts `commands/*.md` into `.claude/skills/devlog-<name>/SKILL.md`, invoked with `/devlog-<name>`; it also adds a `<!-- devlog-tracker:begin/end -->` fallback block to `CLAUDE.md`.
 
 ### Codex
 
@@ -47,15 +49,15 @@ npx devlog-tracker init --claude
 npx devlog-tracker init --codex
 ```
 
-會把 `codex/hooks.json` 的 `hooks` 合併進專案 `.codex/hooks.json`，並從 `commands/*.md` 產生 `.agents/skills/devlog-<名稱>/SKILL.md`，用 `$devlog-<名稱>`（或 `/skills` 選）執行；同時在 `AGENTS.md` 加上同一種 fallback 說明區塊。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——Codex 不讀專案層級的 custom prompts。
+Merges the `hooks` from `codex/hooks.json` into the project's `.codex/hooks.json`, and generates `.agents/skills/devlog-<name>/SKILL.md` from `commands/*.md`, invoked with `$devlog-<name>` (or picked from `/skills`); it also adds the same kind of fallback block to `AGENTS.md`. Files the older 0.25.0 version wrote to `.codex/prompts/` are cleared out on the next `init` run — Codex doesn't read project-level custom prompts.
 
-**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成 `trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
+**Hooks require approval before they run.** Codex requires approval for new or changed hooks; an unapproved hook is silently skipped — **with no warning at all**, so it looks like devlog just isn't recording. This is independent of whether the project is set to `trust_level = "trusted"`; project trust doesn't make hooks active.
 
-- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
-- 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。
-- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
+- Interactive mode: the first time you open it, Codex prompts that hooks need approval; they only run once approved. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require approval again.
+- Non-interactive `codex exec` (CI, scripts): unapproved hooks are silently skipped. `--dangerously-bypass-hook-trust` lets them run, but that flag skips trust checks for *all* hooks, so it's only appropriate for automation environments where you've already vetted the hook sources yourself.
+- To confirm it's working: after `start`, send a message and check whether `.devlog/.round-current.md` shows this round's User Input skeleton; if not, the hook didn't run.
 
-Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在 Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的輪次）不受影響。
+Codex currently has no equivalent to "user interrupted" (Claude Code's `PostToolUseFailure`/`is_interrupt`) or "this round ended abnormally" (`StopFailure`); these two detailed states won't be marked `INTERRUPTED` on Codex, but the core enforcement mechanism (the `Stop` event blocking unfinished rounds) is unaffected.
 
 ### Cursor
 
@@ -63,21 +65,21 @@ Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFail
 npx devlog-tracker init --cursor
 ```
 
-會把 `cursor/hooks.json` 的 `hooks` 合併進專案 `.cursor/hooks.json`。Cursor 沒有 slash 指令面，hooks 裝好後照 commands/*.md 的步驟手動執行對應腳本。Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的 hook 仍依 Cursor 支援的事件執行。
+Merges the `hooks` from `cursor/hooks.json` into the project's `.cursor/hooks.json`. Cursor has no slash-command surface, so once hooks are installed, follow the steps in `commands/*.md` to run the corresponding scripts manually. Cursor's cloud agent doesn't run `sessionStart`, so it won't auto-inject a handoff summary; other configured hooks still run on whichever events Cursor supports.
 
-### 三平台共通
+### All three platforms
 
 ```bash
 npx devlog-tracker init
 ```
 
-沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
+Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
-會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind.
 
-`init` 會把這台機器專屬的絕對路徑寫進各平台的 hooks 設定檔與 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與產生出來的 hooks 設定檔加進 `.gitignore`。
+`init` writes this machine's absolute paths into each platform's hooks config and into `.devlog-tracker/env.sh`. If you commit these files to git, each teammate needs to run `npx devlog-tracker init` on their own machine (paths differ per machine); alternatively, add `.devlog-tracker/` and the generated hooks config files to `.gitignore`.
 
-若要手動裝（不透過 npx），設定 `DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，把對應平台的 `hooks.json` 的 `hooks` 合併進專案設定；`commands/*.md` 會優先讀 `DEVLOG_TRACKER_ROOT`，否則讀 `CLAUDE_PLUGIN_ROOT`：
+To install manually (without npx), set `DEVLOG_TRACKER_ROOT` to this plugin's absolute path, and merge the `hooks` from the matching platform's `hooks.json` into the project config; `commands/*.md` prefers `DEVLOG_TRACKER_ROOT`, falling back to `CLAUDE_PLUGIN_ROOT`:
 
 ```bash
 export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
@@ -86,12 +88,12 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/start-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/status-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/segment-watch-set.sh" 600
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
-# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
+# pause / span-open / span-close / compact / keep-move / clean / resume: see commands/*.md
 ```
 
-## 快速開始
+## Quick start
 
-在專案裡下一次（依安裝方式擇一）：
+Run once in your project (pick whichever matches your install method):
 
 ```
 /devlog-tracker:start   # Claude Code plugin
@@ -99,128 +101,128 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
 $devlog-start           # npx init --codex
 ```
 
-之後正常對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下對應的 `continue` 指令。暫停、歸檔、具名搬走、狀態與 span 見下方指令表。
+After that, just converse normally — every round is enforced-checked and `.devlog/devlog.md` gets updated before it can end. After `/clear`, context is empty; to pick up prior work, run the matching `continue` command. See the command table below for pause, archive, named export, status, and span.
 
-## 指令
+## Commands
 
-下表以 plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，`npx init --codex` 裝的是 `$devlog-<名稱>`，指令內容相同。
+The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --claude` installs `/devlog-<name>`, and `npx init --codex` installs `$devlog-<name>` — the command content is the same.
 
-| 指令 | 做什麼 |
+| Command | What it does |
 |---|---|
-| `/devlog-tracker:start` | 跑腳本建立 `.devlog/.enabled`（缺的 state 檔會補上，已有門檻不重置）。讀檔對進度，不自動開工。`.devlog/` 含 prompt，會建議加進 `.gitignore`，要你同意才改。 |
-| `/devlog-tracker:continue` | 讀 `.devlog/devlog.md`，核對最後一輪 Handoff「工作區」後再依下一步接著做。`/clear` 之後要接續用這個。細節見 [`docs/design/continue.md`](docs/design/continue.md)。 |
-| `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
-| `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
-| `/devlog-tracker:keep` | 掃全檔分主題，一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
-| `/devlog-tracker:overview` | 讀完所有已 keep 的 `devlog.<name>.md`，整合成跨主題總覽，並列出看起來該進 `CLAUDE.md` 的規範候選。純讀取，不核對工作區、不等確認、不寫檔。細節見 [`docs/design/keep.md`](docs/design/keep.md) Kept index。 |
-| `/devlog-tracker:search <關鍵字>` | 在 `devlog.md`／`devlog.archive.md`／已 keep 的 `devlog.<name>.md`／`devlog.lessons.<topic>.md` 裡做不分大小寫的字串搜尋，列出命中檔案、最近的標題與行內容。純讀取，不核對工作區、不等確認、不寫檔。 |
-| `/devlog-tracker:resume <name>` | 讀具名保存檔的最後一輪與 Handoff，核對「工作區」後提出接續；新工作仍寫回主 `devlog.md`。 |
-| `/devlog-tracker:clean` | 無條件清空 `devlog.md`（含專案摘要與所有 Round 歷史），不搬移、不備份、不可復原；執行前一定會先問，要明確回覆「清空」才動手。只留目前開著的那一輪，重編成 `## Round 1`。 |
-| `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch、Lessons Mode 工作區漂移計數與最後一輪 Status。 |
-| `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode（不要手寫 `.span-open` JSON）。 |
-| `/devlog-tracker:segment-watch <時間長度>` | 調整 Segment Watch 的沉默門檻（預設 10 分鐘）。專案還沒 `/devlog-tracker:start` 時回報 `NOT_STARTED`，不會建立任何檔案。 |
-| `/devlog-tracker:checkpoint <輪數>` | 調整 Checkpoint Mode 的沉默門檻（預設 20 輪）。專案還沒 start 時回報 `NOT_STARTED`。 |
-| `/devlog-tracker:lessons-on` | 開啟預設關閉的 Lessons Mode（隸屬主開關，沒 `start` 過會拒絕）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。 |
-| `/devlog-tracker:lessons-off` | 關閉 Lessons Mode，不動任何已寫的 `devlog.lessons.*.md` 或索引。 |
-| `/devlog-tracker:lessons [<topic>]` | 沒給 topic：印 `## Lessons 索引`。給 topic：印該主題檔全文。純讀取，不核對工作區、不等確認。 |
-| `/devlog-tracker:lessons-drift <次數>` | 調整 Lessons Mode「工作區漂移重複發生」機制性提醒的門檻（預設 3 次）。隸屬 Lessons Mode，沒開會回報 `LESSONS_NOT_ENABLED`。 |
+| `/devlog-tracker:start` | Runs a script that creates `.devlog/.enabled` (missing state files are backfilled; existing thresholds aren't reset). Reads the file to check progress; doesn't auto-start work. `.devlog/` contains a prompt suggesting adding it to `.gitignore`, and only edits it with your consent. |
+| `/devlog-tracker:continue` | Reads `.devlog/devlog.md`, checks the last round's Handoff "Workspace" section, then continues per its next step. Use this after `/clear` to resume. See [`docs/design/continue.md`](docs/design/continue.md). |
+| `/devlog-tracker:pause` | Pauses enforced recording; history files are untouched, and you can `start` again later. |
+| `/devlog-tracker:compact` | A script moves older `DONE` rounds into `devlog.archive.md` (Checkpoints and unfinished rounds stay in the main file). |
+| `/devlog-tracker:keep` | Scans the whole file, groups it by topic, lists suggestions at once, then — after confirmation — moves each section out into its own `devlog.<name>.md` (leaving a `## Kept index` pointer line with a one-sentence topic description in the main file); can also extract a single section or merge everything into one history file. Not the same as compact. See [`docs/design/keep.md`](docs/design/keep.md). |
+| `/devlog-tracker:overview` | Reads all kept `devlog.<name>.md` files and merges them into a cross-topic overview, plus a list of candidate rules that look like they belong in `CLAUDE.md`. Read-only — no workspace check, no confirmation, no writes. See the Kept index section of [`docs/design/keep.md`](docs/design/keep.md). |
+| `/devlog-tracker:search <keyword>` | Case-insensitive string search across `devlog.md`/`devlog.archive.md`/kept `devlog.<name>.md`/`devlog.lessons.<topic>.md`, listing the matching files, their nearest heading, and the matched line. Read-only — no workspace check, no confirmation, no writes. |
+| `/devlog-tracker:resume <name>` | Reads the last round and Handoff of a named saved file, checks the "Workspace" section, and proposes how to continue; new work is still written back to the main `devlog.md`. |
+| `/devlog-tracker:clean` | Unconditionally clears `devlog.md` (including the project summary and all Round history) — no move, no backup, not reversible; it always asks first, and only proceeds once you explicitly reply "clear". Keeps only the currently open round, renumbered as `## Round 1`. |
+| `/devlog-tracker:status` | Shows whether enforced recording is on, Span, Checkpoint, Segment Watch, the Lessons Mode workspace-drift count, and the last round's Status. |
+| `/devlog-tracker:span` | Turns Span Mode on/off, used for auto-continuing long-running tasks (don't hand-edit the `.span-open` JSON). |
+| `/devlog-tracker:segment-watch <duration>` | Adjusts Segment Watch's silence threshold (default 10 minutes). Reports `NOT_STARTED` and creates no files if the project hasn't run `/devlog-tracker:start`. |
+| `/devlog-tracker:checkpoint <rounds>` | Adjusts Checkpoint Mode's silence threshold (default 20 rounds). Reports `NOT_STARTED` if the project hasn't started. |
+| `/devlog-tracker:lessons-on` | Turns on Lessons Mode, which is off by default (subordinate to the main switch; refuses if `start` hasn't run). See [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md). |
+| `/devlog-tracker:lessons-off` | Turns off Lessons Mode; doesn't touch any already-written `devlog.lessons.*.md` files or the index. |
+| `/devlog-tracker:lessons [<topic>]` | No topic given: prints the `## Lessons index`. Topic given: prints that topic file's full content. Read-only — no workspace check, no confirmation. |
+| `/devlog-tracker:lessons-drift <count>` | Adjusts the threshold for Lessons Mode's "recurring workspace drift" mechanical reminder (default 3). Subordinate to Lessons Mode; reports `LESSONS_NOT_ENABLED` if it's off. |
 
-## 強制記錄開著之後
+## Once enforced recording is on
 
 ```mermaid
 sequenceDiagram
-  participant U as 使用者
+  participant U as User
   participant H as Hooks
   participant C as Claude
   participant D as .devlog/devlog.md
 
-  U->>H: 送出訊息
-  H->>D: 先寫 Round skeleton（User Input + IN_PROGRESS）
-  C->>D: 補 Summary / Reply / Handoff，改 Status
-  C->>H: 這一輪要結束
-  alt 沒寫完、標題是空的，或 Status 不合法
-    H-->>C: 擋住，要求補寫
-  else 寫完了
-    H-->>C: 放行
+  U->>H: Send message
+  H->>D: Write the Round skeleton first (User Input + IN_PROGRESS)
+  C->>D: Fill in Summary / Reply / Handoff, update Status
+  C->>H: This round wants to end
+  alt Not written, headings empty, or Status invalid
+    H-->>C: Block, require completion
+  else Fully written
+    H-->>C: Allow
   end
 ```
 
-每一輪固定：
+Every round has these fixed sections:
 
-- **`User Input`** — 送出原文優先（hook 寫入；Claude 不要改寫），常見 token 會遮罩
-- **`Summary`** — 給人掃的結論
-- **`Reply`** — 這輪對使用者說過／答應過的話
-- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）
-- **`Status`** — `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED` 四選一
+- **`User Input`** — the raw submitted text takes priority (written by the hook; Claude shouldn't rewrite it), common tokens are masked
+- **`Summary`** — a conclusion a human can scan
+- **`Reply`** — what was said/promised to the user this round
+- **`Handoff`** — for the next round to pick up (decisions / files / workspace / current state / completion criteria / next steps)
+- **`Status`** — one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`
 
-其中「工作區」是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。「完成條件」在進行中／卡住必寫。
+"Workspace" is a git snapshot taken at wrap-up time; required whenever in progress or blocked. `DONE` also requires it if "Files" has content (claiming files were touched/committed). "Completion criteria" is required whenever in progress or blocked.
 
-Stop hook 會做這些事：
+The Stop hook does the following:
 
-1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 小節順序為 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
-2. 進行中／卡住時有「完成條件」與「下一步」；「下一步」不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)）；進行中另做輕量可執行檢查；卡住時「現況」或「下一步」須含缺件句式
-3. 機器核對「工作區」是否跟收尾當下的 git 狀態逐字相符（進行中／卡住一律核對，`DONE` 只在「檔案」非空時核對），避免「已 commit 完成」卻其實沒 commit 這類宣稱跟實際不符
+1. Confirms `Summary`/`Reply`/`Handoff` headings have content underneath, and Status is one of the four values above; Handoff subsections must be in the order Decisions → Files → Workspace → Current state → Completion criteria → Next steps
+2. In-progress/blocked rounds must have "Completion criteria" and "Next steps"; "Next steps" can't be pure blacklisted filler (e.g. a section that just says "continue finishing up" — string matching, not semantic scoring; see [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)); in-progress rounds get an additional lightweight actionability check; blocked rounds require "Current state" or "Next steps" to contain a missing-piece phrasing
+3. Machine-verifies that "Workspace" matches the actual git state at wrap-up time, verbatim (always checked when in progress/blocked; only checked for `DONE` when "Files" is non-empty) — this catches claims like "already committed" that don't actually match reality
 
-`#### 檔案` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
+When `#### Files` is non-empty, it's likewise machine-verified: the commit section must match that commit's actual content verbatim; for uncommitted sections, it only requires that the claimed paths actually have changes (not full coverage, so leftovers from a previous round aren't counted as missing from this one).
 
-細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)、[`docs/design/files-verify.md`](docs/design/files-verify.md) 和 SKILL.md。
+See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md), [`docs/design/files-verify.md`](docs/design/files-verify.md), and SKILL.md for details.
 
-## Hook 會自動做的事
+## What the hooks do automatically
 
-正常規則是「一則使用者訊息 = 一輪，結束前一定要寫完 Summary／Reply／Handoff／Status」。下面四個機制各自放寬這條規則的不同一塊，彼此正交、可以同時存在：
+The normal rule is "one user message = one round, and Summary/Reply/Handoff/Status must be fully written before it ends." The four mechanisms below each relax a different slice of that rule; they're orthogonal and can coexist:
 
-| 機制 | 放寬的是 | 解決的問題 |
+| Mechanism | What it relaxes | What problem it solves |
 |---|---|---|
-| **Span Mode** | 「每次自動喚醒算不算一輪」 | `/loop`、Workflow 這類被自己排程反覆喚醒、不是使用者手動打字觸發的長任務，每個自動 tick 都強制寫完整 Round，會逼出大量沒意義的紀錄，甚至卡住整條自動化流程 |
-| **Checkpoint Mode** | 「有沒有跨輪的摘要路標」 | 一般互動對話每輪都正常寫，但輪數一多，翻閱的人要逐輪爬完才知道整體進度 |
-| **Reply Fold** | 「一問一答算不算兩輪」 | Claude 用純文字提問、下一則訊息其實是在回答時，預設邏輯（每個 `UserPromptSubmit` 開新 Round）會把這組問答硬拆成兩個不相關的 Round |
-| **Segment Watch** | 「一輪內部要不要留階段性痕跡」 | 一輪做很久（先探索、再決策、再實作、再驗證），憋到最後才寫一次，中途 crash 會把整個過程全部遺失 |
+| **Span Mode** | Whether each automatic wake-up counts as a round | Long-running tasks driven by their own schedule (`/loop`, Workflow) rather than a user typing — forcing a full Round on every automatic tick produces a flood of meaningless records, or even stalls the whole automation |
+| **Checkpoint Mode** | Whether there's a cross-round summary waypoint | Normal interactive conversation writes every round fine, but once the round count grows, reviewers have to crawl through every round to see overall progress |
+| **Reply Fold** | Whether a question-and-answer counts as two rounds | When Claude ends with a plain-text question and the next message is really the answer, the default logic (every `UserPromptSubmit` opens a new Round) would hard-split that Q&A into two unrelated rounds |
+| **Segment Watch** | Whether a round leaves intermediate traces internally | A round that takes a long time (explore, then decide, then implement, then verify) and only writes once at the very end loses the whole process if it crashes partway |
 
-以下是各機制實際觸發時的行為：
+Here's how each mechanism actually behaves when triggered:
 
-#### 自動接續
+#### Auto-continue
 
-`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，注入最後一個 Checkpoint（若有）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)。
+The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, injects the last Checkpoint (if any), the `## Kept index` (if any — not the named files' content), plus the last two rounds' Summary / Handoff / Status — not the whole file. `/clear` truly clears everything and injects nothing; to continue, use `/devlog-tracker:continue` (which checks "Workspace" first, then proceeds). See [`docs/design/continue.md`](docs/design/continue.md).
 
-#### 同輪工作區漂移偵測
+#### Same-round workspace-drift detection
 
-同一條對話送出下一則訊息時，`UserPromptSubmit` 會拿上一輪 Handoff 的「工作區」跟目前 git 狀態比對；不符就注入提示，並讓 `PreToolUse` 擋住非 devlog 工具，直到這一輪補上含實際快照的 `### 段落`（唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse` 不受影響，方便自行核對）。Span 安靜 tick、task-notification 與 `DONE` 不擋。細節見 [`docs/design/continue.md`](docs/design/continue.md) 與 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
+When the next message in the same conversation is sent, `UserPromptSubmit` compares the previous round's Handoff "Workspace" against the current git state; on a mismatch, it injects a notice and has `PreToolUse` block non-devlog tools until this round adds a `### Segment` containing an actual snapshot (read-only `git status`/`diff`/`log`/`show`/`rev-parse` are unaffected, so you can check for yourself). Quiet Span ticks, task-notifications, and `DONE` aren't blocked. See [`docs/design/continue.md`](docs/design/continue.md) and [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
 
-#### 意外中斷
+#### Unexpected interruption
 
-非 usage 的 API 錯誤、SessionEnd、殘留的 `.round-open` 會把開著的 Round 標成 `INTERRUPTED`。usage 用光不算中斷。中途取消（例如 Esc）通常是在**下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上；`PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort，不能當成一定會立刻蓋章。`Status` 下面會多一行 `[reason: ...]` 內部代號方便之後 debug（例如 `dangling:next_prompt`）；中斷當下如果是卡在等 `AskUserQuestion` 的回答，Summary/Handoff 會直接說明，不會寫成「意外」。細節見 [`docs/design/recording-moments.md`](docs/design/recording-moments.md)。
+Non-usage API errors, SessionEnd, and a leftover `.round-open` mark an open Round as `INTERRUPTED`. Running out of usage doesn't count as an interruption. A mid-task cancel (e.g. Esc) is usually only recorded on the **next message** or the **next SessionStart** (startup / resume / clear / fork); `PostToolUseFailure`'s `is_interrupt`, when it fires, is best-effort only and can't be relied on to stamp this immediately. A `[reason: ...]` internal code is appended below `Status` for later debugging (e.g. `dangling:next_prompt`); if the interruption happened while waiting on an `AskUserQuestion` answer, Summary/Handoff will say so directly rather than being recorded as an "unexpected" interruption. See [`docs/design/recording-moments.md`](docs/design/recording-moments.md).
 
-#### 段落記錄
+#### Segment recording
 
-長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 10 分鐘沒改 `.round-current.md`，`PreToolUse` hook 會擋住下一個工具；先 Read 再 Edit／StrReplace 追加一段（不要 Write 覆寫整檔）。門檻可用 `/devlog-tracker:segment-watch <時間長度>` 調整。Claude Code subagent／dynamic workflow（PreToolUse 帶 `agent_id`）不套用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
+Don't hold a long round until the very end — write `### Segment` entries as you go. If `.round-current.md` hasn't been touched for about 10 minutes within the same round, the `PreToolUse` hook blocks the next tool call; Read first, then Edit/StrReplace to append a segment (don't Write over the whole file). The threshold is adjustable with `/devlog-tracker:segment-watch <duration>`. Claude Code subagents/dynamic workflows (`PreToolUse` carrying `agent_id`) don't apply this gate from the parent round. See [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
 
 #### Checkpoint Mode
 
-累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint`（門檻可調）。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
+After roughly 20 rounds without a cross-round summary, the `Stop` hook requires a `## Checkpoint` section to be added (threshold adjustable). See [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md).
 
 #### Span Mode
 
-`/loop`、Workflow 這類自動續接的長任務，不必每個 tick 都寫完整 Round，用 tick 計數當安全閥；崩潰最多漏記固定數量的 tick，不是整段。細節見 [`docs/design/span-mode.md`](docs/design/span-mode.md)。
+Long-running auto-continuing tasks (`/loop`, Workflow) don't need a full Round on every tick; a tick counter acts as the safety valve, so a crash loses at most a fixed number of ticks, not the whole span. See [`docs/design/span-mode.md`](docs/design/span-mode.md).
 
 #### Reply Fold
 
-Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不用開新 Round——提問前先手動記一段問題原文再跑 `await-open.sh` 標記，下一則訊息（答案）就會自動折進同一個 Round 當一段 `### 段落`，不是拆成兩個不相關的 Round。連續多輪一問一答（例如 grilling）時，中途每題只記問題段落，不必每題重寫 Summary/Reply/Handoff/Status，等整場問答真正結束才收尾一次。`AskUserQuestion` 在同一 turn 內問答，不用 fold，但仍要用 `### 段落（AskUserQuestion）` 記下問題與答案。背景 task-notification（子 agent 完成通知）也會自動走同一套折疊機制，不留原始 XML，只記精簡摘要。細節見 [`docs/design/reply-fold.md`](docs/design/reply-fold.md)。
+When Claude ends a turn with a plain-text question and the next message is the answer, there's no need to open a new Round — record the question text manually first, run `await-open.sh` to mark it, and the next message (the answer) automatically folds into the same Round as a `### Segment`, instead of splitting into two unrelated Rounds. During a long back-and-forth (e.g. grilling), only the question is logged per turn mid-way; Summary/Reply/Handoff/Status don't need to be rewritten every turn — wrap up once when the whole Q&A actually ends. `AskUserQuestion` asks and answers within the same turn, so it doesn't need folding, but still records the question and answer in a `### Segment (AskUserQuestion)`. Background task-notifications (subagent completion notices) also go through this same folding mechanism automatically, keeping only a condensed summary rather than the raw XML. See [`docs/design/reply-fold.md`](docs/design/reply-fold.md).
 
-#### 分支各自的 devlog 檔
+#### Per-branch devlog files
 
-同一個工作目錄裡切換分支時，主檔會依目前 checkout 的分支自動分開：`main`／`master` 繼續用 `.devlog/devlog.md`，其他分支各自用 `.devlog/devlog.<branch>.md`（斜線轉成 `-`）。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案、且 `devlog.md` 已有內容時，會把它改名（非複製）成該分支的檔案。細節見 [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md)。
+Switching branches within the same working directory automatically splits the main file by the checked-out branch: `main`/`master` keeps using `.devlog/devlog.md`, while other branches each use `.devlog/devlog.<branch>.md` (slashes converted to `-`). A separate `git worktree` (a different directory) already has its own independent `.devlog/` and is unaffected by this mechanism. The first time a branch is detected without its own file while `devlog.md` already has content, it gets renamed (not copied) into that branch's file. See [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md).
 
-#### Lessons Mode（預設關閉，不自動）
+#### Lessons Mode (off by default, not automatic)
 
-開著時，Status 從 `BLOCKED` 解開、明顯繞路，或工作區漂移累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。三種訊號都完全不 hook 強制寫入本身、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
+When enabled, a development-lesson entry is only considered when a `BLOCKED` status resolves, an obvious detour happens, or workspace drift accumulates to a threshold (default 3, adjustable via `/devlog-tracker:lessons-drift <count>`); it's stored per-topic as `devlog.lessons.<topic>.md`, with `devlog.md` keeping only a heading index. None of the three signals are enforced by a hook themselves, and this isn't a knowledge base (architectural decisions still live in `docs/design/*.md`). See [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md).
 
-## 測試
+## Tests
 
 ```
 bash core/scripts/run-tests.sh
 ```
 
-含 Cursor adapter。
+Includes the Cursor adapter.
 
 ## License
 
