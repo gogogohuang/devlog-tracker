@@ -89,6 +89,10 @@ TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
+if [ -n "${LOCK_CONTENDED_BY:-}" ]; then
+  echo "另一個 session（pid ${LOCK_CONTENDED_BY}）目前正在寫 ${DEVLOG_FILE}，稍後再結束這一輪重試一次。" >&2
+  exit 2
+fi
 
 # --- span 檢查（Span Mode：橫跨多次自動續接的長任務）---------------------
 # Claude 主動宣告的 .devlog/.span-open 存在時（見 SKILL.md），這個 tick 不
