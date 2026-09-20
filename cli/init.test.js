@@ -6,16 +6,17 @@ const os = require('os');
 const path = require('path');
 const { parseArgs, run } = require('./init');
 
-test('parseArgs accepts --codex and --cursor', () => {
+test('parseArgs accepts --claude, --codex and --cursor', () => {
+  assert.deepEqual(parseArgs(['--claude']), { platforms: ['claude'] });
   assert.deepEqual(parseArgs(['--codex']), { platforms: ['codex'] });
-  assert.deepEqual(parseArgs(['--codex', '--cursor']), { platforms: ['codex', 'cursor'] });
+  assert.deepEqual(parseArgs(['--claude', '--codex', '--cursor']), { platforms: ['claude', 'codex', 'cursor'] });
   assert.deepEqual(parseArgs([]), { platforms: [] });
 });
 
 test('parseArgs throws a clear error for unknown options', () => {
   assert.throws(
-    () => parseArgs(['--claude']),
-    { message: 'Unknown option: --claude (supported: --codex, --cursor)' }
+    () => parseArgs(['--foo']),
+    { message: 'Unknown option: --foo (supported: --claude, --codex, --cursor)' }
   );
   assert.throws(() => parseArgs(['--codex', '-x']), /Unknown option: -x/);
 });
