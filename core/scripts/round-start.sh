@@ -142,6 +142,32 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
   fi
 fi
 
+if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ] && [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then
+  BLOCKED_ROUND_STARTS="$(devlog_list_round_starts "$DEVLOG_FILE")"
+  BLOCKED_ROUND_COUNT="$(printf '%s\n' "$BLOCKED_ROUND_STARTS" | grep -c '.' || true)"
+  BLOCKED_LAST_LINE="$(printf '%s\n' "$BLOCKED_ROUND_STARTS" | awk 'END { print }')"
+  BLOCKED_LAST_START="$(printf '%s\n' "$BLOCKED_LAST_LINE" | awk '{ print $1 }')"
+  if [ -n "$BLOCKED_LAST_START" ]; then
+    BLOCKED_LAST_END="$(devlog_block_end "$DEVLOG_FILE" "$BLOCKED_LAST_START")"
+    BLOCKED_LAST_STATUS="$(devlog_round_status "$DEVLOG_FILE" "$BLOCKED_LAST_START" "$BLOCKED_LAST_END")"
+
+    if [ "$BLOCKED_LAST_STATUS" = "BLOCKED" ]; then
+      lessons_advisory_migrate "$DEVLOG_DIR"
+      lessons_advisory_bump "$ADVISORY_FILE"
+    fi
+
+    if [ "$BLOCKED_ROUND_COUNT" -ge 2 ]; then
+      BLOCKED_PREV_LINE="$(printf '%s\n' "$BLOCKED_ROUND_STARTS" | tail -2 | head -1)"
+      BLOCKED_PREV_START="$(printf '%s\n' "$BLOCKED_PREV_LINE" | awk '{ print $1 }')"
+      BLOCKED_PREV_END="$(devlog_block_end "$DEVLOG_FILE" "$BLOCKED_PREV_START")"
+      BLOCKED_PREV_STATUS="$(devlog_round_status "$DEVLOG_FILE" "$BLOCKED_PREV_START" "$BLOCKED_PREV_END")"
+      if [ "$BLOCKED_PREV_STATUS" = "BLOCKED" ] && [ "$BLOCKED_LAST_STATUS" != "BLOCKED" ]; then
+        printf '\n[Lessons Mode 提示] 上一輪從 BLOCKED 解開了。可考慮用 lessons-append.sh 記一筆這次卡在哪、怎麼解開，非強制。\n'
+      fi
+    fi
+  fi
+fi
+
 if [ -n "$FOLD_ROUND" ]; then
   devlog_reopen_last_round "$DEVLOG_FILE" "$ROUND_CURRENT" || : > "$ROUND_CURRENT"
   if [ -z "$PROMPT" ]; then
