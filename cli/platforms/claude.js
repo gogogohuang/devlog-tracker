@@ -46,6 +46,7 @@ function install({ repoRoot, targetDir, vendorRoot }) {
     templatePath: path.join(repoRoot, 'claude', 'hooks.json'),
     targetPath: path.join(targetDir, '.claude', 'settings.local.json'),
     vendorRoot,
+    placeholders: ['${DEVLOG_TRACKER_ROOT}', '${CLAUDE_PLUGIN_ROOT}'],
   });
   installSkills({ targetDir, vendorRoot });
   upsertMarkdown(targetDir, { fileName: 'CLAUDE.md', block: claudeBlock() });

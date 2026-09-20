@@ -75,10 +75,11 @@ test('install upserts the devlog-tracker block into CLAUDE.md, leaving other con
   assert.match(content, /# My project/);
   assert.match(content, /Some existing notes\./);
   assert.match(content, /<!-- devlog-tracker:begin -->/);
+  assert.match(content, /<!-- devlog-tracker:end -->/);
   assert.match(content, /devlog-tracker/);
 });
 
-test('re-running install is idempotent: no duplicate hook entries or skill files', () => {
+test('re-running install is idempotent: no duplicate hook entries or skill directories', () => {
   const repoRoot = tmpdir();
   const vendorParent = tmpdir();
   const targetDir = tmpdir();
@@ -86,10 +87,13 @@ test('re-running install is idempotent: no duplicate hook entries or skill files
   makeFakeRepo(repoRoot);
 
   install({ repoRoot, targetDir, vendorRoot });
+  const skillsAfterFirst = fs.readdirSync(path.join(targetDir, '.claude', 'skills'));
   install({ repoRoot, targetDir, vendorRoot });
+  const skillsAfterSecond = fs.readdirSync(path.join(targetDir, '.claude', 'skills'));
 
   const settings = JSON.parse(fs.readFileSync(path.join(targetDir, '.claude', 'settings.local.json'), 'utf8'));
   assert.equal(settings.hooks.Stop.length, 1);
+  assert.deepEqual(skillsAfterFirst, skillsAfterSecond, 'skill directories should not duplicate');
 });
 
 test('re-running install twice on existing CLAUDE.md keeps exactly one marker pair', () => {
@@ -110,4 +114,65 @@ test('re-running install twice on existing CLAUDE.md keeps exactly one marker pa
   assert.equal(endCount, 1, 'Should have exactly one end marker');
   assert.match(content, /# My project/);
   assert.match(content, /Some existing notes\./);
+});
+
+test('install with real claude/hooks.json substitutes all placeholders and is idempotent', () => {
+  const repoRoot = path.join(__dirname, '..', '..');
+  const vendorParent = tmpdir();
+  const targetDir = tmpdir();
+  const vendorRoot = makeVendorRoot(vendorParent);
+
+  // First run
+  install({ repoRoot, targetDir, vendorRoot });
+
+  const settingsPath = path.join(targetDir, '.claude', 'settings.local.json');
+  const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+
+  // Collect all commands from the merged hooks
+  const commands = [];
+  for (const event of Object.keys(settings.hooks)) {
+    const entries = settings.hooks[event];
+    for (const entry of entries) {
+      if (entry.hooks) {
+        for (const hook of entry.hooks) {
+          if (hook.command) {
+            commands.push(hook.command);
+          }
+        }
+      }
+    }
+  }
+
+  // Verify no unsubstituted placeholders remain
+  for (const command of commands) {
+    assert.ok(!command.includes('${'), `Command should not contain unsubstituted placeholder: ${command}`);
+  }
+
+  // Verify every command contains the vendorRoot and /core/scripts/
+  for (const command of commands) {
+    assert.ok(command.includes(vendorRoot), `Command should contain vendorRoot path: ${command}`);
+    assert.ok(command.includes('/core/scripts/'), `Command should reference core/scripts: ${command}`);
+  }
+
+  // Now read the template to count expected entries per event
+  const templatePath = path.join(repoRoot, 'claude', 'hooks.json');
+  const template = JSON.parse(fs.readFileSync(templatePath, 'utf8'));
+
+  // Before second run, get the current entry counts
+  const entriesBeforeSecond = {};
+  for (const event of Object.keys(template.hooks)) {
+    entriesBeforeSecond[event] = settings.hooks[event] ? settings.hooks[event].length : 0;
+  }
+
+  // Second run
+  install({ repoRoot, targetDir, vendorRoot });
+
+  const settingsAfterSecond = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+
+  // Verify no duplication: each event should have same count as template (1 entry each)
+  for (const event of Object.keys(template.hooks)) {
+    const expectedCount = template.hooks[event].length;
+    const actualCount = settingsAfterSecond.hooks[event] ? settingsAfterSecond.hooks[event].length : 0;
+    assert.equal(actualCount, expectedCount, `Event ${event} should have ${expectedCount} entry (template count), got ${actualCount}`);
+  }
 });

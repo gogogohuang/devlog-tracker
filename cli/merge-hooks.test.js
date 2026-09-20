@@ -185,3 +185,55 @@ test('real templates quote the vendor path so project paths with spaces work', (
     }
   }
 });
+
+test('placeholders parameter substitutes multiple placeholder strings when provided', () => {
+  const dir = tmpdir();
+  const templatePath = path.join(dir, 'template.json');
+  fs.writeFileSync(
+    templatePath,
+    JSON.stringify({
+      hooks: {
+        SessionStart: [{ hooks: [{ type: 'command', command: 'bash "${CLAUDE_PLUGIN_ROOT}/script.sh"' }] }],
+        Stop: [{ hooks: [{ type: 'command', command: 'bash "${DEVLOG_TRACKER_ROOT}/other.sh"' }] }],
+      },
+    })
+  );
+  const targetPath = path.join(dir, 'hooks.json');
+  const vendorRoot = '/proj/.devlog-tracker';
+
+  mergeHooksTemplate({
+    templatePath,
+    targetPath,
+    vendorRoot,
+    placeholders: ['${DEVLOG_TRACKER_ROOT}', '${CLAUDE_PLUGIN_ROOT}'],
+  });
+
+  const written = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
+  assert.equal(written.hooks.SessionStart[0].hooks[0].command, `bash "${vendorRoot}/script.sh"`);
+  assert.equal(written.hooks.Stop[0].hooks[0].command, `bash "${vendorRoot}/other.sh"`);
+});
+
+test('unlisted placeholders remain verbatim when placeholders parameter is provided', () => {
+  const dir = tmpdir();
+  const templatePath = path.join(dir, 'template.json');
+  fs.writeFileSync(
+    templatePath,
+    JSON.stringify({
+      hooks: {
+        Stop: [{ hooks: [{ type: 'command', command: 'bash "${UNLISTED_PLACEHOLDER}/script.sh"' }] }],
+      },
+    })
+  );
+  const targetPath = path.join(dir, 'hooks.json');
+  const vendorRoot = '/proj/.devlog-tracker';
+
+  mergeHooksTemplate({
+    templatePath,
+    targetPath,
+    vendorRoot,
+    placeholders: ['${DEVLOG_TRACKER_ROOT}'],
+  });
+
+  const written = JSON.parse(fs.readFileSync(targetPath, 'utf8'));
+  assert.equal(written.hooks.Stop[0].hooks[0].command, 'bash "${UNLISTED_PLACEHOLDER}/script.sh"');
+});
