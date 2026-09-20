@@ -39,17 +39,19 @@ the *system being developed*.
 
 ## When Claude should consider writing a lessons entry
 
-Only while `.lessons-enabled` exists. Three trigger signals: two advisory
-(both below), plus one mechanical (see 「機制性訊號：工作區漂移重複發生」further
-down) — the mechanical one is hook-counted and print-only, not Claude's own
-judgment.
+Only while `.lessons-enabled` exists. Four trigger signals: two advisory
+(self-judged, hook cannot detect them), two mechanical (hook-counted,
+print-only, sharing one counter — see 「機制性訊號：共用計數器」below), plus
+one further mechanical print that is not counted (see 「機制性提示：
+BLOCKED→解開」below).
 
-1. **`BLOCKED` → resolved.** The previous historical Round's `### Status`
-   was `BLOCKED` and this Round's `### Status` is not. This is the one
-   mechanically observable signal (a plain Status-string comparison), but
-   it is *not* used to force a write — it is only a prompt to Claude, in
-   the same SKILL.md sense as "Round Segments: 有意義的階段性結果" already
-   is a self-judged, undetected-if-skipped convention.
+1. **`BLOCKED` → resolved (self-judged framing).** The previous historical
+   Round's `### Status` was `BLOCKED` and this Round's `### Status` is not.
+   Since 2026-09-20 this transition is *also* mechanically detected and
+   printed by `round-start.sh` at the start of the next Round (see 「機制性
+   提示：BLOCKED→解開」below) — the self-judged version above still applies
+   in the same Round where the transition happens, before the hook gets a
+   chance to say anything one Round later.
 2. **Self-judged detour.** Claude decides, at Round close, that this round
    took a real wrong turn before landing on the right approach, and that
    future-Claude would benefit from knowing to skip the wrong turn.
@@ -58,34 +60,59 @@ Writing an entry is **never required** to close a Round (unlike
 `#### 工作區`/`#### 檔案`, which are machine-verified when applicable).
 Skipping it is not an error and produces no warning.
 
-## 機制性訊號：工作區漂移重複發生（顧問式，非強制）
+## 機制性訊號：共用計數器（顧問式，非強制）
 
-第三種考慮寫一筆的訊號，跟上面兩種不同：不是 Claude 自我判斷，而是 hook 用既有的機器
-訊號累積計數、達門檻才印一句**建議**——依然不強制寫、不阻擋任何工具。
+第三、四種考慮寫一筆的訊號，跟上面兩種不同：不是 Claude 自我判斷，而是 hook 用既有的機器
+訊號累積計數、達門檻才印一句**建議**——依然不強制寫、不阻擋任何工具。兩個來源共用同一個
+狀態檔、同一個計數器、同一個門檻——達門檻時印出的訊息不分辨是哪個來源觸發的（或兩者都有
+貢獻），這是刻意的簡化。
 
-- **訊號來源**：`round-start.sh` 既有的工作區漂移偵測（`docs/design/continue.md`
+- **來源一：工作區漂移**。`round-start.sh` 既有的工作區漂移偵測（`docs/design/continue.md`
   「同輪工作區漂移偵測」）。每次偵測到上一輪 Handoff 的「工作區」跟目前 git 狀態不符
-  （跟產生 `.workspace-mismatch` 同一時機），只要 `.lessons-enabled` 存在，就把
-  `.devlog/.lessons-drift-state` 的 `mismatch_count` 累加 1。
-- **門檻**：`.lessons-drift-state` 的 `threshold` 欄位，預設 3，可用
-  `/devlog-tracker:lessons-drift <次數>` 調整（跟 `checkpoint`/`segment-watch` 同款
-  指令，隸屬 Lessons Mode：沒開會回報 `LESSONS_NOT_ENABLED`）。
-- **達門檻時**：`round-start.sh` 在既有的 mismatch 提示之後多印一行建議（「工作區宣稱
-  與實際不符已累積出現 N 次，可考慮用 lessons-append.sh 記一筆流程教訓，非強制」），
-  並把 `mismatch_count` 重置為 0——Claude 仍可略過不寫，這一輪的收尾完全不受影響。
-- **累積而非連續**：計數不要求連續發生（不像 Checkpoint Mode 的沉默輪數），任何時間點
-  的 mismatch 都算一次；`.lessons-drift-state` 跨 Round 持續存在，只有達門檻印完那次才
-  歸零。
+  （跟產生 `.workspace-mismatch` 同一時機），只要 `.lessons-enabled` 存在，就把計數器 +1。
+- **來源二：BLOCKED 輪次累積**。`round-start.sh` 開新一輪時，讀「剛收尾那一輪」的
+  `### Status`；只要 `.lessons-enabled` 存在且該值是 `BLOCKED`，就把同一個計數器 +1——
+  不要求「這輪沒寫 lessons 才算」，只要 Status 是 `BLOCKED` 就算一次，不 correlate 是否
+  隨後呼叫過 `lessons-append.sh`。
+- **狀態檔**：`.devlog/.lessons-advisory-state`，欄位 `count`（累積次數）、`threshold`
+  （門檻，預設 3）。命名刻意語意中性（不叫 `drift`），因為它現在涵蓋兩種來源。
+- **門檻**：`threshold` 欄位，預設 3，可用 `/devlog-tracker:lessons-drift <次數>` 調整
+  （跟 `checkpoint`/`segment-watch` 同款指令，隸屬 Lessons Mode：沒開會回報
+  `LESSONS_NOT_ENABLED`）。
+- **達門檻時**：`round-start.sh` 印一行建議（「流程訊號已累積出現 N 次（門檻 M），可考慮
+  用 lessons-append.sh 記一筆流程教訓，非強制。」），並把 `count` 重置為 0——Claude 仍可
+  略過不寫，這一輪的收尾完全不受影響。
+- **累積而非連續**：計數不要求連續發生，任何時間點的訊號都算一次；`.lessons-advisory-state`
+  跨 Round 持續存在，只有達門檻印完那次才歸零。
 - **只在 Lessons Mode 開著時計數**：`.lessons-enabled` 不存在時，`round-start.sh`
-  完全不碰 `.lessons-drift-state`——沒開 Lessons Mode 就沒有任何額外開銷或提示。
-- **狀態檔建立時機**：`/devlog-tracker:lessons-on` 每次執行時，若
-  `.lessons-drift-state` 不存在就建立（`{"mismatch_count": 0, "threshold": 3}`）——
-  涵蓋「剛開 Lessons Mode」跟「舊專案升級到這個版本」兩種情況。
-  `/devlog-tracker:lessons-off` 不動這個檔案，維持既有的非破壞性原則。
-- **`/devlog-tracker:status`** 會多印一行 `LESSONS_DRIFT=<count>/<threshold>`。
+  完全不碰 `.lessons-advisory-state`——沒開 Lessons Mode 就沒有任何額外開銷或提示。
+- **狀態檔建立時機**：`/devlog-tracker:lessons-on` 每次執行時，若 `.lessons-advisory-state`
+  不存在就建立（`{"count": 0, "threshold": 3}`）——涵蓋「剛開 Lessons Mode」跟「舊專案升級
+  到這個版本」兩種情況。`/devlog-tracker:lessons-off` 不動這個檔案，維持既有的非破壞性原則。
+- **`/devlog-tracker:status`** 會多印一行 `LESSONS_ADVISORY=<count>/<threshold>`。
 
-這條訊號的存在**修訂了下面 Non-goals 原本「不做計數式提醒」的決定**——差異與理由見該
-條目。
+### 舊檔名遷移：`.lessons-drift-state` → `.lessons-advisory-state`
+
+這個狀態檔以前只有工作區漂移一種來源，叫 `.lessons-drift-state`（欄位
+`mismatch_count`）。加入 BLOCKED 累積這第二種來源後改名成語意中性的
+`.lessons-advisory-state`（欄位 `count`）。既有專案不會歸零重來：`round-start.sh` 跟
+`lessons-drift-set.sh` 在讀寫新檔之前，都會先呼叫共用的 `lessons_advisory_migrate`
+（`core/scripts/lessons-advisory-state.sh`）——只有新檔不存在且舊檔存在時才搬遷（讀舊欄位、
+寫新檔、刪舊檔），冪等、只在 `.lessons-enabled` 存在時處理。
+
+## 機制性提示：BLOCKED→解開
+
+跟上面「共用計數器」的兩個來源不同，這個訊號**每次偵測到就印，不經過門檻計數**——因為它
+本身是一次性事件（一次轉變），不是可以累積的次數。`round-start.sh` 開新一輪時，額外比對
+「上上一輪」跟「剛收尾那一輪」的 `### Status`：上上一輪是 `BLOCKED`、剛收尾那一輪不是
+`BLOCKED`，就印一句提示（「上一輪從 BLOCKED 解開了。可考慮用 lessons-append.sh 記一筆這次
+卡在哪、怎麼解開，非強制。」）。只在 `.lessons-enabled` 存在時檢查；需要兩輪歷史紀錄才能
+判斷，剛開 Lessons Mode 或 devlog.md 只有一輪歷史時不會出現（冷啟動限制）。
+
+**這個提示天生晚一輪出現**：`enforce-devlog.sh`（Stop hook）exit 0 時印的內容不會送回
+Claude 的對話 context，只有 `round-start.sh`（UserPromptSubmit）的 stdout 不論 exit code
+都會被注入 context——所以這個訊號必須放在下一輪開始時印，而不是在 BLOCKED 解開的那一輪
+Stop 當下。
 
 ## Storage: per-topic files, mirroring `keep`
 
@@ -179,6 +206,20 @@ New command `/devlog-tracker:lessons [<topic>]`:
    `devlog.md` (strip old block if present, append the freshly derived
    one at the end of the file).
 
+### Additional advisory output
+
+Besides `PATH=...`, the script may print up to two more purely informational
+lines (never blocking, never required):
+
+- when the just-appended topic file's entry count is a multiple of 3, a
+  line suggesting the topic is mature enough to become a
+  `docs/design/*.md` decision instead;
+- when this call created a **brand-new** topic file (the topic didn't exist
+  before) and at least one other topic file already exists, a
+  `NEW_TOPIC。既有主題：...` line listing the other topics, so Claude can
+  choose to reuse one instead of fragmenting the same subject across
+  files.
+
 This script is **never wired into `claude/hooks.json`** — nothing calls it
 automatically. Claude invokes it directly at Round close, the same way
 `keep-move.sh` is only ever invoked by `commands/keep.md`, not a hook.
@@ -213,9 +254,10 @@ If a topic file does grow large in practice, revisit then — not now.
   not worth writing."
 - **Ghost `## Lessons 索引` rows** on manual file deletion, same as
   `## Kept 索引`.
-- **No cross-topic search.** `/devlog-tracker:lessons <topic>` requires
-  knowing (or reading the index for) the topic name; there is no
-  full-text search across all lesson files.
+- **BLOCKED→resolved 機械提示天生晚一輪出現**（見「機制性提示：BLOCKED→解開」），且需要
+  兩輪歷史紀錄才能判斷——剛開 Lessons Mode 或 devlog.md 只有一輪歷史時不會出現。
+- **共用計數器達門檻時無法分辨來源**——工作區漂移跟 BLOCKED 輪次累積打同一個計數器，印出的
+  建議不會說是哪一種（或兩者都有貢獻），這是刻意的簡化（見「機制性訊號：共用計數器」）。
 
 ## Non-goals
 
@@ -251,10 +293,12 @@ If a topic file does grow large in practice, revisit then — not now.
 | `skills/devlog-tracker/SKILL.md` | New section: what Lessons Mode is, the two trigger signals, that it is opt-in and never hook-enforced |
 | `docs/design/lessons-mode.md` | This spec |
 | `commands/lessons-drift.md` | `/devlog-tracker:lessons-drift <次數>`: adjust the drift-nudge threshold |
-| `core/scripts/lessons-drift-set.sh` | Sets `.lessons-drift-state`'s `threshold`, mirroring `checkpoint-set.sh` |
-| `core/scripts/round-start.sh` | Also increments/reads `.lessons-drift-state` inside the existing mismatch block |
-| `core/scripts/lessons-on.sh` | Also creates `.lessons-drift-state` with defaults if missing |
-| `core/scripts/status-devlog.sh` | Also prints `LESSONS_DRIFT=<count>/<threshold>` |
+| `core/scripts/lessons-advisory-state.sh` | Shared `lessons_advisory_migrate`/`lessons_advisory_bump` helpers, sourced by `round-start.sh` and `lessons-drift-set.sh` |
+| `core/scripts/lessons-drift-set.sh` | Migrates then sets `.lessons-advisory-state`'s `threshold`, mirroring `checkpoint-set.sh` |
+| `core/scripts/round-start.sh` | Bumps the shared `.lessons-advisory-state` counter on workspace-drift mismatch and on a just-closed BLOCKED round; prints a one-shot BLOCKED→resolved advisory |
+| `core/scripts/lessons-on.sh` | Migrates, then creates `.lessons-advisory-state` with defaults if missing |
+| `core/scripts/status-devlog.sh` | Also prints `LESSONS_ADVISORY=<count>/<threshold>` |
+| `core/scripts/lessons-append.sh` | Also prints the topic-repeat and new-topic advisories described above |
 
 No `claude/hooks.json` changes beyond what `session-start-devlog.sh` already
 does — `lessons-append.sh` is Claude-invoked only, same as `keep-move.sh`.
