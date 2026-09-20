@@ -2,7 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const VENDOR_ENTRIES = ['hooks/scripts', 'codex/hooks', 'cursor/hooks', 'skills', 'commands'];
+const VENDOR_ENTRIES = ['core/scripts', 'claude/hooks.json', 'codex/hooks', 'cursor/hooks', 'skills', 'commands'];
+
+// 0.25.x及更早版本 vendor 到 .devlog-tracker/hooks/scripts/；升級後改放
+// core/scripts/，這裡清掉舊目錄避免孤兒檔案殘留。
+const STALE_ENTRIES = ['hooks'];
 
 function copyRecursive(src, dest) {
   const stat = fs.statSync(src);
@@ -28,6 +32,9 @@ function vendor({ repoRoot, targetDir, version }) {
     const src = path.join(repoRoot, entry);
     if (!fs.existsSync(src)) continue;
     copyRecursive(src, path.join(vendorRoot, entry));
+  }
+  for (const entry of STALE_ENTRIES) {
+    fs.rmSync(path.join(vendorRoot, entry), { recursive: true, force: true });
   }
   fs.writeFileSync(path.join(vendorRoot, 'VERSION'), `${version}\n`);
   fs.writeFileSync(path.join(vendorRoot, 'env.sh'), envShContent(vendorRoot));

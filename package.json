@@ -9,6 +9,7 @@
     "bin",
     "cli",
     "core/scripts",
+    "claude/hooks.json",
     "codex/hooks",
     "cursor/hooks",
     "skills",
