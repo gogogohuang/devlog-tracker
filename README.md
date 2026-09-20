@@ -20,119 +20,90 @@
 
 ## 安裝
 
-作為 Claude Code plugin 安裝（會自動更新）：
+三個平台對等，各自獨立安裝；同一個專案要用哪個或哪幾個都可以，但同一個平台**不要同時**用 plugin marketplace 跟 `npx init` 兩條路線，會讓 hook 觸發兩次。
+
+### Claude Code
+
+**方式一：plugin marketplace（會自動更新）**
 
 ```
 /plugin marketplace add gogogohuang/devlog-tracker
 /plugin install devlog-tracker@devlog-tracker
 ```
 
-### npx（Cursor／Codex 用）
+指令用 `/devlog-tracker:*`（例如 `/devlog-tracker:start`）。
 
-Claude Code 請用上面的 `/plugin marketplace add` 安裝方式；這個 CLI 不會設定 Claude Code。
+**方式二：npx（vendor 進專案，版本可鎖定）**
+
+```bash
+npx devlog-tracker init --claude
+```
+
+會把 hooks 合併進 `.claude/settings.local.json`（不是 `settings.json`——合併後的指令路徑含這台機器的絕對路徑，不該 commit；`settings.local.json` 是 Claude Code 預設 gitignore 的檔案），並把 `commands/*.md` 轉成 `.claude/skills/devlog-<名稱>/SKILL.md`，用 `/devlog-<名稱>` 執行；同時在 `CLAUDE.md` 加上一段 `<!-- devlog-tracker:begin/end -->` fallback 說明。
+
+### Codex
+
+```bash
+npx devlog-tracker init --codex
+```
+
+會把 `codex/hooks.json` 的 `hooks` 合併進專案 `.codex/hooks.json`，並從 `commands/*.md` 產生 `.agents/skills/devlog-<名稱>/SKILL.md`，用 `$devlog-<名稱>`（或 `/skills` 選）執行；同時在 `AGENTS.md` 加上同一種 fallback 說明區塊。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——Codex 不讀專案層級的 custom prompts。
+
+**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成 `trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
+
+- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
+- 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。
+- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
+
+Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在 Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的輪次）不受影響。
+
+### Cursor
+
+```bash
+npx devlog-tracker init --cursor
+```
+
+會把 `cursor/hooks.json` 的 `hooks` 合併進專案 `.cursor/hooks.json`。Cursor 沒有 slash 指令面，hooks 裝好後照 commands/*.md 的步驟手動執行對應腳本。Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的 hook 仍依 Cursor 支援的事件執行。
+
+### 三平台共通
 
 ```bash
 npx devlog-tracker init
 ```
 
-沒帶 `--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝所有支援的平台（codex + cursor）。也可以直接指定：
+沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
-```bash
-npx devlog-tracker init --codex --cursor
-```
+會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
 
-會把 `hooks/scripts/`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/`
-複製進專案的 `.devlog-tracker/`，並把對應平台的 `hooks.json` 合併進專案（不覆蓋
-其他工具已設定的 hook）。重新執行 `npx devlog-tracker init` 可以升級到套件目前的
-版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+`init` 會把這台機器專屬的絕對路徑寫進各平台的 hooks 設定檔與 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與產生出來的 hooks 設定檔加進 `.gitignore`。
 
-裝 Codex 時，`init` 會從 `.devlog-tracker/commands/*.md` 產生對應的專案 skill 到
-`.agents/skills/devlog-<名稱>/SKILL.md`，例如在 Codex 打 `$devlog-start`（或用 `/skills`
-選）啟動追蹤。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——
-Codex 不讀專案層級的 custom prompts。也會在專案根目錄的
-`AGENTS.md` 加上（或更新）一段以 `<!-- devlog-tracker:begin/end -->` 包住的 fallback
-說明。區塊外的內容不會動，重跑 `init` 只會換掉區塊本身；區塊裡只有相對路徑，可以 commit。
-
-裝完 Codex 之後，第一次還要在 Codex 裡核准這些 hook，否則不會記錄（見下方〈Codex（選用）〉的「hook 需要審核」）。
-
-`init` 會把這台機器專屬的絕對路徑寫進 `.codex/hooks.json`、`.cursor/hooks.json` 與
-`.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上
-跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與
-產生出來的 hooks.json 加進 `.gitignore`。
-
-### Cursor（選用）
-
-Claude Code 仍是主要安裝方式。若要在 Cursor workspace 使用，先設定
-`DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `cursor/hooks.json` 的
-`hooks` 合併進專案 `.cursor/hooks.json`。也可以把整個 `cursor/hooks/` 與
-`hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
-
-Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的
-hook 仍依 Cursor 支援的事件執行。
-
-Cursor 沒有 `/devlog-tracker:*` slash 指令面；hooks 裝好後，請用與 Claude commands
-相同的腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
-`DEVLOG_TRACKER_ROOT`）：
+若要手動裝（不透過 npx），設定 `DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，把對應平台的 `hooks.json` 的 `hooks` 合併進專案設定；`commands/*.md` 會優先讀 `DEVLOG_TRACKER_ROOT`，否則讀 `CLAUDE_PLUGIN_ROOT`：
 
 ```bash
 export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
-export CLAUDE_PROJECT_DIR="$(pwd)"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
-# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
-```
-
-### Codex（選用）
-
-Claude Code 仍是主要安裝方式。若要在 Codex CLI 使用，先設定
-`DEVLOG_TRACKER_ROOT` 為本 plugin 的絕對路徑，再把 `codex/hooks.json` 的
-`hooks` 合併進專案（或 `~/.codex/`）的 `hooks.json`。也可以把整個 `codex/hooks/` 與
-`hooks/scripts/` vendoring 到專案，並調整 command 路徑；兩者的相對目錄必須維持可用。
-
-**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被
-直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成
-`trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
-
-- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定
-  有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
-- 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust`
-  可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的
-  自動化環境。
-- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的
-  User Input skeleton；沒有就代表 hook 沒被執行。
-
-Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／
-`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在
-Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的
-輪次）不受影響。
-
-Codex 使用 `$devlog-<名稱>`（例如 `$devlog-start`）執行指令；它們會讀與 Claude
-commands 相同的內容。若使用的 Codex 環境沒有載入專案 skills，仍可直接使用以下腳本（`commands/*.md` 會優先讀 `CLAUDE_PLUGIN_ROOT`，否則讀
-`DEVLOG_TRACKER_ROOT`）：
-
-```bash
-export DEVLOG_TRACKER_ROOT=/absolute/path/to/devlog-tracker
-export CLAUDE_PROJECT_DIR="$(pwd)"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/start-devlog.sh"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/status-devlog.sh"
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/segment-watch-set.sh" 600
-bash "$DEVLOG_TRACKER_ROOT/hooks/scripts/checkpoint-set.sh" 20
+export DEVLOG_PROJECT_DIR="$(pwd)"
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/start-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/status-devlog.sh"
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/segment-watch-set.sh" 600
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
 # pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
 ```
 
 ## 快速開始
 
-在專案裡下一次：
+在專案裡下一次（依安裝方式擇一）：
 
 ```
-/devlog-tracker:start
+/devlog-tracker:start   # Claude Code plugin
+/devlog-start           # npx init --claude
+$devlog-start           # npx init --codex
 ```
 
-之後正常跟 Claude 對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下 `/devlog-tracker:continue`。暫停、歸檔、具名搬走、狀態與 span 見下方指令表（完整 namespace，plugin 名稱是 `devlog-tracker`）。
+之後正常對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下對應的 `continue` 指令。暫停、歸檔、具名搬走、狀態與 span 見下方指令表。
 
 ## 指令
+
+下表以 plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，`npx init --codex` 裝的是 `$devlog-<名稱>`，指令內容相同。
 
 | 指令 | 做什麼 |
 |---|---|
