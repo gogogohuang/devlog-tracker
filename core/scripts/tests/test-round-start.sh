@@ -634,6 +634,49 @@ fi
 assert_file_absent "task-notification during open span: no .round-open" "$DEVLOG_DIR/.round-open"
 rm -f "$DEVLOG_DIR/.span-open"
 
+# --- 19: devlog-tracker admin slash commands are exempt from Round logging -
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.checkpoint-state"
+printf '%s\n' '{"rounds_since_checkpoint": 3, "max_silent_rounds": 20, "checkpoint_marker_count": 0}' > "$DEVLOG_DIR/.checkpoint-state"
+ADMIN_PROMPT='<command-name>/devlog-tracker:status</command-name><command-message>status</command-message><command-args></command-args>'
+printf '{"prompt":"%s"}' "$ADMIN_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+assert_file_absent "admin command: no .round-current.md" "$DEVLOG_DIR/.round-current.md"
+assert_file_absent "admin command: no .round-open" "$DEVLOG_DIR/.round-open"
+assert_file_absent "admin command: no .turn-start" "$DEVLOG_DIR/.turn-start"
+assert_file_absent "admin command: no devlog.md created" "$DEVLOG_DIR/devlog.md"
+CP="$(grep -o '"rounds_since_checkpoint"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.checkpoint-state" | grep -o '[0-9]\+$')"
+if [ "$CP" = "3" ]; then
+  echo "PASS: admin command does not increment rounds_since_checkpoint"
+else
+  echo "FAIL: expected rounds_since_checkpoint to stay 3, got $CP"
+  FAIL=1
+fi
+rm -f "$DEVLOG_DIR/.checkpoint-state"
+
+# --- 20: a namespaced-but-different command name is not falsely exempted ---
+# "lessons-on" must not match the "lessons" case arm (prefix collision guard).
+LESSONS_ON_PROMPT='<command-name>/devlog-tracker:lessons-on</command-name><command-message>lessons-on</command-message><command-args></command-args>'
+printf '{"prompt":"%s"}' "$LESSONS_ON_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+if [ -f "$DEVLOG_DIR/.round-current.md" ]; then
+  echo "FAIL: lessons-on command should still be exempt (matched its own arm)"
+  FAIL=1
+else
+  echo "PASS: lessons-on command exempt via its own case arm"
+fi
+
+# --- 21: /devlog-tracker:continue is NOT exempt -- real work may follow ----
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+CONTINUE_PROMPT='<command-name>/devlog-tracker:continue</command-name><command-message>continue</command-message><command-args></command-args>'
+printf '{"prompt":"%s"}' "$CONTINUE_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "continue command still opens a Round" "## Round 1 —" "$CUR_BODY"
+if [ -f "$DEVLOG_DIR/.round-open" ]; then
+  echo "PASS: continue command still sets .round-open"
+else
+  echo "FAIL: continue command should still set .round-open"
+  FAIL=1
+fi
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+
 # --- workspace claim on next prompt ----------------------------------------
 WS="$TMP_ROOT/ws"
 mkdir -p "$WS/.devlog"

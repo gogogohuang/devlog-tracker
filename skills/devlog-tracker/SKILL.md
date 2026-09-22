@@ -311,6 +311,18 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
 Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」與「下一步」且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」或「下一步」須含缺件句式（缺／等待／等使用者等）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）；`IN_PROGRESS`／`BLOCKED` 還必須有完整的 `### Session Handoff`（決策／待解問題／失敗嘗試），通過後覆寫分支對應的 `handoff.md`，`DONE` 則刪除該檔。
 新開的 Round 三個標題（Summary／Reply／Handoff）都要有，瑣碎輪也不例外。
 
+### devlog-tracker 自己的管理指令不記錄
+
+這一輪如果是使用者直接呼叫 devlog-tracker 自己的純管理指令——`/devlog-tracker:checkpoint`、
+`clean`、`compact`、`keep`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
+`overview`、`pause`、`search`、`segment-watch`、`span`、`start`、`status`——`round-start.sh`
+會整輪直接放行，不開 Round、不動任何計數器，等於這個 tick 沒發生過；不用、也不會被
+Stop hook 要求補寫 Summary／Reply／Handoff。這些指令本身就是在操作 devlog 系統，不是開發
+工作，記錄下來對接續開發沒有幫助。
+
+`/devlog-tracker:continue` 與 `/devlog-tracker:resume` **不在此列**：這兩個指令執行完會接著
+做實際開發工作（可能在同一輪裡做很多事），仍照正常規則強制記錄。
+
 ### 怎麼判斷這輪該寫多細（瑣碎程度）
 
 「每輪都要記錄」管的是**要不要留下這一輪的痕跡**，瑣碎程度管的是**該寫多細**，這是兩件
