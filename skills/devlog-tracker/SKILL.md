@@ -412,6 +412,15 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 格式貼近 `CLAUDE.md` 條列寫法方便複製）。不寫入任何檔案，包含 `CLAUDE.md` 本身。步驟見
 `commands/overview.md`。
 
+## 跨檔搜尋：`/devlog-tracker:search <關鍵字>`
+
+純讀取，不核對工作區、不等確認（跟 overview／lessons 一樣的唯讀風格）。用
+`core/scripts/search-devlog.sh` 掃過 `.devlog/devlog*.md`（主檔、archive、keep、lessons、
+分支檔一個 glob 涵蓋），做不分大小寫的固定字串比對，回報命中檔、最近 `##`／`###` 標題與
+行內容。自然語言查詢由 Claude 先抽出關鍵片語再丟給腳本；不另建 index、不做 embedding。
+讀完命中後**用自己的話**回答使用者在問什麼，必要時附檔名／標題／行號當出處——不要把腳本
+原始輸出整段貼當主回答。不寫入任何檔案。步驟見 `commands/search.md`。
+
 ## Lessons Mode：開發歷程教訓（預設關閉，非架構知識庫）
 
 跟 Checkpoint／Span 不同，管的是「開發**過程**踩過的坑」，不是進度或架構——架構
