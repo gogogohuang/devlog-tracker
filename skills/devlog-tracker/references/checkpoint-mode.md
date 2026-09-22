@@ -39,6 +39,10 @@
 **「待解問題」是給 SessionStart 注入與接手的首要線索**，寧可少寫決策、也不要漏掉仍卡住的問題。
 寫完之後這一輪就會正常結束，不用再做任何事。
 
+這三欄與 `.devlog/handoff.md` 的 Session Handoff 快照相同（見
+`docs/design/session-handoff-file.md`）：Checkpoint 是寫進 `devlog.md` 的
+耐久路標；Session Handoff 是 Stop 覆寫、`DONE` 就刪的揮發快照。
+
 主動寫 checkpoint（還沒被 Stop 擋、但覺得該補路標）時用同一套格式。
 
 ## 調整門檻

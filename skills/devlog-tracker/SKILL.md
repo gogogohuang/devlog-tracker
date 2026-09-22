@@ -75,6 +75,9 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 - 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
   收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
+- Session Handoff 快照：`.devlog/handoff.md`（`main`／`master`）；其他分支 `.devlog/handoff.<branch>.md`。
+  由 Stop 在 `IN_PROGRESS`／`BLOCKED` 收尾時覆寫、`DONE` 時刪除；Claude 只寫 Round 內的
+  `### Session Handoff`，不要直接編這個檔。設計見 `docs/design/session-handoff-file.md`。
 - Cursor／Codex 上沒有 `/devlog-tracker:*` slash 選單。若專案是用 `npx devlog-tracker init` 裝的，指令對照就是 `.devlog-tracker/commands/*.md`：先 `source .devlog-tracker/env.sh`，再照使用者意圖對應的那份 `.md` 檔案的步驟做（例如「開始追蹤」對應 `commands/start.md`，「接續上一題」對應 `commands/continue.md`）。手動裝的專案見 README「Cursor（選用）」「Codex（選用）」章節。
 
 第一次使用時，若 `.devlog/` 不存在就建立它。
@@ -151,9 +154,10 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 自動注入時：
 
-1. 腳本讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）、最後一個 `## Kept 索引`（若有；不是具名檔內容），加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
-2. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
-3. Claude 收到這段 context 後，開場就已經知道目前進度
+1. 若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空，先注入這份 Session Handoff 快照
+2. 再讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）、最後一個 `## Kept 索引`（若有；不是具名檔內容）、最後一個 `## Lessons 索引`（若有），加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
+3. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
+4. Claude 收到這段 context 後，開場就已經知道目前進度
 
 `/clear` 時 hook 仍可能把殘留的開著 Round 標成 `INTERRUPTED`，但 stdout 什麼都不印。
 之後只有使用者下 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時，
@@ -225,6 +229,16 @@ BLOCKED 時寫清楚缺什麼、出現長怎樣（可觀察條件）>
 <下一輪第一件具體要做的事（路徑、指令、要載入的 skill）。
 IN_PROGRESS／BLOCKED 必寫；DONE 且沒有後續就整節省略>
 
+### Session Handoff
+#### 決策
+- <仍影響後續方向的選擇；沒有就 `- （無）`>
+
+#### 待解問題
+- <下一 session 最該先看的卡點；沒有就 `- （無）`>
+
+#### 失敗嘗試
+- <試過但放棄／不可行的做法；沒有就 `- （無）`>
+
 ### Status
 DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 ```
@@ -238,6 +252,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   （用詞、並列條件、例外）必須留在檔裡。超長內容由 hook 截斷並標明；不要在收尾時再手動縮成更短的改寫版。
 - **三個讀者拆開：** `Summary` 只給人掃；`Reply` 只記對使用者說過／答應過的話；`Handoff` 只給下一輪
   Claude 接手。同一件事不要三邊複述。
+- **`### Session Handoff`（跨 session 精簡快照）：** 與 Checkpoint 同款三欄（決策／待解問題／失敗嘗試），
+  不是 `### Handoff` 六小節的複本。`IN_PROGRESS`／`BLOCKED` 必寫（可 `- （無）`）；`DONE` 不要求；
+  `INTERRUPTED` stub 不寫。Stop 通過後會把內容覆寫到 `.devlog/handoff.md`（分支檔同規則）；
+  `DONE` 會刪掉該檔——不要把長期軌跡只寫在 handoff 檔裡。細節見 `docs/design/session-handoff-file.md`。
 - Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），Stop hook 會檢查已出現的小節
   順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整節省略，不要寫「無」。
   `現況` 幾乎每輪都該有。`工作區`、`完成條件` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
@@ -290,7 +308,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」與「下一步」且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」或「下一步」須含缺件句式（缺／等待／等使用者等）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」與「下一步」且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」或「下一步」須含缺件句式（缺／等待／等使用者等）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）；`IN_PROGRESS`／`BLOCKED` 還必須有完整的 `### Session Handoff`（決策／待解問題／失敗嘗試），通過後覆寫分支對應的 `handoff.md`，`DONE` 則刪除該檔。
 新開的 Round 三個標題（Summary／Reply／Handoff）都要有，瑣碎輪也不例外。
 
 ### 怎麼判斷這輪該寫多細（瑣碎程度）

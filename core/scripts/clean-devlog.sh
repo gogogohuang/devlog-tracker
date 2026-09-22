@@ -60,6 +60,7 @@ else
 fi
 
 rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.interrupted" "$DEVLOG_DIR/.awaiting-reply"
+rm -f "$HANDOFF_FILE"
 if [ -f "$DEVLOG_DIR/.checkpoint-state" ]; then
   json_int_set "$DEVLOG_DIR/.checkpoint-state" rounds_since_checkpoint 0
   json_int_set "$DEVLOG_DIR/.checkpoint-state" checkpoint_marker_count 0

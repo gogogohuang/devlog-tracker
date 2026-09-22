@@ -156,5 +156,17 @@ printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$ENAB/.devlog/.round-open"
 bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
 [ -f "$ENAB/.devlog/.enabled" ] && echo "PASS: .enabled untouched" || { echo "FAIL: .enabled removed"; FAIL=1; }
 
+# clean removes handoff.md
+HOFF="$TMP/handoffclean"
+mkdir -p "$HOFF/.devlog"
+export CLAUDE_PROJECT_DIR="$HOFF"
+printf '# project\n\n' > "$HOFF/.devlog/devlog.md"
+make_round "$HOFF/.devlog/devlog.md" 1 DONE
+echo "## Session Handoff" > "$HOFF/.devlog/handoff.md"
+bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null
+[ ! -f "$HOFF/.devlog/handoff.md" ] \
+  && echo "PASS: clean removes handoff.md" \
+  || { echo "FAIL: handoff.md survived clean"; FAIL=1; }
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
