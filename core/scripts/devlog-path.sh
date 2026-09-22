@@ -29,6 +29,7 @@ devlog_resolve_paths() {
   local dir="${1:-.}"
   DEVLOG_DIR="$dir/.devlog"
   DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+  # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
   HANDOFF_FILE="$DEVLOG_DIR/handoff.md"
 
   local branch raw name
@@ -71,5 +72,6 @@ devlog_resolve_paths() {
     devlog_lock_release
   fi
   DEVLOG_FILE="$resolved"
+  # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
   HANDOFF_FILE="$DEVLOG_DIR/handoff.$name.md"
 }
