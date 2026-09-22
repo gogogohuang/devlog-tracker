@@ -355,9 +355,10 @@ JSON 格式、開關步驟、已知限制（分辨不出自動續接 vs 真人�
 （可用 `/devlog-tracker:checkpoint <輪數>` 調整）沒寫 `## Checkpoint`，Stop
 hook 會要求補一段。
 
-運作機制、補寫格式、`/devlog-tracker:pause` 之後的行為，見
+運作機制、`/devlog-tracker:pause` 之後的行為，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/checkpoint-mode.md`
-（設計動機見 `docs/design/checkpoint-mode.md`）。
+（設計動機見 `docs/design/checkpoint-mode.md`）。補寫時用固定三段：
+`### 決策`／`### 待解問題`／`### 失敗嘗試`（格式與填寫規則見該 reference）。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
 

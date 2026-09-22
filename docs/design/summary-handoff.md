@@ -159,10 +159,12 @@ subsections use the Chinese labels above, in that fixed order.
 blocks between User Input and the closing Summary / Reply / Handoff as
 phases complete. Do not copy segment bodies into Summary, Reply, or Handoff.
 
-**Checkpoint Mode** is unchanged as a mechanism. Its *content* should
-align with the intervening rounds' Summaries (human landmarks), not become
-a concatenation of Handoffs. A Checkpoint does not replace per-round
-Summary.
+**Checkpoint Mode** is unchanged as a mechanism. Its *content* uses a fixed
+three-part block (`### 決策`, `### 待解問題`, `### 失敗嘗試`) under
+`## Checkpoint（Round X-Y）`, distilled from intervening rounds' Summaries
+(human landmarks), not a concatenation of Handoffs. A Checkpoint does not
+replace per-round Summary. Authoring details live in
+`skills/devlog-tracker/references/checkpoint-mode.md`.
 
 **Span Mode** is unchanged as a mechanism. The Round that opens a span,
 quiet ticks under `max_silent_ticks`, a one-line write when the budget
