@@ -40,3 +40,17 @@ DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/lessons-append.sh"
 - 建立**全新**主題檔時（這個 topic 之前不存在），若已有其他主題檔，印一行既有主題清單
   （`NEW_TOPIC。既有主題：...`）——如果內容其實屬於某個既有主題，改用該名稱重跑，避免
   同一件事分裂成兩個檔案。
+
+## sub agent／workflow 情境
+
+上面兩種自我判斷訊號預設你在跑 Round。改由 Agent 工具的 sub agent 或 Workflow 工具執行時，
+沒有 Round／Status 可比，但一樣可能踩坑，判斷方式類比如下（一樣完全自我判斷，非強制）：
+verify 階段推翻了 sub agent 先前的 fix／claim、sub agent 自陳繞了一圈、同一個 workflow
+裡多個 agent 各自卡在類似問題（彙整成一筆更有代表性的）、sub agent 的成果被使用者或
+reviewer 打回票要求重做。
+
+sub agent 不需要知道 Lessons Mode 存在；不新增回報格式，你覺得這次任務可能踩雷時，自己
+決定要不要在 dispatch prompt 裡順口提一句「回報時順便說一下有沒有繞路」。永遠是你（主
+session）讀完回報後自己判斷主題、呼叫 `lessons-append.sh`——sub agent／workflow 本身不
+直接呼叫，避免 worktree isolation 下環境變數指錯專案目錄。詳見
+`docs/design/lessons-mode.md`「sub agent／workflow 情境的自我判斷訊號」。

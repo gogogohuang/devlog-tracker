@@ -452,6 +452,12 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 機械印一句提示（不經過門檻計數，偵測到就印）。以上全部都完全不 hook 強制寫入
 本身——寫不寫都不影響這一輪能不能收尾。
 
+若這輪任務是透過 Agent 工具派 sub agent，或用 Workflow 工具跑多階段 pipeline，一樣可能
+踩到值得記的坑，只是沒有 Round／Status 可比對訊號；讀完 sub agent／workflow 的最終回報後
+自我判斷（例如 verify 推翻了它先前的 fix、它自陳繞了一圈、多個 agent 重複卡在同一種問題、
+或成果被打回票要求重做），值得的話一樣呼叫 `lessons-append.sh`——sub agent／workflow 本身
+不會、也不需要知道這個機制存在。
+
 寫法、per-topic 存檔規則、索引重建、機制性訊號細節，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
 設計見 `docs/design/lessons-mode.md`）。
