@@ -31,6 +31,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/files-snapshot.sh"
 # shellcheck source=devlog-md.sh
 . "$SCRIPT_DIR/devlog-md.sh"
+# shellcheck source=handoff-file.sh
+. "$SCRIPT_DIR/handoff-file.sh"
 
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
@@ -554,6 +556,15 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
       exit 2
     fi
   fi
+
+  # Session Handoff → .devlog/handoff.md（docs/design/session-handoff-file.md）
+  # 放在其他 IN_PROGRESS／BLOCKED 檢查之後，避免搶先蓋掉既有失敗訊息。
+  if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
+    if ! handoff_session_section_ok "$LAST_ROUND"; then
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，必須有 \`### Session Handoff\`，且依序包含 \`#### 決策\`／\`#### 待解問題\`／\`#### 失敗嘗試\`（可寫 \`- （無）\`）。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session。" >&2
+      exit 2
+    fi
+  fi
 fi
 
 rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
@@ -577,6 +588,16 @@ rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
 if [ -n "$LAST_ROUND" ]; then
   if devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"; then
     rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+    case "${STATUS_VAL:-}" in
+      IN_PROGRESS|BLOCKED)
+        handoff_write "$HANDOFF_FILE" "$LAST_ROUND" 2>/dev/null || \
+          echo "警告：無法寫入 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+        ;;
+      DONE)
+        handoff_clear "$HANDOFF_FILE" 2>/dev/null || \
+          echo "警告：無法清除 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+        ;;
+    esac
   fi
 else
   rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true

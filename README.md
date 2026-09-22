@@ -182,7 +182,7 @@ Here's how each mechanism actually behaves when triggered:
 
 #### Auto-continue
 
-The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, injects the last Checkpoint (if any — including its `### 待解問題` section for open blockers), the `## Kept index` (if any — not the named files' content), plus the last two rounds' Summary / Handoff / Status — not the whole file. `/clear` truly clears everything and injects nothing; to continue, use `/devlog-tracker:continue` (which checks "Workspace" first, then proceeds). See [`docs/design/continue.md`](docs/design/continue.md).
+The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, first injects the branch-scoped `.devlog/handoff.md` snapshot when non-empty, then the last Checkpoint (if any — including its `### 待解問題` section for open blockers), the `## Kept index` (if any — not the named files' content), plus the last two rounds' Summary / Handoff / Status — not the whole file. Stop overwrites the handoff file on `IN_PROGRESS`／`BLOCKED` closes and deletes it on `DONE`. `/clear` truly clears everything and injects nothing; to continue, use `/devlog-tracker:continue` (which checks "Workspace" first, then proceeds). See [`docs/design/continue.md`](docs/design/continue.md) and [`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md).
 
 #### Same-round workspace-drift detection
 

@@ -69,6 +69,13 @@ if [ -f "$SPAN_FILE" ]; then
   fi
 fi
 
+if [ -s "${HANDOFF_FILE:-}" ]; then
+  echo "以下是目前的 Session Handoff 快照（.devlog/${HANDOFF_FILE##*/}；精簡狀態，不是全文）："
+  echo ""
+  cat "$HANDOFF_FILE" 2>/dev/null || true
+  echo ""
+fi
+
 if [ -f "$DEVLOG_FILE" ]; then
   echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："
   echo ""

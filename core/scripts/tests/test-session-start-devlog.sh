@@ -499,6 +499,65 @@ else
   FAIL=1
 fi
 
+# --- handoff.md present: printed before excerpt header --------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/handoff.md" "$DEVLOG_DIR/.span-open"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-22T00:00:00+08:00
+
+### Summary
+summary 1
+
+### Handoff
+#### 現況
+handoff 1
+
+### Status
+DONE
+EOF
+cat > "$DEVLOG_DIR/handoff.md" <<'EOF'
+## Session Handoff
+
+### 決策
+- keep route A
+
+### 待解問題
+- open Q
+
+### 失敗嘗試
+- （無）
+EOF
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "handoff header present" "Session Handoff" "$OUTPUT"
+assert_contains "handoff body present" "open Q" "$OUTPUT"
+assert_contains "excerpt still present" "接手摘要" "$OUTPUT"
+HOFF_POS="$(printf '%s\n' "$OUTPUT" | grep -n 'open Q' | head -1 | cut -d: -f1)"
+EX_POS="$(printf '%s\n' "$OUTPUT" | grep -n '接手摘要' | head -1 | cut -d: -f1)"
+if [ -n "$HOFF_POS" ] && [ -n "$EX_POS" ] && [ "$HOFF_POS" -lt "$EX_POS" ]; then
+  echo "PASS: handoff prints before devlog excerpt"
+else
+  echo "FAIL: handoff should precede excerpt (hoff=$HOFF_POS ex=$EX_POS)"
+  FAIL=1
+fi
+
+# --- no handoff.md: excerpt only -----------------------------------------
+rm -f "$DEVLOG_DIR/handoff.md"
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_not_contains "no handoff file -> no open Q" "open Q" "$OUTPUT"
+assert_contains "excerpt still works" "接手摘要" "$OUTPUT"
+
+# --- clear: still silent even with handoff.md ----------------------------
+cat > "$DEVLOG_DIR/handoff.md" <<'EOF'
+## Session Handoff
+### 決策
+- should not inject
+EOF
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then
+  echo "PASS: clear stays silent with handoff.md present"
+else
+  echo "FAIL: clear should be silent, got: $OUTPUT"; FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

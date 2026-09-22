@@ -793,6 +793,18 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 esc
 ```
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 IN_PROGRESS
 EOF
@@ -909,6 +921,18 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 stale interrupt
 ```
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 IN_PROGRESS
 EOF
@@ -929,6 +953,18 @@ assert_exit "after stale interrupt cleared -> normal enforcement blocks (hash eq
 # --- Recording moments: loop guard leaves .round-open ----------------------
 cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
 ## Round 1 — 2026-09-09T12:00:00+08:00
+
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
 
 ### Status
 IN_PROGRESS
@@ -999,6 +1035,18 @@ fixture reply.
 #### 現況
 做到一半。
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 IN_PROGRESS
 EOF
@@ -1025,6 +1073,18 @@ fixture reply.
 `bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 打開 foo.ts 繼續。
+
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
 
 ### Status
 IN_PROGRESS
@@ -1074,6 +1134,18 @@ fixture reply.
 #### 下一步
 繼續完成
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 IN_PROGRESS
 EOF
@@ -1103,6 +1175,18 @@ fixture reply.
 #### 下一步
 持續優化。
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 BLOCKED
 EOF
@@ -1130,6 +1214,18 @@ fixture reply.
 `bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
 #### 下一步
 先繼續完成 foo.ts 的錯誤處理，再跑一次測試。
+
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
 
 ### Status
 IN_PROGRESS
@@ -1161,6 +1257,18 @@ fixture reply.
 #### 下一步
 繼續完成
 打開 bar.ts 補上測試。
+
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
 
 ### Status
 IN_PROGRESS
@@ -1212,6 +1320,18 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 #### 下一步
 再想一下怎麼做比較好
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 IN_PROGRESS
 EOF
@@ -1243,6 +1363,18 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 #### 下一步
 改 hooks/foo.sh
 
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
+
 ### Status
 BLOCKED
 EOF
@@ -1273,6 +1405,18 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 .env 有 key 且 hooks/foo.sh 改完。
 #### 下一步
 等使用者提供 key 後改 hooks/foo.sh
+
+
+### Session Handoff
+
+#### 決策
+- （無）
+
+#### 待解問題
+- fixture open
+
+#### 失敗嘗試
+- （無）
 
 ### Status
 BLOCKED

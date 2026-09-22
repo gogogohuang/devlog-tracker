@@ -14,18 +14,22 @@ _devlog_sanitize_name() {
   printf '%s' "$1" | sed -E 's/[^A-Za-z0-9._-]/-/g; s/-+/-/g; s/^-+//; s/-+$//'
 }
 
-# Sets DEVLOG_DIR and DEVLOG_FILE for the branch currently checked out in
-# $1 (defaults to "."). main/master (any case) and anything that isn't a
-# git repo or has no resolvable branch keep the shared devlog.md. Any
-# other branch gets devlog.<sanitized-branch>.md; a detached HEAD (or an
-# unborn branch, which git also reports as "HEAD" here) falls back to the
-# working directory's own basename. The first time a branch resolves to a
-# file that doesn't exist yet while devlog.md already has content, the
-# existing devlog.md is renamed (not copied) into that branch's file.
+# Sets DEVLOG_DIR, DEVLOG_FILE, and HANDOFF_FILE for the branch currently
+# checked out in $1 (defaults to "."). main/master (any case) and anything
+# that isn't a git repo or has no resolvable branch keep the shared
+# devlog.md / handoff.md. Any other branch gets
+# devlog.<sanitized-branch>.md and handoff.<sanitized-branch>.md; a
+# detached HEAD (or an unborn branch, which git also reports as "HEAD"
+# here) falls back to the working directory's own basename. The first
+# time a branch resolves to a file that doesn't exist yet while
+# devlog.md already has content, the existing devlog.md is renamed (not
+# copied) into that branch's file. handoff.md is never renamed on first
+# resolve (current-state snapshot, not history).
 devlog_resolve_paths() {
   local dir="${1:-.}"
   DEVLOG_DIR="$dir/.devlog"
   DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
+  HANDOFF_FILE="$DEVLOG_DIR/handoff.md"
 
   local branch raw name
   branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
@@ -67,4 +71,5 @@ devlog_resolve_paths() {
     devlog_lock_release
   fi
   DEVLOG_FILE="$resolved"
+  HANDOFF_FILE="$DEVLOG_DIR/handoff.$name.md"
 }

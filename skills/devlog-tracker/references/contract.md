@@ -23,6 +23,7 @@
 | `#### 工作區` 七種格式 | 同上；生產者 `core/scripts/workspace-snapshot.sh` |
 | `#### 檔案` machine-verify 區塊 | 同上；`docs/design/files-verify.md`；`core/scripts/files-snapshot.sh` |
 | Checkpoint 三段 | `references/checkpoint-mode.md` |
+| Session Handoff 三段（揮發快照） | `docs/design/session-handoff-file.md`；`SKILL.md` 格式節 |
 | `### 段落` 格式 | `references/round-segments.md`；Reply Fold 見 `references/reply-fold.md` |
 
 ## Invariants
@@ -45,6 +46,7 @@
 | Hard：缺 Summary／Reply／Handoff／非法 Status | Stop `enforce-devlog.sh` | `SKILL.md` 格式節末段 |
 | Hard：工作區快照不符 | Stop + `workspace-snapshot.sh` | 同上；ssot Phase 1 |
 | Hard：檔案區塊不符 | Stop + `files-snapshot.sh` | `docs/design/files-verify.md` |
+| Hard：Session Handoff（IN_PROGRESS／BLOCKED） | Stop + `handoff-file.sh` | `docs/design/session-handoff-file.md`；`SKILL.md` 格式節 |
 | Hard：上一輪工作區漂移擋工具 | PreToolUse（continue 同 session） | `SKILL.md`「接續」；`commands/continue.md` |
 | Hard：Segment Watch 逾時先補段落 | PreToolUse | `references/round-segments.md` |
 | Soft：Checkpoint／Lessons 建議 | hook 提示，不強制寫入本身 | `references/checkpoint-mode.md`／`lessons-mode.md` |
@@ -65,7 +67,7 @@
 
 | 主題 | 權威位置 |
 |---|---|
-| 主檔／分支檔／歸檔／keep／round-current | `SKILL.md`「檔案位置」；`docs/design/branch-scoped-devlog.md` |
+| 主檔／分支檔／歸檔／keep／round-current／handoff | `SKILL.md`「檔案位置」；`docs/design/branch-scoped-devlog.md`；`docs/design/session-handoff-file.md` |
 | 錄製時機與截斷 | `docs/design/recording-moments.md` |
 | Span／Checkpoint／Lessons／Reply Fold／Segments | 各 `references/*.md` + 對應 `docs/design/*` |
 | 下一步黑名單 | `docs/design/next-step-blacklist.md` |
