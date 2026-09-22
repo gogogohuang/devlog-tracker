@@ -22,7 +22,7 @@
   },
   "scripts": {
     "test": "node --test cli/*.test.js scripts/*.test.js",
-    "version": "node scripts/sync-version.js && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json README.md"
+    "version": "node scripts/sync-version.js && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json README.md README.zh-TW.md"
   },
   "license": "Apache-2.0",
   "author": {
