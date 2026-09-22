@@ -174,7 +174,7 @@ Stop hook 會做這些事：
 | 機制 | 放寬的是 | 解決的問題 |
 |---|---|---|
 | **Span Mode** | 「每次自動喚醒算不算一輪」 | `/loop`、Workflow 這類被自己排程反覆喚醒、不是使用者手動打字觸發的長任務，每個自動 tick 都強制寫完整 Round，會逼出大量沒意義的紀錄，甚至卡住整條自動化流程 |
-| **Checkpoint Mode** | 「有沒有跨輪的摘要路標」 | 一般互動對話每輪都正常寫，但輪數一多，翻閱的人要逐輪爬完才知道整體進度 |
+| **Checkpoint Mode** | 「有沒有跨輪的摘要路標」 | 一般互動對話每輪都正常寫，但輪數一多，翻閱的人要逐輪爬完才知道整體進度；每段 checkpoint 固定 **決策／待解問題／失敗嘗試** 三段，SessionStart 注入時較容易抓到卡點 |
 | **Reply Fold** | 「一問一答算不算兩輪」 | Claude 用純文字提問、下一則訊息其實是在回答時，預設邏輯（每個 `UserPromptSubmit` 開新 Round）會把這組問答硬拆成兩個不相關的 Round |
 | **Segment Watch** | 「一輪內部要不要留階段性痕跡」 | 一輪做很久（先探索、再決策、再實作、再驗證），憋到最後才寫一次，中途 crash 會把整個過程全部遺失 |
 
@@ -182,7 +182,7 @@ Stop hook 會做這些事：
 
 #### 自動接續
 
-`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，注入最後一個 Checkpoint（若有）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)。
+`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)。
 
 #### 同輪工作區漂移偵測
 
@@ -198,7 +198,13 @@ Stop hook 會做這些事：
 
 #### Checkpoint Mode
 
-累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint`（門檻可調）。細節見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
+累積約 20 輪沒寫跨輪摘要，`Stop` hook 會要求補一段 `## Checkpoint（Round X-Y）`（門檻可調）。內容不用自由段落，標題下固定三小節：
+
+- **`### 決策`** — 這段期間的定案
+- **`### 待解問題`** — 仍懸而未決的卡點（下一 session 接手的首要線索）
+- **`### 失敗嘗試`** — 試過但放棄的做法，避免下一任重踩
+
+hook 偵測邏輯不變（仍只驗 `## Checkpoint` 標題有沒有新增，不驗三段內容）。撰寫規則見 [`skills/devlog-tracker/references/checkpoint-mode.md`](skills/devlog-tracker/references/checkpoint-mode.md)；設計見 [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md)。
 
 #### Span Mode
 

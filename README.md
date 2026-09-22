@@ -174,7 +174,7 @@ The normal rule is "one user message = one round, and Summary/Reply/Handoff/Stat
 | Mechanism | What it relaxes | What problem it solves |
 |---|---|---|
 | **Span Mode** | Whether each automatic wake-up counts as a round | Long-running tasks driven by their own schedule (`/loop`, Workflow) rather than a user typing — forcing a full Round on every automatic tick produces a flood of meaningless records, or even stalls the whole automation |
-| **Checkpoint Mode** | Whether there's a cross-round summary waypoint | Normal interactive conversation writes every round fine, but once the round count grows, reviewers have to crawl through every round to see overall progress |
+| **Checkpoint Mode** | Whether there's a cross-round summary waypoint | Normal interactive conversation writes every round fine, but once the round count grows, reviewers have to crawl through every round to see overall progress; each checkpoint uses a fixed **Decisions / Open questions / Failed attempts** layout so SessionStart injection surfaces blockers quickly |
 | **Reply Fold** | Whether a question-and-answer counts as two rounds | When Claude ends with a plain-text question and the next message is really the answer, the default logic (every `UserPromptSubmit` opens a new Round) would hard-split that Q&A into two unrelated rounds |
 | **Segment Watch** | Whether a round leaves intermediate traces internally | A round that takes a long time (explore, then decide, then implement, then verify) and only writes once at the very end loses the whole process if it crashes partway |
 
@@ -182,7 +182,7 @@ Here's how each mechanism actually behaves when triggered:
 
 #### Auto-continue
 
-The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, injects the last Checkpoint (if any), the `## Kept index` (if any — not the named files' content), plus the last two rounds' Summary / Handoff / Status — not the whole file. `/clear` truly clears everything and injects nothing; to continue, use `/devlog-tracker:continue` (which checks "Workspace" first, then proceeds). See [`docs/design/continue.md`](docs/design/continue.md).
+The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, injects the last Checkpoint (if any — including its `### 待解問題` section for open blockers), the `## Kept index` (if any — not the named files' content), plus the last two rounds' Summary / Handoff / Status — not the whole file. `/clear` truly clears everything and injects nothing; to continue, use `/devlog-tracker:continue` (which checks "Workspace" first, then proceeds). See [`docs/design/continue.md`](docs/design/continue.md).
 
 #### Same-round workspace-drift detection
 
@@ -198,7 +198,13 @@ Don't hold a long round until the very end — write `### Segment` entries as yo
 
 #### Checkpoint Mode
 
-After roughly 20 rounds without a cross-round summary, the `Stop` hook requires a `## Checkpoint` section to be added (threshold adjustable). See [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md).
+After roughly 20 rounds without a cross-round summary, the `Stop` hook requires a new `## Checkpoint（Round X-Y）` block (threshold adjustable). Content is structured, not free prose — three subsections under the heading:
+
+- **`### 決策`** — decisions made in that stretch
+- **`### 待解問題`** — still-open blockers (primary handoff cue for the next session)
+- **`### 失敗嘗試`** — approaches tried and abandoned, so the next agent doesn't repeat them
+
+Hook detection is unchanged (only the `## Checkpoint` heading is verified, not subsection quality). Authoring rules: [`skills/devlog-tracker/references/checkpoint-mode.md`](skills/devlog-tracker/references/checkpoint-mode.md); design: [`docs/design/checkpoint-mode.md`](docs/design/checkpoint-mode.md).
 
 #### Span Mode
 
