@@ -80,6 +80,26 @@ fi
 
 PROMPT="$(json_str_field "$INPUT" prompt)"
 
+# devlog-tracker 自己的純管理指令（讀狀態或操作 devlog 系統本身，不做開發工作）：
+# 這一輪完全不開 Round、不動任何計數器，整輪直接放行，等於這個 tick 沒發生過。
+# 不包含 continue／resume——這兩個會接著做實際開發工作，仍要照常強制記錄。
+# 偵測依據：Claude Code 呼叫 slash command／skill 時，這一輪的 prompt 內容會帶
+# 一個 <command-name> 標籤（本專案這些指令都是以 skill 形式提供給 Claude）。
+# 抓不到就落回正常流程（fail-open，不影響一般訊息）。
+CMD_NAME=""
+case "$PROMPT" in
+  *'<command-name>'*)
+    CMD_NAME="${PROMPT#*<command-name>}"
+    CMD_NAME="${CMD_NAME%%</command-name>*}"
+    CMD_NAME="${CMD_NAME#/}"
+    ;;
+esac
+case "$CMD_NAME" in
+  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status)
+    exit 0
+    ;;
+esac
+
 # 背景 task-notification（例如子 agent 完成通知）不是使用者真的打字：不留原始
 # XML，換成精簡摘要；也不當成新話題開新 Round，改折進最後一個 Round 當段落。
 TASK_NOTIF=0
