@@ -125,6 +125,39 @@ Stop 當下。
 影響有界：頂多讓共用計數器多算一次，或讓這裡「一次性」的提示理論上不只印一次，純屬顧問
 性質，不是資料正確性問題，這一版先不為此加 `FOLD_ROUND` 判斷。
 
+## sub agent／workflow 情境的自我判斷訊號
+
+上面兩種自我判斷訊號（BLOCKED→解開、detour）預設主 session 自己在跑 Round。當任務改由
+Agent 工具的 sub agent，或 Workflow 工具的多階段 pipeline 執行時，沒有 Round／Status
+可比對，但過程中一樣可能踩到值得記下來的坑。以下四種訊號，跟現有兩種同一個性質——
+**完全自我判斷，hook 偵測不到、不計數、不強制**：
+
+1. **verify 階段推翻了 sub agent 先前的 fix／claim**。review-fix 或 Workflow 的
+   `pipeline()` 常見模式是 Fix 階段宣稱解決了、Verify（adversarial check）階段發現只是
+   治標或根本沒解決。這個「被推翻」的落差本身就值得記一筆。
+2. **sub agent 自陳這次任務繞了一圈才找到對的做法**——跟主 session 的 detour 訊號同一種
+   判斷方式，只是判斷者換成 sub agent 自己，在最終回報裡帶一句。
+3. **同一個 workflow 裡多個 agent 各自回報了類似的困難**。並行或序列的多個 agent 如果
+   不約而同卡在同一種問題（例如都在同一個 API 或同一段 legacy code 卡住），代表這是系統
+   性的坑，值得協調者（主 session）彙整成一筆更有代表性的 lesson，而不是各自零散記。
+4. **sub agent 的成果被使用者或 reviewer 的回饋打回票、要求重做**——類比主 session 的
+   BLOCKED，只是換成「交付物被拒絕」這個訊號。
+
+### 交付機制：主 session 轉譯，不是新回報格式
+
+sub agent 是 fresh context（除非是 fork），不會自動知道 Lessons Mode 存在，也不需要知道。
+**不新增任何結構化回報欄位或 schema**——主 session 在 dispatch sub agent 或 workflow 的
+prompt 時，如果判斷這次任務有機會踩到上面幾種訊號，可以自行決定要不要在 prompt 裡順口加
+一句類似「如果過程中繞了彎路，回報時用一兩句話說明」；沒加這句、sub agent 也沒主動提到，
+就不寫、不追蹤，不是遺漏或錯誤。
+
+**誰來呼叫 `lessons-append.sh`：永遠是主 session。** sub agent／workflow 本身不直接呼叫
+這支腳本——原因有二：(a) sub agent 不需要知道這個機制存在；(b) 若 sub agent 跑在
+`isolation: "worktree"` 底下，其 `DEVLOG_PROJECT_DIR`／`CLAUDE_PROJECT_DIR` 可能指向暫時
+的 worktree 而非真專案目錄，讓它自己呼叫容易寫錯地方。主 session 讀完 sub agent 或
+Workflow 的最終回報（Workflow 是讀 task notification 附的完整報告）後，自己判斷主題、
+自己呼叫 `lessons-append.sh`，跟今天 Round close 時的操作完全一樣，沒有新增任何參數。
+
 ## Storage: per-topic files, mirroring `keep`
 
 Path: `.devlog/devlog.lessons.<topic>.md`, same directory as `devlog.md`
