@@ -8,6 +8,21 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 參考 agfnow/agentflow 的 devlog 基礎協定做的簡化版，只保留「逐輪對話紀錄」這一層，
 不含原版的 10 步驟 SDD pipeline、多模型對抗審查、external worker 外包等進階機制。
 
+## Contract
+
+每輪收尾／接手前先對齊這七項；細節與例外見下方章節與
+`references/contract.md`（審核用展開，不取代本節）。
+
+| 維度 | 契約（短） |
+|---|---|
+| **Requirements** | 強制記錄需 `.devlog/.enabled`（`/devlog-tracker:start`）。`/clear` 後不自動接續；要開工用 `/devlog-tracker:continue`（或明確說接續）。Cursor／Codex 對照 `.devlog-tracker/commands/*.md`。 |
+| **Output** | 編輯開著的 Round（`.round-current.md`）：必有 `### Summary`／`### Reply`／`### Handoff`／`### Status`；Handoff 小節順序固定。格式見「每一輪的紀錄格式」。 |
+| **Invariants** | L1 寫回義務；聊天不旁白記錄動作；不改 User Input（除非 hook `（無 prompt）`）；不為同一則訊息再 append `## Round`；設計真相在 `docs/design/*.md`，不是 lessons。 |
+| **Validation** | Soft：收尾前自檢欄位與工作區。Hard：Stop／PreToolUse／workspace／files snapshot（見「每一輪的紀錄格式」末段與 hook 腳本）。fail-open／loop guard 見下方開關一節。 |
+| **Transformation** | 單次動作走對應 `commands/*.md`（start／continue／compact／keep／…）；本檔管協定與跨指令不變式，不重抄步驟。 |
+| **Knowledge** | 檔案位置、分支主檔、mode 邊界見下方與 `references/*`；更深設計見 `docs/design/*`。 |
+| **Observation** | 收尾／接手前看：開著的 Round、live git（`workspace-snapshot.sh`）、Handoff「完成條件」／「下一步」、是否該寫 `### 段落`（瑣碎度表、Segment Watch）。 |
+
 ## 核心原則
 
 devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步、完成條件）的 single source of truth，
