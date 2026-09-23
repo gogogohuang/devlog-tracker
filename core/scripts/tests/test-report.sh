@@ -184,5 +184,14 @@ J="$(bash "$SCRIPT_DIR/report-devlog.sh" --json --rounds --all-branches)"
 jcheck "all-branches: feat-x rounds tagged" "$J" 'd.rounds.some(r => r.branch==="feat-x" && r.summary==="branch work")'
 jcheck "all-branches: no kept or lessons rounds" "$J" 'd.rounds.every(r => r.branch!=="topic-a" && !r.branch.startsWith("lessons."))'
 
+# --- control chars outside \t\r\n (e.g. pasted ANSI \033) escape to \uXXXX ------
+CTRL_ROOT="$(mktemp -d)"
+mkdir -p "$CTRL_ROOT/.devlog"
+printf '## Round 1 — 2026-09-06T10:00:00+0800\n\n### Summary\nboom\033[31mred\n\n### Status\nDONE\n' \
+  > "$CTRL_ROOT/.devlog/devlog.md"
+J="$(CLAUDE_PROJECT_DIR="$CTRL_ROOT" bash "$SCRIPT_DIR/report-devlog.sh" --json --rounds)"
+jcheck "control char (ESC) escapes to \\u001b, JSON still parses" "$J" 'd.rounds[0].summary.includes("\x1b")'
+rm -rf "$CTRL_ROOT"
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

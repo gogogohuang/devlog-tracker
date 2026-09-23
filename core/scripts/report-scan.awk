@@ -6,9 +6,15 @@
 #   C<TAB>branch<TAB>checkpoint-json
 # Headings inside ``` fences are content, not structure (same rule as
 # devlog-md.sh).
-function esc(s) {
+BEGIN {
+  # Build the 0x01-0x1F control bytes once; \t \r \n get their short escapes
+  # below, the rest (e.g. pasted ANSI \033) fall back to \u00XX.
+  for (ci = 1; ci <= 31; ci++) { cchar[ci] = sprintf("%c", ci); cesc[ci] = sprintf("\\u%04x", ci) }
+}
+function esc(s,    ci) {
   gsub(/\\/, "\\\\", s); gsub(/"/, "\\\"", s)
   gsub(/\t/, "\\t", s); gsub(/\r/, "\\r", s); gsub(/\n/, "\\n", s)
+  for (ci = 1; ci <= 31; ci++) if (index(s, cchar[ci]) > 0) gsub(cchar[ci], cesc[ci], s)
   return s
 }
 function trim_nl(s) { sub(/^\n+/, "", s); sub(/\n+$/, "", s); return s }
