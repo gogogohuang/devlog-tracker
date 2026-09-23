@@ -118,6 +118,7 @@ $devlog-start           # npx init --codex
 | `/devlog-tracker:search <關鍵字>` | 在 `devlog.md`／`devlog.archive.md`／已 keep 的 `devlog.<name>.md`／`devlog.lessons.<topic>.md` 裡做不分大小寫的字串搜尋；Claude 讀完命中後用自己的話回答（必要時附檔名／標題／行號）。純讀取，不核對工作區、不等確認、不寫檔。 |
 | `/devlog-tracker:report` | 印出 devlog 統計：Round 數（主檔 + archive）、各 Status 數、BLOCKED 比例、Checkpoint／keep／lessons 數量、第一輪與最後一輪時間。`--all-branches` 合計所有 branch 檔。純讀取。機器可讀輸出用 `npx devlog-tracker report [--json]`。 |
 | `/devlog-tracker:timeline` | 把 devlog 產生成離線可開的自足 HTML 時間軸 `.devlog/timeline.html`（Round 卡片依 Status 上色、穿插 Checkpoint、可依 Status／branch／關鍵字篩選、支援深色模式）。不含 User Input 原文。需要 Node ≥18；`--all-branches` 納入所有 branch 檔。也可用 `npx devlog-tracker timeline`。 |
+| `/devlog-tracker:pr` | 從這個 branch 的 devlog Rounds 與 `git log` 產生 PR 描述（Summary／Decisions／Changes／Test plan，不含 User Input 原文），寫到 `.devlog/pr-body.md`；你確認後才跑 `gh pr create` 或 `gh pr edit`。在 `main`／`master` 上不執行。 |
 | `/devlog-tracker:resume <name>` | 讀具名保存檔的最後一輪與 Handoff，核對「工作區」後提出接續；新工作仍寫回主 `devlog.md`。 |
 | `/devlog-tracker:clean` | 無條件清空 `devlog.md`（含專案摘要與所有 Round 歷史），不搬移、不備份、不可復原；執行前一定會先問，要明確回覆「清空」才動手。只留目前開著的那一輪，重編成 `## Round 1`。 |
 | `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch、Lessons Mode 工作區漂移計數與最後一輪 Status。 |

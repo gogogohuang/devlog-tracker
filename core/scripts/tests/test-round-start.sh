@@ -684,6 +684,16 @@ else
 fi
 rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
 
+# --- 21b: /devlog-tracker:pr and :promote are NOT exempt (outward / file writes)
+# shellcheck disable=SC2043 # promote-plan Task 4 adds a second value
+for WORK_CMD in pr; do
+  rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+  printf '{"prompt":"<command-name>/devlog-tracker:%s</command-name>"}' "$WORK_CMD" | bash "$SCRIPT_DIR/round-start.sh"
+  CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+  assert_contains "$WORK_CMD command still opens a Round" "## Round 1 —" "$CUR_BODY"
+done
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+
 # --- workspace claim on next prompt ----------------------------------------
 WS="$TMP_ROOT/ws"
 mkdir -p "$WS/.devlog"
