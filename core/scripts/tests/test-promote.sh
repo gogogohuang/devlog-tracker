@@ -84,7 +84,56 @@ printf '# Mine\n\n<!-- devlog-tracker:rules:begin -->\n## devlog-tracker 沉澱�
 OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-target.sh")"
 assert_line "target: existing block counted" "EXISTING=2" "$OUT"
 
-# @@WRITE_TESTS@@
+# === promote-write.sh ==========================================================
+BEGIN_MARK='<!-- devlog-tracker:rules:begin -->'
+END_MARK='<!-- devlog-tracker:rules:end -->'
+P="$(new_project)"
+RULES="$TMP_ROOT/rules.txt"
+
+# --- target missing -> created with header ---------------------------------------
+printf '  改核心腳本後跑 run-tests.sh  \n\n- 一般 PR 不改版號\n' > "$RULES"
+OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES")"
+assert_eq "write: new file result" "ADDED=2 SKIPPED_DUP=0 TARGET=$P/CLAUDE.md" "$OUT"
+EXPECTED="$(printf '%s\n## devlog-tracker 沉澱的規範\n\n- 改核心腳本後跑 run-tests.sh\n- 一般 PR 不改版號\n%s' "$BEGIN_MARK" "$END_MARK")"
+assert_eq "write: new file content (trimmed, '- ' prefixed, blank skipped)" "$EXPECTED" "$(cat "$P/CLAUDE.md")"
+
+# --- existing content without block -> appended after a blank line -------------------
+P="$(new_project)"
+printf '# Mine\nkeep me' > "$P/CLAUDE.md"
+printf 'rule one\n' > "$RULES"
+CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null
+EXPECTED="$(printf '# Mine\nkeep me\n\n%s\n## devlog-tracker 沉澱的規範\n\n- rule one\n%s' "$BEGIN_MARK" "$END_MARK")"
+assert_eq "write: appended after existing content (missing trailing newline handled)" "$EXPECTED" "$(cat "$P/CLAUDE.md")"
+
+# --- existing block -> inserted before end mark; content after block kept -----------
+printf '\n## After\ntail\n' >> "$P/CLAUDE.md"
+printf 'rule two\n' > "$RULES"
+CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null
+EXPECTED="$(printf '# Mine\nkeep me\n\n%s\n## devlog-tracker 沉澱的規範\n\n- rule one\n- rule two\n%s\n\n## After\ntail' "$BEGIN_MARK" "$END_MARK")"
+assert_eq "write: appended inside existing block" "$EXPECTED" "$(cat "$P/CLAUDE.md")"
+
+# --- exact duplicates (existing + within input) skipped; file unchanged -------------
+BEFORE="$(cat "$P/CLAUDE.md")"
+printf -- '- rule one\nrule two\n' > "$RULES"
+OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES")"
+assert_eq "write: all duplicates" "ADDED=0 SKIPPED_DUP=2 TARGET=$P/CLAUDE.md" "$OUT"
+assert_eq "write: file unchanged on all-dup" "$BEFORE" "$(cat "$P/CLAUDE.md")"
+printf 'rule three\nrule three\n' > "$RULES"
+OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES")"
+assert_eq "write: duplicate within input counted once" "ADDED=1 SKIPPED_DUP=1 TARGET=$P/CLAUDE.md" "$OUT"
+
+# --- lock released ------------------------------------------------------------------
+mkdir -p "$P/.devlog"
+CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null
+[ ! -e "$P/.devlog/.lock" ] && echo "PASS: write: lock released" || { echo "FAIL: write: .lock left behind"; FAIL=1; }
+
+# --- usage errors ---------------------------------------------------------------------
+bash "$SCRIPT_DIR/promote-write.sh" >/dev/null 2>&1
+RC=$?
+assert_eq "write: no args exits 2" "2" "$RC"
+bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$TMP_ROOT/missing.txt" >/dev/null 2>&1
+RC=$?
+assert_eq "write: missing rules file exits 2" "2" "$RC"
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
