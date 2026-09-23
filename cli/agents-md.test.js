@@ -40,6 +40,38 @@ test('is idempotent and replaces the block in place', () => {
   assert.equal(once.split(BEGIN).length, 2);
 });
 
+const RULES_BLOCK = '<!-- devlog-tracker:rules:begin -->\n## devlog-tracker 沉澱的規範\n\n- rule one\n<!-- devlog-tracker:rules:end -->\n';
+
+test('upsert never touches the promote rules block (rules before the init block)', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'AGENTS.md'), `# Mine\n\n${RULES_BLOCK}`);
+  upsertAgentsMd(dir);
+  upsertAgentsMd(dir);
+  const text = fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8');
+  assert.ok(text.includes(RULES_BLOCK));
+  assert.equal(text.split(BEGIN).length, 2);
+});
+
+test('upsert never touches the promote rules block (rules after the init block)', () => {
+  const dir = tmp();
+  upsertAgentsMd(dir);
+  fs.appendFileSync(path.join(dir, 'AGENTS.md'), `\n${RULES_BLOCK}`);
+  upsertAgentsMd(dir);
+  const text = fs.readFileSync(path.join(dir, 'AGENTS.md'), 'utf8');
+  assert.ok(text.includes(RULES_BLOCK));
+  assert.ok(text.indexOf(END) < text.indexOf(RULES_BLOCK));
+});
+
+test('claude CLAUDE.md upsert never touches the promote rules block', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'CLAUDE.md'), `# Mine\n\n${RULES_BLOCK}`);
+  upsertMarkdown(dir, { fileName: 'CLAUDE.md', block: `${BEGIN}\nx\n${END}\n` });
+  upsertMarkdown(dir, { fileName: 'CLAUDE.md', block: `${BEGIN}\ny\n${END}\n` });
+  const text = fs.readFileSync(path.join(dir, 'CLAUDE.md'), 'utf8');
+  assert.ok(text.includes(RULES_BLOCK));
+  assert.ok(text.includes('\ny\n') && !text.includes('\nx\n'));
+});
+
 test('block mentions every command doc and Codex skill naming convention', () => {
   const commandsDir = path.join(__dirname, '..', 'commands');
   const text = fs.readFileSync(upsertAgentsMd(tmp()), 'utf8');
