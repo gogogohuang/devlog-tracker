@@ -653,8 +653,7 @@ fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
 # --- 19b: report / timeline are admin (read-side) commands too -------------
-# shellcheck disable=SC2043 # timeline-plan Task 4 adds a second value
-for ADMIN_CMD in report; do
+for ADMIN_CMD in report timeline; do
   rm -f "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.round-open"
   printf '{"prompt":"<command-name>/devlog-tracker:%s</command-name>"}' "$ADMIN_CMD" | bash "$SCRIPT_DIR/round-start.sh"
   assert_file_absent "admin $ADMIN_CMD: no .round-current.md" "$DEVLOG_DIR/.round-current.md"
