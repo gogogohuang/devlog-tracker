@@ -16,7 +16,7 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 一個 PR 一起出，執行順序 **B → C → A → D**（B 的 JSON 是 C 的資料來源；A、D
 互相獨立）。PR 內不改版號，合併後照 `AGENTS.md` 發版流程 `pnpm version minor`。
 
-子計畫（實作前由 writing-plans 產生）：[`report-plan.md`](report-plan.md)、[`timeline-plan.md`](timeline-plan.md)、
+子計畫：[`report-plan.md`](report-plan.md)、[`timeline-plan.md`](timeline-plan.md)、
 [`pr-body-plan.md`](pr-body-plan.md)、[`promote-plan.md`](promote-plan.md)。
 
 ## 共通原則
@@ -59,9 +59,10 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
   `main`）。
 - `--json`：同一組欄位的 JSON 物件，數字欄位輸出成 number。
 - `--json --rounds`：多一個 `rounds` 陣列，每筆
-  `{branch, file, n, at, status, summary, reply, handoff, segments}`，各段內容是
+  `{branch, file, line, n, at, status, summary, reply, handoff, segments}`，各段內容是
   原始 Markdown 字串（不含 `###` 標題行本身），`segments` 是字串陣列；另加
-  `checkpoints` 陣列 `{file, line, heading, body}`，供 timeline 穿插。
+  `checkpoint_blocks` 陣列 `{branch, file, line, heading, body}`，供 timeline 穿插
+  （`checkpoints` 已是計數欄位，陣列另外命名）。`line` 是標題所在行號。
   `--with-input` 再加 `input` 欄位。
 - 解析用 awk 單次掃描（沿用 `devlog-md.sh` 的標題判斷規則，含 code fence 內的
   `##` 不算標題），不對每個 Round 反覆 grep。
@@ -75,7 +76,7 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 
 ### `npx devlog-tracker report [--json] [--all-branches]`
 
-`cli/report.js` 用 `child_process.spawnSync('bash', [script, ...args])`，
+`cli/core-script.js`（report 與 timeline 共用）用 `child_process.spawnSync('bash', [script, ...args])`，
 `DEVLOG_PROJECT_DIR=process.cwd()`。script 優先用專案 vendored 的
 `.devlog-tracker/core/scripts/report-devlog.sh`，沒有就用套件內附的
 `core/scripts/report-devlog.sh`。stdout／exit code 原樣轉出。`bin/devlog-tracker.js`
@@ -114,24 +115,25 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 
 - `commands/timeline.md`：跑腳本、回報 `OUT` 路徑或 `NO_NODE`。列入 admin 指令清單
   （只寫 gitignore 的衍生檔）。
-- `npx devlog-tracker timeline [--all-branches] [--out <path>]`：`cli/timeline.js`，
-  呼叫方式同 report。
+- `npx devlog-tracker timeline [--all-branches] [--out <path>]`：同樣經 `cli/core-script.js`
+  轉呼 `timeline-devlog.sh`。
 
 ## A：PR 描述產生器
 
 ### `core/scripts/pr-context.sh`（純讀取）
 
-- 以 `git rev-parse --abbrev-ref HEAD` 判斷：`main`／`master`（不分大小寫，同
-  `devlog_resolve_paths`）→ `ON_DEFAULT_BRANCH`，exit 0。detached HEAD →
-  `DETACHED_HEAD`，exit 0。
+- 不是 git repo → `NOT_A_REPO`。以 `git symbolic-ref --short HEAD` 判斷：detached HEAD →
+  `DETACHED_HEAD`；`main`／`master`（不分大小寫，同 `devlog_resolve_paths`）→
+  `ON_DEFAULT_BRANCH`；皆 exit 0。
 - 輸出：
   - `BRANCH=`
-  - `BASE=`：`git symbolic-ref --short refs/remotes/origin/HEAD` 去掉 `origin/`；
-    失敗時依序試 `main`、`master` 是否存在；都沒有 → `NO_BASE`，exit 0。
+  - `BASE=`／`BASE_REF=`：`refs/remotes/origin/HEAD` 存在時 `BASE` 為去掉 `origin/` 的名稱、
+    `BASE_REF=origin/<name>`（`git log`／`rev-list` 用）；否則依序試本地 `main`、`master`，
+    `BASE=BASE_REF=<name>`；都沒有 → `NO_BASE`，exit 0。
   - `DEVLOG_FILE=<絕對路徑>`：`devlog_resolve_paths` 的結果。
   - `ROUNDS=<空白分隔的起始行號>`；檔案不存在或沒有 Round → 改印
     `NO_BRANCH_DEVLOG`（其餘欄位照印）。
-  - `COMMITS=<git rev-list --count BASE..HEAD>`
+  - `COMMITS=<git rev-list --count BASE_REF..HEAD>`
   - `GH=yes|no`：`gh` 存在且 `gh auth status` 成功。
   - `PR=<number>|none`：`GH=yes` 時 `gh pr view --json number -q .number`，失敗或
     `GH=no` 皆為 `none`。
@@ -139,7 +141,7 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 ### `commands/pr.md`
 
 1. 跑 `pr-context.sh`；`ON_DEFAULT_BRANCH`／`DETACHED_HEAD`／`NO_BASE` 就說明後結束。
-2. 讀 `DEVLOG_FILE` 裡 `ROUNDS` 的 Round 與 `git log BASE..HEAD`，用 Round 的
+2. 讀 `DEVLOG_FILE` 裡 `ROUNDS` 的 Round 與 `git log BASE_REF..HEAD`，用 Round 的
    `#### 檔案` 對照 commit。`NO_BRANCH_DEVLOG` 時只依 git log 產生，並在對話說明這是
    降級結果。
 3. 產生 PR body，四節固定，語言跟使用者一致：
@@ -213,13 +215,14 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 ## 跨功能收尾
 
 - `core/scripts/round-start.sh` admin 清單：加 `report`、`timeline`。
-- `cli/agents-md.js` 的 Codex 對照表：加四列。`skills-from-commands.js` 自動轉
+- `cli/agents-md.js` 的 Codex 對照表與 `cli/platforms/claude.js` 的 Claude 對照表：加上四個指令。`skills-from-commands.js` 自動轉
   `commands/*.md`，測試確認新檔都生成對應 skill。
 - README.md／README.zh-TW.md 指令表補四列；`bin/devlog-tracker.js` usage 加
   `report`、`timeline`。
-- `package.json`：`"test"` glob 加 `core/scripts/*.test.js`；`"files"` 已含
+- `package.json`：`"test"` glob 加 `core/scripts/*.test.js`（順手補上原本沒被跑到的
+  `cli/platforms/*.test.js`）；`"files"` 已含
   `core/scripts`，`timeline-render.js` 自動打包。
-- `run-tests.sh` 納入新增的 `tests/test-report.sh`、`test-timeline.sh`、
+- `run-tests.sh` 以 `tests/test-*.sh` glob 自動納入新增的 `test-report.sh`、`test-timeline.sh`、
   `test-pr-context.sh`、`test-promote.sh`；shellcheck 範圍不變。
 
 ## 測試重點
