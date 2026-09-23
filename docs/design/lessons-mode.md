@@ -74,6 +74,9 @@ Skipping it is not an error and produces no warning.
   `### Status`；只要 `.lessons-enabled` 存在且該值是 `BLOCKED`，就把同一個計數器 +1——
   不要求「這輪沒寫 lessons 才算」，只要 Status 是 `BLOCKED` 就算一次，不 correlate 是否
   隨後呼叫過 `lessons-append.sh`。
+- **來源三：背景任務失敗**（2026-09-23 加入）。`round-start.sh` 收到 task-notification
+  （背景 sub agent／Workflow 完成通知）且 `<status>` 是 `failed` 或 `killed` 時 +1。見
+  「sub agent／workflow 情境的自我判斷訊號」→「自動觸發」。
 - **狀態檔**：`.devlog/.lessons-advisory-state`，欄位 `count`（累積次數）、`threshold`
   （門檻，預設 3）。命名刻意語意中性（不叫 `drift`），因為它現在涵蓋兩種來源。
 - **門檻**：`threshold` 欄位，預設 3，可用 `/devlog-tracker:lessons-drift <次數>` 調整
@@ -130,7 +133,8 @@ Stop 當下。
 上面兩種自我判斷訊號（BLOCKED→解開、detour）預設主 session 自己在跑 Round。當任務改由
 Agent 工具的 sub agent，或 Workflow 工具的多階段 pipeline 執行時，沒有 Round／Status
 可比對，但過程中一樣可能踩到值得記下來的坑。以下四種訊號，跟現有兩種同一個性質——
-**完全自我判斷，hook 偵測不到、不計數、不強制**：
+**是否構成訊號完全自我判斷，不強制寫**；但 hook 會在 sub agent／workflow 開始與結束時
+自動提醒（見下面「自動觸發」）：
 
 1. **verify 階段推翻了 sub agent 先前的 fix／claim**。review-fix 或 Workflow 的
    `pipeline()` 常見模式是 Fix 階段宣稱解決了、Verify（adversarial check）階段發現只是
@@ -143,20 +147,49 @@ Agent 工具的 sub agent，或 Workflow 工具的多階段 pipeline 執行時�
 4. **sub agent 的成果被使用者或 reviewer 的回饋打回票、要求重做**——類比主 session 的
    BLOCKED，只是換成「交付物被拒絕」這個訊號。
 
-### 交付機制：主 session 轉譯，不是新回報格式
+### 自動觸發（Claude Code hook）
 
-sub agent 是 fresh context（除非是 fork），不會自動知道 Lessons Mode 存在，也不需要知道。
-**不新增任何結構化回報欄位或 schema**——主 session 在 dispatch sub agent 或 workflow 的
-prompt 時，如果判斷這次任務有機會踩到上面幾種訊號，可以自行決定要不要在 prompt 裡順口加
-一句類似「如果過程中繞了彎路，回報時用一兩句話說明」；沒加這句、sub agent 也沒主動提到，
-就不寫、不追蹤，不是遺漏或錯誤。
+只在 `.enabled` 與 `.lessons-enabled` 都存在時作用，其餘情況完全不輸出。三個觸發點：
 
-**誰來呼叫 `lessons-append.sh`：永遠是主 session。** sub agent／workflow 本身不直接呼叫
-這支腳本——原因有二：(a) sub agent 不需要知道這個機制存在；(b) 若 sub agent 跑在
-`isolation: "worktree"` 底下，其 `DEVLOG_PROJECT_DIR`／`CLAUDE_PROJECT_DIR` 可能指向暫時
-的 worktree 而非真專案目錄，讓它自己呼叫容易寫錯地方。主 session 讀完 sub agent 或
-Workflow 的最終回報（Workflow 是讀 task notification 附的完整報告）後，自己判斷主題、
-自己呼叫 `lessons-append.sh`，跟今天 Round close 時的操作完全一樣，沒有新增任何參數。
+1. **sub agent／Workflow agent 開始時（`SubagentStart`，`lessons-subagent-start.sh`）**：
+   用 `hookSpecificOutput.additionalContext` 把「可以自己呼叫 `lessons-append.sh`」的
+   說明注入 sub agent 的 context，附上寫死的絕對路徑指令：
+   `DEVLOG_PROJECT_DIR='<主專案絕對路徑>' bash '<core/scripts 絕對路徑>/lessons-append.sh' --topic … --text …`，
+   並請它有記的話在最終回報裡說一句記了哪個主題。
+2. **前景 sub agent 完成時（`PostToolUse`，matcher `Agent|Task`，`lessons-subagent-done.sh`）**：
+   用 `additionalContext` 在主 session 印一句 `[Lessons Mode 提示] sub agent 完成。…`，
+   列出上面四種訊號提醒主 session 檢查。`tool_response.status` 為 `async_launched`
+   （或 `isAsync: true`）時略過——背景 agent 在這個時間點只是剛啟動；payload 帶
+   `agent_id`（sub agent 自己再派 agent）也略過。
+3. **背景 sub agent／Workflow 完成時（`round-start.sh` 的 task-notification 分支）**：印
+   `[Lessons Mode 提示] 背景任務完成（status=<status>）。…`，內容同上；`status` 是
+   `failed` 或 `killed` 時另外把共用計數器 `.lessons-advisory-state` 加 1（見「機制性訊號：
+   共用計數器」，這是第三個來源）。Span 開著時也照印——長任務正是會派背景 agent 的場景。
+
+2026-09-23 實測（Claude Code，`.claude/settings.local.json` 掛記錄用 hook）確認的行為：
+
+- `SubagentStart` 對一般 sub agent、`isolation: "worktree"` 的 sub agent、Workflow 產生的
+  agent（`agent_type: "workflow-subagent"`）都會觸發，`additionalContext` 三者都收得到。
+- hook 行程裡 `CLAUDE_PROJECT_DIR` 永遠是主專案目錄；payload 的 `cwd` 在 worktree 情況下
+  是 worktree 路徑。sub agent 自己的 Bash 裡 **沒有** `CLAUDE_PROJECT_DIR`，worktree 裡
+  也沒有 `.devlog/`（被 gitignore）——所以注入的指令必須寫死主專案的絕對路徑。
+- 背景 Agent 的 `PostToolUse` 在啟動當下觸發，`tool_response` 是
+  `{"isAsync": true, "status": "async_launched", …}`；其 `additionalContext` 會進主
+  session context。
+
+### 誰來呼叫 `lessons-append.sh`：主 session 或 sub agent 都可以
+
+sub agent 透過上面第 1 點的注入得知 Lessons Mode 存在，覺得值得就自己呼叫
+`lessons-append.sh`（它最清楚自己在哪裡卡住）；因為注入的是主專案的絕對路徑，
+worktree isolation 下也不會寫錯地方。並行的多個 agent 同時寫不會互相覆蓋——
+`lessons-append.sh` 本身持有 `devlog_lock`。
+
+主 session 讀完回報後仍照舊自己判斷：sub agent 已說明記過的，不用重複記；多個 agent
+卡在同一種問題時，由主 session 彙整成一筆更有代表性的 lesson（訊號 3）。**不新增任何
+結構化回報欄位或 schema**，也不強制 sub agent 一定要記或一定要回報。
+
+Codex／Cursor 沒有對應的 sub agent hook，這三個觸發點目前只在 Claude Code 生效；這兩個
+平台上仍是主 session 自我判斷。
 
 ## Storage: per-topic files, mirroring `keep`
 
@@ -265,8 +298,9 @@ lines (never blocking, never required):
   files.
 
 This script is **never wired into `claude/hooks.json`** — nothing calls it
-automatically. Claude invokes it directly at Round close, the same way
-`keep-move.sh` is only ever invoked by `commands/keep.md`, not a hook.
+automatically. Claude (the main session at Round close, or a sub agent
+told about it by `lessons-subagent-start.sh`) invokes it directly, the same
+way `keep-move.sh` is only ever invoked by `commands/keep.md`, not a hook.
 Failing to call it is not an error; there is no enforcement path that
 would notice.
 
@@ -350,5 +384,10 @@ If a topic file does grow large in practice, revisit then — not now.
 | `core/scripts/status-devlog.sh` | Also prints `LESSONS_ADVISORY=<count>/<threshold>` |
 | `core/scripts/lessons-append.sh` | Also prints the topic-repeat and new-topic advisories described above |
 
-No `claude/hooks.json` changes beyond what `session-start-devlog.sh` already
-does — `lessons-append.sh` is Claude-invoked only, same as `keep-move.sh`.
+| `core/scripts/lessons-subagent-start.sh` | `SubagentStart` hook: injects `lessons-append.sh` instructions (absolute paths) into sub agent／Workflow agent context |
+| `core/scripts/lessons-subagent-done.sh` | `PostToolUse` (`Agent\|Task`) hook: advisory to the main session when a foreground sub agent returns |
+| `core/scripts/round-start.sh` | Also prints the background-task advisory on task-notification; bumps the shared counter on `failed`／`killed` |
+
+`claude/hooks.json` wires `SubagentStart` and `PostToolUse` (`Agent|Task`) to the
+two scripts above; `lessons-append.sh` itself stays Claude-invoked only, same as
+`keep-move.sh`.

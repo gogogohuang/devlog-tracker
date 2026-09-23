@@ -123,6 +123,20 @@ if [ "$TASK_NOTIF" -eq 1 ]; then
   else
     PROMPT="$NOTIF_SUMMARY"
   fi
+
+  # Lessons Mode：背景 sub agent／Workflow 完成時機械提示主 session 檢查
+  # sub agent 訊號（docs/design/lessons-mode.md「sub agent／workflow 情境」）；
+  # failed／killed 另外算進共用計數器。span 開著也照印——長任務正是會派
+  # 背景 agent 的場景。
+  if [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then
+    printf '\n[Lessons Mode 提示] 背景任務完成（status=%s）。讀完回報後檢查：verify 推翻先前的 fix／claim、sub agent 自陳繞路、多個 agent 卡在類似問題、成果被打回票——有的話可考慮用 lessons-append.sh 記一筆（sub agent 若已自己記過就不用重複），非強制。\n' "${NOTIF_STATUS:-unknown}"
+    case "$NOTIF_STATUS" in
+      failed|killed)
+        lessons_advisory_migrate "$DEVLOG_DIR"
+        lessons_advisory_bump "$ADVISORY_FILE"
+        ;;
+    esac
+  fi
 fi
 
 if [ "$SPAN_SKIP" -eq 1 ]; then

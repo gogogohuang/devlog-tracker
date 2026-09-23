@@ -220,7 +220,7 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 
 #### Lessons Mode（預設關閉，不自動）
 
-開著時，Status 從 `BLOCKED` 解開、明顯繞路，或工作區漂移累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。三種訊號都完全不 hook 強制寫入本身、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
+開著時，Status 從 `BLOCKED` 解開、明顯繞路，或工作區漂移累積達門檻（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調）才考慮記一筆開發歷程教訓，per-topic 存成 `devlog.lessons.<topic>.md`，`devlog.md` 只留標題索引。Claude Code 上，sub agent／Workflow agent 開始時（`SubagentStart`）會被注入 `lessons-append.sh` 的用法（絕對路徑，worktree isolation 也不會寫錯地方），可以自己記一筆；sub agent 回來或背景任務通知到達時，主 session 會看到一句 `[Lessons Mode 提示]`（`failed`／`killed` 另算進共用計數器）。這些訊號都完全不 hook 強制寫入本身、不是知識庫（架構決策仍在 `docs/design/*.md`）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。
 
 ## 測試
 

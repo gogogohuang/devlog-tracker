@@ -467,8 +467,10 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 若這輪任務是透過 Agent 工具派 sub agent，或用 Workflow 工具跑多階段 pipeline，一樣可能
 踩到值得記的坑，只是沒有 Round／Status 可比對訊號；讀完 sub agent／workflow 的最終回報後
 自我判斷（例如 verify 推翻了它先前的 fix、它自陳繞了一圈、多個 agent 重複卡在同一種問題、
-或成果被打回票要求重做），值得的話一樣呼叫 `lessons-append.sh`——sub agent／workflow 本身
-不會、也不需要知道這個機制存在。
+或成果被打回票要求重做），值得的話一樣呼叫 `lessons-append.sh`。Claude Code 上 hook 會自動
+觸發：sub agent／Workflow agent 開始時被注入 `lessons-append.sh` 的絕對路徑用法、可以自己記；
+它回來或背景任務通知到達時，你會看到一句 `[Lessons Mode 提示]`（`failed`／`killed` 另算進
+共用計數器）。sub agent 已記過的不用重複記。
 
 寫法、per-topic 存檔規則、索引重建、機制性訊號細節，見
 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
