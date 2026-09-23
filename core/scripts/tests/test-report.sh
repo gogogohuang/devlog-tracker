@@ -175,7 +175,14 @@ J="$(CLAUDE_PROJECT_DIR="$NS_ROOT" bash "$SCRIPT_DIR/report-devlog.sh" --json)"
 jcheck "json NOT_STARTED" "$J" 'd.started===false'
 rm -rf "$NS_ROOT"
 
-# @@JSON_TESTS@@
+# --- --all-branches ---------------------------------------------------------------
+OUT="$(bash "$SCRIPT_DIR/report-devlog.sh" --all-branches)"
+assert_line "all-branches: branch file added, kept file excluded" "ROUNDS_TOTAL=5" "$OUT"
+assert_line "all-branches: in-progress from branch file" "STATUS_IN_PROGRESS=1" "$OUT"
+assert_line "all-branches: last round from branch file" "LAST_ROUND_AT=2026-09-04T10:00:00+0800" "$OUT"
+J="$(bash "$SCRIPT_DIR/report-devlog.sh" --json --rounds --all-branches)"
+jcheck "all-branches: feat-x rounds tagged" "$J" 'd.rounds.some(r => r.branch==="feat-x" && r.summary==="branch work")'
+jcheck "all-branches: no kept or lessons rounds" "$J" 'd.rounds.every(r => r.branch!=="topic-a" && !r.branch.startsWith("lessons."))'
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

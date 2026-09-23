@@ -48,7 +48,19 @@ branch_of_file() {
 FILES=()
 [ -f "$DEVLOG_DIR/devlog.archive.md" ] && FILES+=("$DEVLOG_DIR/devlog.archive.md")
 if [ "$ALL" -eq 1 ]; then
-  : # filled in by Task 4
+  shopt -s nullglob
+  KEPT_NAMES=" "
+  for f in "$DEVLOG_DIR"/devlog*.md; do
+    while IFS= read -r name; do
+      [ -n "$name" ] && KEPT_NAMES="$KEPT_NAMES$name "
+    done < <(devlog_kept_index_lines "$f" | sed -nE 's/.*`devlog\.([^`]+)\.md`.*/\1/p')
+  done
+  for f in "$DEVLOG_DIR"/devlog*.md; do
+    case "${f##*/}" in devlog.archive.md|devlog.lessons.*.md) continue ;; esac
+    case "$KEPT_NAMES" in *" $(branch_of_file "$f") "*) continue ;; esac
+    FILES+=("$f")
+  done
+  shopt -u nullglob
 else
   [ -f "$DEVLOG_FILE" ] && FILES+=("$DEVLOG_FILE")
 fi
