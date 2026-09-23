@@ -315,7 +315,7 @@ Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply
 
 這一輪如果是使用者直接呼叫 devlog-tracker 自己的純管理指令——`/devlog-tracker:checkpoint`、
 `clean`、`compact`、`keep`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
-`overview`、`pause`、`search`、`segment-watch`、`span`、`start`、`status`——`round-start.sh`
+`overview`、`pause`、`report`、`search`、`segment-watch`、`span`、`start`、`status`——`round-start.sh`
 會整輪直接放行，不開 Round、不動任何計數器，等於這個 tick 沒發生過；不用、也不會被
 Stop hook 要求補寫 Summary／Reply／Handoff。這些指令本身就是在操作 devlog 系統，不是開發
 工作，記錄下來對接續開發沒有幫助。

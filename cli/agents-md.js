@@ -24,6 +24,7 @@ function codexBlock() {
 | 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
 | 保存主題 / keep、接續具名檔 / resume、跨主題總覽 / overview | \`commands/keep.md\`、\`commands/resume.md\`、\`commands/overview.md\` |
 | 搜尋 / search | \`commands/search.md\` |
+| 統計 / report | \`commands/report.md\` |
 | 長任務定期記錄 / span | \`commands/span.md\` |
 | 調整沉默門檻 / checkpoint、segment-watch | \`commands/checkpoint.md\`、\`commands/segment-watch.md\` |
 | 開發歷程教訓 / lessons、lessons-on、lessons-off、lessons-drift | \`commands/lessons.md\`、\`commands/lessons-on.md\`、\`commands/lessons-off.md\`、\`commands/lessons-drift.md\` |

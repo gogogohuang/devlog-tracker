@@ -652,6 +652,13 @@ else
 fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
+# --- 19b: report / timeline are admin (read-side) commands too -------------
+for ADMIN_CMD in report; do
+  rm -f "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.round-open"
+  printf '{"prompt":"<command-name>/devlog-tracker:%s</command-name>"}' "$ADMIN_CMD" | bash "$SCRIPT_DIR/round-start.sh"
+  assert_file_absent "admin $ADMIN_CMD: no .round-current.md" "$DEVLOG_DIR/.round-current.md"
+done
+
 # --- 20: a namespaced-but-different command name is not falsely exempted ---
 # "lessons-on" must not match the "lessons" case arm (prefix collision guard).
 LESSONS_ON_PROMPT='<command-name>/devlog-tracker:lessons-on</command-name><command-message>lessons-on</command-message><command-args></command-args>'
