@@ -19,6 +19,9 @@ function escapeHtml(s) {
 // protocol-relative（//host）一律不給連結。
 function safeHref(url) {
   const u = String(url).trim();
+  // A leading/embedded C0 control char (e.g. \u0001) hides the real scheme
+  // from the tests below, but browsers strip it and still run it — reject.
+  if (/[\u0000-\u001F\u007F]/.test(u)) return null;
   if (/^https?:\/\//i.test(u)) return u;
   if (u.startsWith('//')) return null;
   if (/^[a-z][a-z0-9+.-]*:/i.test(u)) return null;

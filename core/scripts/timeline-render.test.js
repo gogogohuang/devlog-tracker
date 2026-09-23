@@ -23,6 +23,12 @@ test('safeHref allows http(s) and relative, rejects other schemes', () => {
   assert.equal(safeHref('//evil.example'), null);
 });
 
+test('safeHref rejects a leading C0 control char that browsers strip', () => {
+  assert.equal(safeHref('\u0001javascript:alert(1)'), null);
+  const html = renderMarkdown('[x](\u0001javascript:alert(1))');
+  assert.ok(!/href=/i.test(html));
+});
+
 test('renderMarkdown never emits raw HTML from content', () => {
   const html = renderMarkdown('<script>alert(1)</script>\n<img src=x onerror=alert(1)>');
   assert.ok(!html.includes('<script>'));
