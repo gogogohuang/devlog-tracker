@@ -115,6 +115,7 @@ $devlog-start           # npx init --codex
 | `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
 | `/devlog-tracker:keep` | 掃全檔分主題，一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
 | `/devlog-tracker:overview` | 讀完所有已 keep 的 `devlog.<name>.md`，整合成跨主題總覽，並列出看起來該進 `CLAUDE.md` 的規範候選。純讀取，不核對工作區、不等確認、不寫檔。細節見 [`docs/design/keep.md`](docs/design/keep.md) Kept index。 |
+| `/devlog-tracker:promote` | 從已 keep 的檔、lessons 檔與 Checkpoint 的 `### 決策` 挑出規範候選並編號列出；只有你選定的才追加到 `CLAUDE.md`（`CLAUDE.md` 只有 `@AGENTS.md` 或只裝 Codex 時改寫 `AGENTS.md`）的 `<!-- devlog-tracker:rules:begin/end -->` 受管區塊。只追加、一字不差的重複會跳過；`init` 不會覆寫這個區塊。 |
 | `/devlog-tracker:search <關鍵字>` | 在 `devlog.md`／`devlog.archive.md`／已 keep 的 `devlog.<name>.md`／`devlog.lessons.<topic>.md` 裡做不分大小寫的字串搜尋；Claude 讀完命中後用自己的話回答（必要時附檔名／標題／行號）。純讀取，不核對工作區、不等確認、不寫檔。 |
 | `/devlog-tracker:report` | 印出 devlog 統計：Round 數（主檔 + archive）、各 Status 數、BLOCKED 比例、Checkpoint／keep／lessons 數量、第一輪與最後一輪時間。`--all-branches` 合計所有 branch 檔。純讀取。機器可讀輸出用 `npx devlog-tracker report [--json]`。 |
 | `/devlog-tracker:timeline` | 把 devlog 產生成離線可開的自足 HTML 時間軸 `.devlog/timeline.html`（Round 卡片依 Status 上色、穿插 Checkpoint、可依 Status／branch／關鍵字篩選、支援深色模式）。不含 User Input 原文。需要 Node ≥18；`--all-branches` 納入所有 branch 檔。也可用 `npx devlog-tracker timeline`。 |

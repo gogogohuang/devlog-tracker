@@ -23,6 +23,7 @@ function codexBlock() {
 | 歸檔 / compact | \`commands/compact.md\` |
 | 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
 | 保存主題 / keep、接續具名檔 / resume、跨主題總覽 / overview | \`commands/keep.md\`、\`commands/resume.md\`、\`commands/overview.md\` |
+| 沉澱規範寫進 CLAUDE.md／AGENTS.md / promote | \`commands/promote.md\` |
 | 搜尋 / search | \`commands/search.md\` |
 | 統計 / report、HTML 時間軸 / timeline | \`commands/report.md\`、\`commands/timeline.md\` |
 | 產生 PR 描述 / pr | \`commands/pr.md\` |
