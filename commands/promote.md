@@ -28,6 +28,8 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 - 要：跨任務都成立的約定、踩過坑後定下的做法、明確的「不要做 X」。
 - 不要：單次任務細節、已經被後續內容推翻或取代的決定、`TARGET` 檔裡已經寫了（不論在不在規範區塊裡）意思相同的規則。
 
+**不要把 `### User Input` 原文寫成規則候選**——kept 檔保留完整 Round，內容是單次任務的原文，不是沉澱過的規範。
+
 每條候選寫成一行、可以直接放進 CLAUDE.md 的條列句，必要時附一句原因，結尾標出處：`（來源：<檔名>「<標題>」）`。找不到夠格的就說沒有，不硬湊。
 
 在對話裡列出編號清單，並說明會寫進哪個檔（`TARGET`）。
@@ -39,11 +41,12 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 ## 4. 寫入
 
 1. 用 Write 把選定（改寫過就用改寫版）的規則寫到 `<專案根目錄>/.devlog/.promote-rules.tmp`，一行一條。
-2. 跑：
+2. 跑（這是新的一個 Bash call，`PLUGIN_ROOT` 要重新設一次——理由同步驟 1）：
 
    ```bash
-   DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/promote-write.sh" "<TARGET>" "<專案根目錄>/.devlog/.promote-rules.tmp"
-   rm -f "<專案根目錄>/.devlog/.promote-rules.tmp"
+   PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+   DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/promote-write.sh" "<TARGET>" "<專案根目錄>/.devlog/.promote-rules.tmp" \
+     && rm -f "<專案根目錄>/.devlog/.promote-rules.tmp"
    ```
 
 3. 依輸出 `ADDED=<n> SKIPPED_DUP=<m> TARGET=<路徑>` 回報：寫入了幾條、幾條因為一字不差已存在而跳過、寫到哪個檔。提醒使用者這個檔要不要 commit 由他決定。
