@@ -220,7 +220,7 @@ Switching branches within the same working directory automatically splits the ma
 
 #### Lessons Mode (off by default, not automatic)
 
-When enabled, a development-lesson entry is only considered when a `BLOCKED` status resolves, an obvious detour happens, or workspace drift accumulates to a threshold (default 3, adjustable via `/devlog-tracker:lessons-drift <count>`); it's stored per-topic as `devlog.lessons.<topic>.md`, with `devlog.md` keeping only a heading index. None of the three signals are enforced by a hook themselves, and this isn't a knowledge base (architectural decisions still live in `docs/design/*.md`). See [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md).
+When enabled, a development-lesson entry is only considered when a `BLOCKED` status resolves, an obvious detour happens, or workspace drift accumulates to a threshold (default 3, adjustable via `/devlog-tracker:lessons-drift <count>`); it's stored per-topic as `devlog.lessons.<topic>.md`, with `devlog.md` keeping only a heading index. On Claude Code, subagents and Workflow agents get the `lessons-append.sh` usage (with absolute paths, so worktree isolation is safe) injected at `SubagentStart` and may record an entry themselves; when a subagent returns or a background task-notification arrives, the main session sees a `[Lessons Mode 提示]` advisory (`failed`/`killed` also count toward the shared counter). None of these signals enforce writing an entry, and this isn't a knowledge base (architectural decisions still live in `docs/design/*.md`). See [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md).
 
 ## Tests
 

@@ -49,8 +49,14 @@ verify 階段推翻了 sub agent 先前的 fix／claim、sub agent 自陳繞了�
 裡多個 agent 各自卡在類似問題（彙整成一筆更有代表性的）、sub agent 的成果被使用者或
 reviewer 打回票要求重做。
 
-sub agent 不需要知道 Lessons Mode 存在；不新增回報格式，你覺得這次任務可能踩雷時，自己
-決定要不要在 dispatch prompt 裡順口提一句「回報時順便說一下有沒有繞路」。永遠是你（主
-session）讀完回報後自己判斷主題、呼叫 `lessons-append.sh`——sub agent／workflow 本身不
-直接呼叫，避免 worktree isolation 下環境變數指錯專案目錄。詳見
+Claude Code 上 hook 會自動觸發（只在 Lessons Mode 開著時）：
+- sub agent／Workflow agent 開始時（`SubagentStart`），hook 會把 `lessons-append.sh` 的用法
+  連同**主專案絕對路徑**注入它的 context，它覺得值得就自己記一筆，並在最終回報裡說一聲。
+  worktree isolation 下也照那條絕對路徑指令跑，不會寫錯地方。
+- 前景 sub agent 回來時（`PostToolUse`），或背景 sub agent／Workflow 的 task-notification
+  到達時（`round-start.sh`），你會看到一句 `[Lessons Mode 提示]`，提醒你檢查上面四種訊號；
+  背景任務 `status` 是 `failed`／`killed` 時還會算進共用計數器。
+
+看到提示後：sub agent 已說明記過的主題不要重複記；多個 agent 卡在同一種問題時，由你彙整成
+一筆更有代表性的。一樣全部非強制。Codex／Cursor 沒有對應 hook，仍是你自己判斷。詳見
 `docs/design/lessons-mode.md`「sub agent／workflow 情境的自我判斷訊號」。

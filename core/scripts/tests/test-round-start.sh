@@ -1050,6 +1050,55 @@ assert_not_contains "lessons off: no BLOCKED-accumulation advisory" "[Lessons Mo
 rm -rf "$NOLES_DIR"
 export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
+# --- lessons: background agent / workflow task-notification advisory ------
+TN_DIR="$(mktemp -d)"
+mkdir -p "$TN_DIR/.devlog"
+touch "$TN_DIR/.devlog/.enabled" "$TN_DIR/.devlog/.lessons-enabled"
+export CLAUDE_PROJECT_DIR="$TN_DIR"
+tn_notif() {
+  printf '{"prompt":"<task-notification><task-id>t9</task-id><status>%s</status><summary>Agent \\"x\\" finished</summary></task-notification>"}' "$1"
+}
+tn_reset() {
+  rm -f "$TN_DIR/.devlog/.round-open" "$TN_DIR/.devlog/.round-current.md"
+  printf '## Round 1 — 2026-09-23T00:00:00+0800\n\n### User Input\n```text\nx\n```\n\n### Summary\ns\n\n### Status\nDONE\n' > "$TN_DIR/.devlog/devlog.md"
+}
+
+tn_reset
+printf '%s\n' '{"count": 0, "threshold": 3}' > "$TN_DIR/.devlog/.lessons-advisory-state"
+OUT="$(tn_notif completed | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "task-notif completed: sub agent advisory printed" "[Lessons Mode 提示] 背景任務完成（status=completed）" "$OUT"
+grep -q '"count": 0' "$TN_DIR/.devlog/.lessons-advisory-state" && echo "PASS: task-notif completed does not bump counter" || { echo "FAIL: completed bumped counter"; FAIL=1; }
+
+tn_reset
+OUT="$(tn_notif failed | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "task-notif failed: advisory printed" "背景任務完成（status=failed）" "$OUT"
+grep -q '"count": 1' "$TN_DIR/.devlog/.lessons-advisory-state" && echo "PASS: task-notif failed bumps counter" || { echo "FAIL: failed did not bump counter"; FAIL=1; }
+
+tn_reset
+printf '%s\n' '{"count": 2, "threshold": 3}' > "$TN_DIR/.devlog/.lessons-advisory-state"
+OUT="$(tn_notif killed | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "task-notif killed at threshold: shared nudge printed" "流程訊號已累積出現 3 次" "$OUT"
+grep -q '"count": 0' "$TN_DIR/.devlog/.lessons-advisory-state" && echo "PASS: task-notif killed resets counter at threshold" || { echo "FAIL: killed did not reset counter"; FAIL=1; }
+
+tn_reset
+printf '%s\n' '{"round": 1, "ticks_since_checkin": 0, "max_silent_ticks": 5}' > "$TN_DIR/.devlog/.span-open"
+OUT="$(tn_notif completed | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "task-notif during span: advisory still printed" "背景任務完成（status=completed）" "$OUT"
+rm -f "$TN_DIR/.devlog/.span-open"
+
+tn_reset
+rm -f "$TN_DIR/.devlog/.lessons-enabled" "$TN_DIR/.devlog/.lessons-advisory-state"
+OUT="$(tn_notif failed | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "task-notif with lessons off: no advisory" "[Lessons Mode 提示]" "$OUT"
+[ ! -f "$TN_DIR/.devlog/.lessons-advisory-state" ] && echo "PASS: task-notif with lessons off leaves no advisory-state" || { echo "FAIL: advisory-state created while lessons off"; FAIL=1; }
+
+touch "$TN_DIR/.devlog/.lessons-enabled"
+tn_reset
+OUT="$(printf '%s' '{"prompt":"plain message"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "plain prompt: no background-task advisory" "背景任務完成" "$OUT"
+rm -rf "$TN_DIR"
+export CLAUDE_PROJECT_DIR="$TMP_ROOT"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

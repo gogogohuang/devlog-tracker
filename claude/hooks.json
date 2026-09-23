@@ -31,6 +31,27 @@
         ]
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/lessons-subagent-start.sh\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/core/scripts/lessons-subagent-done.sh\""
+          }
+        ]
+      }
+    ],
     "PostToolUseFailure": [
       {
         "hooks": [
