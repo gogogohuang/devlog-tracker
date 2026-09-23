@@ -122,6 +122,25 @@ printf 'rule three\nrule three\n' > "$RULES"
 OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES")"
 assert_eq "write: duplicate within input counted once" "ADDED=1 SKIPPED_DUP=1 TARGET=$P/CLAUDE.md" "$OUT"
 
+# --- symlink target: write-in-place preserves the link, rules land in the real file --
+P="$(new_project)"
+printf '# Base\n' > "$P/AGENTS.md"
+ln -s AGENTS.md "$P/CLAUDE.md"
+printf 'rule via symlink\n' > "$RULES"
+CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null
+if [ -L "$P/CLAUDE.md" ]; then echo "PASS: write: symlink target stays a symlink"
+else echo "FAIL: write: symlink was replaced by a regular file"; FAIL=1; fi
+if grep -qF "rule via symlink" "$P/AGENTS.md"; then echo "PASS: write: rules land in the symlink's real target"
+else echo "FAIL: write: rules missing from AGENTS.md"; FAIL=1; fi
+
+# --- mode is preserved on a plain (non-symlink) target -------------------------------
+P="$(new_project)"
+printf '# Mode\n' > "$P/CLAUDE.md"
+chmod 640 "$P/CLAUDE.md"
+printf 'rule mode\n' > "$RULES"
+CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null
+assert_eq "write: mode preserved (640)" "-rw-r-----" "$(ls -l "$P/CLAUDE.md" | cut -c1-10)"
+
 # --- lock released ------------------------------------------------------------------
 mkdir -p "$P/.devlog"
 CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-write.sh" "$P/CLAUDE.md" "$RULES" >/dev/null

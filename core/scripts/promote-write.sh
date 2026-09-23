@@ -63,7 +63,12 @@ if [ "$ADDED" -gt 0 ]; then
       printf '%s\n' "$END_MARK"
     } > "$TARGET.tmp" || exit 1
   fi
-  mv "$TARGET.tmp" "$TARGET" || exit 1
+  # Write back in place (not mv): TARGET may be a symlink (e.g. CLAUDE.md ->
+  # AGENTS.md) or have a non-default mode; mv would replace it with a plain
+  # 644 file and break the link. $TARGET.tmp is fully built above already,
+  # so this is the only step that touches TARGET.
+  cat "$TARGET.tmp" > "$TARGET" || exit 1
+  rm -f "$TARGET.tmp"
 fi
 
 echo "ADDED=$ADDED SKIPPED_DUP=$SKIPPED TARGET=$TARGET"
