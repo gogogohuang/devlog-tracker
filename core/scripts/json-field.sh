@@ -94,3 +94,13 @@ json_str_field() {
 slugify() {
   printf '%s' "$1" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//'
 }
+
+json_escape() {
+  printf '%s' "$1" | awk '
+    BEGIN { ORS = "" }
+    {
+      gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
+      if (NR > 1) print "\\n"
+      print
+    }'
+}
