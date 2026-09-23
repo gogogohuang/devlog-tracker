@@ -38,7 +38,7 @@ DEVLOG_PROJECT_DIR="<剛才記下的專案根目錄絕對路徑>" bash "${PLUGIN
 
 專案的 CLAUDE.md／AGENTS.md 若規定 PR 描述結尾格式（例如署名行），照做；此外不要自己加簽名。
 
-用 Write 寫到 `<專案根目錄>/.devlog/pr-body.md`（`.devlog/` 已被 gitignore），並在對話裡完整顯示內容。
+用 Write 寫到 `<專案根目錄>/.devlog/pr-body.md`（`.devlog/` 通常已被 gitignore，沒有的話別把它 commit），並在對話裡完整顯示內容。
 
 ## 4. 等確認，再送出
 

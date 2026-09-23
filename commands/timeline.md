@@ -15,4 +15,4 @@ DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/timeline-devlog.sh
 - `NOT_STARTED`：告知還沒 `/devlog-tracker:start`，結束。
 - `OUT=<路徑>`：告知檔案位置，並提示可以直接用瀏覽器開（macOS：`open <路徑>`）。不要自己打開瀏覽器，也不要把 HTML 內容貼進對話。
 
-時間軸不含 User Input 原文。`.devlog/timeline.html` 在 `.devlog/` 底下，每次重跑會覆寫，不需要 commit。
+時間軸不含 User Input 原文。`.devlog/timeline.html` 在 `.devlog/` 底下，每次重跑會覆寫；`.devlog/` 通常已被 gitignore，沒有的話別把它 commit。

@@ -92,7 +92,7 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 1. `command -v node` 失敗 → `NO_NODE`，exit 0（Claude plugin 使用者不一定有 Node）。
 2. 沒有 `.devlog/` → `NOT_STARTED`。
 3. `report-devlog.sh --json --rounds [--all-branches] | node timeline-render.js > out`。
-   預設 out 是 `.devlog/timeline.html`（gitignore 範圍內）。
+   預設 out 是 `.devlog/timeline.html`（`.devlog/` 通常已被 gitignore，沒有的話別把它 commit）。
 4. 輸出 `OUT=<絕對路徑>`。
 
 ### `core/scripts/timeline-render.js`
@@ -114,7 +114,7 @@ devlog 目前的指令大多在「寫」與「維護」；讀取端只有 `searc
 ### 入口
 
 - `commands/timeline.md`：跑腳本、回報 `OUT` 路徑或 `NO_NODE`。列入 admin 指令清單
-  （只寫 gitignore 的衍生檔）。
+  （只寫通常已被 gitignore 的衍生檔，沒有的話別把它 commit）。
 - `npx devlog-tracker timeline [--all-branches] [--out <path>]`：同樣經 `cli/core-script.js`
   轉呼 `timeline-devlog.sh`。
 
