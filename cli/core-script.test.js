@@ -52,3 +52,11 @@ test('bin report runs the real packaged report-devlog.sh', () => {
   assert.equal(r.status, 0);
   assert.equal(r.stdout, 'NOT_STARTED\n');
 });
+
+test('bin timeline runs the real packaged timeline-devlog.sh', () => {
+  const cwd = tmp();
+  const bin = path.join(__dirname, '..', 'bin', 'devlog-tracker.js');
+  const r = spawnSync(process.execPath, [bin, 'timeline'], { cwd, encoding: 'utf8' });
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, 'NOT_STARTED\n');
+});
