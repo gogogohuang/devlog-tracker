@@ -147,6 +147,34 @@ bash "$SCRIPT_DIR/report-devlog.sh" --bogus >/dev/null 2>&1
 RC=$?
 if [ "$RC" -eq 2 ]; then echo "PASS: unknown arg exits 2"; else echo "FAIL: unknown arg exit $RC"; FAIL=1; fi
 
+# --- --json (no rounds) -------------------------------------------------------
+J="$(bash "$SCRIPT_DIR/report-devlog.sh" --json)"
+jcheck "json: started + counts are numbers" "$J" 'd.started===true && d.rounds_total===4 && d.status_blocked===1 && d.blocked_ratio===25'
+jcheck "json: branch + times" "$J" 'd.branch==="main" && d.first_round_at==="2026-08-31T10:00:00+0800"'
+jcheck "json: no advisory -> null" "$J" 'd.lessons_advisory===null'
+jcheck "json: no rounds array without --rounds" "$J" '!("rounds" in d) && !("checkpoint_blocks" in d)'
+
+# --- --json --rounds ------------------------------------------------------------
+J="$(bash "$SCRIPT_DIR/report-devlog.sh" --json --rounds)"
+jcheck "rounds: 4 entries, archive first" "$J" 'd.rounds.length===4 && d.rounds[0].branch==="archive" && d.rounds[0].n===0'
+jcheck "rounds: escaping survives quote/backslash/tab/CJK" "$J" 'd.rounds[1].summary.includes("\"quoted\"") && d.rounds[1].summary.includes("\\") && d.rounds[1].summary.includes("\t") && d.rounds[1].summary.includes("中文")'
+jcheck "rounds: fenced fake heading stays inside summary" "$J" 'd.rounds[2].summary.includes("## Round 9 fake inside fence")'
+jcheck "rounds: status parsed despite reason line" "$J" 'd.rounds[3].status==="INTERRUPTED"'
+jcheck "rounds: segments captured" "$J" 'd.rounds[3].segments.length===1 && d.rounds[3].segments[0]==="段落 探索\nseg body"'
+jcheck "rounds: handoff keeps #### lines" "$J" 'd.rounds[1].handoff.startsWith("#### 現況")'
+jcheck "rounds: line numbers" "$J" 'd.rounds[1].line===1 && d.rounds[1].file==="devlog.md"'
+jcheck "rounds: no input by default" "$J" 'd.rounds.every(r => !("input" in r))'
+jcheck "checkpoint_blocks: one block with body" "$J" 'd.checkpoint_blocks.length===1 && d.checkpoint_blocks[0].heading==="Checkpoint（Round 1-2）" && d.checkpoint_blocks[0].body.includes("keep it")'
+
+J="$(bash "$SCRIPT_DIR/report-devlog.sh" --json --rounds --with-input)"
+jcheck "with-input: input field present" "$J" 'd.rounds[1].input==="secret-input-text"'
+
+# --- --json on NOT_STARTED ------------------------------------------------------
+NS_ROOT="$(mktemp -d)"
+J="$(CLAUDE_PROJECT_DIR="$NS_ROOT" bash "$SCRIPT_DIR/report-devlog.sh" --json)"
+jcheck "json NOT_STARTED" "$J" 'd.started===false'
+rm -rf "$NS_ROOT"
+
 # @@JSON_TESTS@@
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0

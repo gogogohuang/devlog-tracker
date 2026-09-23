@@ -18,7 +18,6 @@ JSON=0
 ROUNDS=0
 ALL=0
 WITH_INPUT=0
-# shellcheck disable=SC2034  # ROUNDS and ALL prepared for Task 3/4
 for arg in "$@"; do
   case "$arg" in
     --json) JSON=1 ;;
@@ -104,5 +103,26 @@ if [ "$JSON" -eq 0 ]; then
   exit 0
 fi
 
-# JSON output: filled in by Task 3.
+jstr() {
+  if [ -z "$1" ] || [ "$1" = none ]; then printf 'null'
+  else printf '"%s"' "$(json_escape "$1")"; fi
+}
+{
+  printf '{"started":true,"branch":"%s"' "$(json_escape "$BRANCH")"
+  printf ',"rounds_total":%s,"rounds_main":%s,"rounds_archive":%s' "$ROUNDS_TOTAL" "$ROUNDS_MAIN" "$ROUNDS_ARCHIVE"
+  printf ',"status_done":%s,"status_in_progress":%s,"status_blocked":%s,"status_interrupted":%s' \
+    "$STATUS_DONE" "$STATUS_IN_PROGRESS" "$STATUS_BLOCKED" "$STATUS_INTERRUPTED"
+  printf ',"blocked_ratio":%s,"checkpoints":%s,"kept_topics":%s,"lessons_topics":%s' \
+    "$BLOCKED_RATIO" "$CHECKPOINTS" "$KEPT_TOPICS" "$LESSONS_TOPICS"
+  printf ',"lessons_advisory":%s,"first_round_at":%s,"last_round_at":%s' \
+    "$(jstr "$ADVISORY")" "$(jstr "$FIRST_ROUND_AT")" "$(jstr "$LAST_ROUND_AT")"
+  if [ "$ROUNDS" -eq 1 ]; then
+    printf ',"rounds":['
+    awk -F'\t' '$1 == "R" { printf "%s%s", (n++ ? "," : ""), $5 }' "$SCAN"
+    printf '],"checkpoint_blocks":['
+    awk -F'\t' '$1 == "C" { printf "%s%s", (n++ ? "," : ""), $3 }' "$SCAN"
+    printf ']'
+  fi
+  printf '}\n'
+}
 exit 0
