@@ -16,6 +16,8 @@ function runCoreScript({ targetDir, repoRoot, name, args }) {
     cwd: targetDir,
     env: { ...process.env, DEVLOG_PROJECT_DIR: targetDir },
     encoding: 'utf8',
+    // Default 1 MB would truncate a large `report --json --rounds`.
+    maxBuffer: 64 * 1024 * 1024,
   });
   return { status: r.status === null ? 1 : r.status, stdout: r.stdout || '', stderr: r.stderr || '' };
 }
