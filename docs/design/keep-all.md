@@ -18,6 +18,14 @@ siblings (`lessons-on`/`lessons-off`).
 unit of work is "a set of Rounds from several files", which a
 `--from/--to` range in one file cannot express.
 
+`core/scripts/keep-all.sh` resolves the current branch's file, reads the
+open Round from `.round-open`, holds the devlog lock, and hands off to
+`core/scripts/keep-all.js`, which does the scanning, validation and
+rewriting. Multi-file, all-or-nothing rewriting is far easier to get
+right in JS than in awk; like `timeline`, the command needs Node ≥18 and
+the wrapper prints `NO_NODE` without it. keep-all is a management
+command: `round-start.sh` doesn't open a Round for it, same as `keep`.
+
 This also adds an **origin marker** to branch-scoped devlog files (see
 Origin marker), which keep-all relies on to tell branch files from kept
 files without guessing.
@@ -124,8 +132,9 @@ Round numbers are not unique across files (every branch file restarts
 wherever main was; archive can hold two "Round 3" after a full keep
 renumbered the open Round). The scan gives every Round a global id
 `#1…#N`, ordered by the heading timestamp (`## Round N — <ts>`, format
-`%Y-%m-%dT%H:%M:%S%z`; compared as strings, ties and unparseable
-timestamps fall back to file order then line order). Plans refer to ids,
+`%Y-%m-%dT%H:%M:%S%z`, parsed to an instant so different UTC offsets
+compare correctly; unparseable timestamps sort last, ties fall back to
+file name order then line order). Plans refer to ids,
 never to Round numbers.
 
 ### Scan output
@@ -190,8 +199,8 @@ Nothing movable at all → `NOTHING`, exit 0.
 One run, all or nothing, under the devlog lock.
 
 1. **Re-scan and compare fingerprint.** The scan and the apply run in
-   different turns: between them, Stop merges the proposal turn's Round
-   into `current`. So the fingerprint does not cover whole files. It
+   different turns: between them, other work may merge a Round into
+   `current` (keep-all itself opens none). So the fingerprint does not cover whole files. It
    covers the scanned Rounds and the source list: `cksum` over the
    ordered `(file, heading, block cksum)` of ids `#1…#N` plus every
    source's path and kind. Apply re-scans and recomputes it over the

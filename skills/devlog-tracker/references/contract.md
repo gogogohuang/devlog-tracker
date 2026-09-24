@@ -60,6 +60,7 @@
 | 接續上一題 | `commands/continue.md` |
 | 暫停／狀態／壓縮／清空 | `commands/pause.md`／`status.md`／`compact.md`／`clean.md` |
 | 具名保存／接續／總覽 | `commands/keep.md`／`resume.md`／`overview.md` |
+| 整理所有 devlog（跨分支檔、archive、既有 keep 檔） | `commands/keep-all.md` |
 | Span／Checkpoint／Segment／Lessons | `commands/span.md`／`checkpoint.md`／`segment-watch.md`／`lessons*.md` |
 | 協定與跨指令行為 | `SKILL.md`（本層不重抄步驟） |
 

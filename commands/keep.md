@@ -4,6 +4,8 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 
 請執行 devlog keep（具名搬走）。這是使用者主動執行 `/devlog-tracker:keep` 時才做的事，不要自動觸發。
 
+這個指令只整理**目前分支的主檔**（`devlog.md` 或 `devlog.<branch>.md`）。要一次整理所有 devlog——其他分支的檔、`devlog.archive.md`、既有的 keep 檔——用 `/devlog-tracker:keep-all`（`commands/keep-all.md`）。
+
 確認之前不要寫任何檔。若這一輪本身是開著的 Round，永遠不要把它搬走，這一輪結束前仍要補 `### Summary` / `### Handoff` / `### Status`（若沒有開著的 Round，見步驟 1 第 2 點）。
 
 ## 1. 讀檔、找出開著的 Round

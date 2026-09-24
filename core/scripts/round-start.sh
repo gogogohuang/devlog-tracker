@@ -95,7 +95,7 @@ case "$PROMPT" in
     ;;
 esac
 case "$CMD_NAME" in
-  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
+  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
     exit 0
     ;;
 esac

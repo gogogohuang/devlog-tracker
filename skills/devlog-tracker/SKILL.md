@@ -70,9 +70,10 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 ## 檔案位置
 
 - 主檔：`.devlog/devlog.md`——在 `main`／`master` 分支上工作時使用
-- 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案時，只會把 `devlog.md` 裡還沒完成的尾巴（最後一個 `DONE` 之後的 Round，連同 `handoff.md`）剪到該分支的檔案；`main` 自己的歷史、專案摘要、Checkpoint、Kept／Lessons 索引都留在 `devlog.md`。最後一輪已經是 `DONE`，或切到的是不含目前 `main` 最新 commit 的舊分支時，什麼都不搬，新分支從空檔開始。細節見 `docs/design/branch-scoped-devlog.md`。
+- 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案時，只會把 `devlog.md` 裡還沒完成的尾巴（最後一個 `DONE` 之後的 Round，連同 `handoff.md`）剪到該分支的檔案；`main` 自己的歷史、專案摘要、Checkpoint、Kept／Lessons 索引都留在 `devlog.md`。最後一輪已經是 `DONE`，或切到的是不含目前 `main` 最新 commit 的舊分支時，什麼都不搬，新分支從空檔開始。分支檔第一行是 origin 標記 `<!-- devlog-origin: branch=<原始分支名> -->`（detached HEAD 是 `detached=<目錄名>`），由 hook 在建立分支檔時寫入；不要刪改這一行。細節見 `docs/design/branch-scoped-devlog.md`。
 - 歸檔：`.devlog/devlog.archive.md`
-- 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
+- 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep`／`keep-all` 搬走的主題檔，第一行是 `# Kept log`；SessionStart 不讀這些檔）
+- keep-all 備份：`.devlog/.keep-all-backup/<時間戳>/`（`/devlog-tracker:keep-all` 動手前的原始檔複本）
 - 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
   收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
 - Session Handoff 快照：`.devlog/handoff.md`（`main`／`master`）；其他分支 `.devlog/handoff.<branch>.md`。
@@ -314,7 +315,7 @@ Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply
 ### devlog-tracker 自己的管理指令不記錄
 
 這一輪如果是使用者直接呼叫 devlog-tracker 自己的純管理指令——`/devlog-tracker:checkpoint`、
-`clean`、`compact`、`keep`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
+`clean`、`compact`、`keep`、`keep-all`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
 `overview`、`pause`、`report`、`search`、`segment-watch`、`span`、`start`、`status`、`timeline`——`round-start.sh`
 會整輪直接放行，不開 Round、不動任何計數器，等於這個 tick 沒發生過；不用、也不會被
 Stop hook 要求補寫 Summary／Reply／Handoff。這些指令本身就是在操作 devlog 系統，不是開發
@@ -424,6 +425,15 @@ hook 會要求補一段。
 的舊索引行就沒有這一段）。SessionStart 注入的接手摘要會帶上這個索引（不是具名檔的內容），
 讓「哪個主題被搬去哪個檔」不用翻完整份 `devlog.md` 或憑印象猜檔名
 （`docs/design/devlog-as-ssot-assessment.md` Phase 3）。
+
+## 整理所有 devlog：`/devlog-tracker:keep-all`
+
+keep 只整理目前分支的主檔；keep-all 一次整理 `.devlog/` 裡**所有** devlog 檔：目前分支的
+主檔、其他分支的 `devlog.<branch>.md`、`devlog.archive.md`，以及既有的具名檔。Round 依時間
+拿到全域編號，Claude 跨檔依主題重新分段、一次列出建議，確認後 `core/scripts/keep-all.sh`
+整批執行（全有或全無，先備份到 `.devlog/.keep-all-backup/`）。既有 kept 檔的 Round 必須全部
+重新分配；各分支最後一個 `DONE` 之後的未完成尾巴與開著的那一輪不搬；分支檔搬空也不刪。
+新索引行寫進目前分支主檔的 `## Kept 索引`。需要 Node。步驟見 `commands/keep-all.md`。不要自動觸發。
 
 ## 接續具名保存：`/devlog-tracker:resume <name>`
 

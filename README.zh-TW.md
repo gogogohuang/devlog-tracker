@@ -90,7 +90,7 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/segment-watch-set.sh" 600
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/report-devlog.sh" --json
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/timeline-devlog.sh"
-# pause / span-open / span-close / compact / keep-move / clean / resume / pr / promote：見 commands/*.md
+# pause / span-open / span-close / compact / keep-move / keep-all / clean / resume / pr / promote：見 commands/*.md
 ```
 
 ## 快速開始
@@ -115,7 +115,8 @@ $devlog-start           # npx init --codex
 | `/devlog-tracker:continue` | 讀 `.devlog/devlog.md`，核對最後一輪 Handoff「工作區」後再依下一步接著做。`/clear` 之後要接續用這個。細節見 [`docs/design/continue.md`](docs/design/continue.md)。 |
 | `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
 | `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
-| `/devlog-tracker:keep` | 掃全檔分主題，一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
+| `/devlog-tracker:keep` | 掃目前分支的主檔分主題（要一次整理所有 devlog 用 `keep-all`），一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
+| `/devlog-tracker:keep-all` | 整理**所有** devlog，不只目前分支：目前的主檔、其他分支的 `devlog.<branch>.md`、`devlog.archive.md`，以及先前 `keep`／`keep-all` 產生的所有具名檔。Claude 跨檔依主題重新分段（同一個主題散在 main、feature 分支與 archive 的片段會合回同一檔），一次列出所有建議檔案，確認後由一支腳本整批寫入，全有或全無。既有的具名檔會被拆開重組；各分支未完成的尾巴（最後一個 `DONE` 之後的 Round）與開著的那一輪不會被搬，分支檔也不會被刪。動手前會先把所有會動到的檔備份到 `.devlog/.keep-all-backup/<時間戳>/`。需要 Node ≥18。細節見 [`docs/design/keep-all.md`](docs/design/keep-all.md)。 |
 | `/devlog-tracker:overview` | 讀完所有已 keep 的 `devlog.<name>.md`，整合成跨主題總覽，並列出看起來該進 `CLAUDE.md` 的規範候選。純讀取，不核對工作區、不等確認、不寫檔。細節見 [`docs/design/keep.md`](docs/design/keep.md) Kept index。 |
 | `/devlog-tracker:promote` | 從已 keep 的檔、lessons 檔與 Checkpoint 的 `### 決策` 挑出規範候選並編號列出；只有你選定的才追加到 `CLAUDE.md`（`CLAUDE.md` 只有 `@AGENTS.md` 或只裝 Codex 時改寫 `AGENTS.md`）的 `<!-- devlog-tracker:rules:begin/end -->` 受管區塊。只追加、一字不差的重複會跳過；`init` 不會覆寫這個區塊。 |
 | `/devlog-tracker:search <關鍵字>` | 在 `devlog.md`／`devlog.archive.md`／已 keep 的 `devlog.<name>.md`／`devlog.lessons.<topic>.md` 裡做不分大小寫的字串搜尋；Claude 讀完命中後用自己的話回答（必要時附檔名／標題／行號）。純讀取，不核對工作區、不等確認、不寫檔。 |
@@ -233,7 +234,7 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 
 #### 分支各自的 devlog 檔
 
-同一個工作目錄裡切換分支時，主檔會依目前 checkout 的分支自動分開：`main`／`master` 繼續用 `.devlog/devlog.md`，其他分支各自用 `.devlog/devlog.<branch>.md`（斜線轉成 `-`）。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案時，只會把 `devlog.md` 裡還沒完成的尾巴（最後一個 `DONE` 之後的 Round，連同 `handoff.md`）剪到該分支的檔案；`main` 自己的歷史、專案摘要、Checkpoint、Kept／Lessons 索引都留在 `devlog.md`。最後一輪已經是 `DONE`，或切到的是不含目前 `main` 最新 commit 的舊分支時，什麼都不搬，新分支從空檔開始。細節見 [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md)。
+同一個工作目錄裡切換分支時，主檔會依目前 checkout 的分支自動分開：`main`／`master` 繼續用 `.devlog/devlog.md`，其他分支各自用 `.devlog/devlog.<branch>.md`（斜線轉成 `-`）。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案時，只會把 `devlog.md` 裡還沒完成的尾巴（最後一個 `DONE` 之後的 Round，連同 `handoff.md`）剪到該分支的檔案；`main` 自己的歷史、專案摘要、Checkpoint、Kept／Lessons 索引都留在 `devlog.md`。最後一輪已經是 `DONE`，或切到的是不含目前 `main` 最新 commit 的舊分支時，什麼都不搬，新分支從空檔開始。分支檔的第一行是 origin 標記 `<!-- devlog-origin: branch=<原始分支名> -->`（渲染時看不到），記下檔名轉換後已經還原不回來的真實分支名；`/devlog-tracker:keep-all` 靠它分辨分支檔與具名檔，並回報該分支還在開發、已合併或已刪除。這個標記出現前就存在的舊檔維持原樣。細節見 [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md)。
 
 #### Lessons Mode（預設關閉，不自動）
 
