@@ -72,5 +72,49 @@ kill "$LIVE_PID" 2>/dev/null || true
 wait "$LIVE_PID" 2>/dev/null || true
 rm -rf "$DEVLOG_DIR/.lock"
 
+# Re-entry from a child process: a script run by the lock holder (e.g.
+# round-start.sh -> close-open-round.sh) sees the lock as already its own —
+# returns at once, and its release leaves the parent's lock in place.
+devlog_lock_acquire
+START="$(date +%s)"
+CHILD="$(bash -c '. "$1"; DEVLOG_DIR="$2"; devlog_lock_acquire; echo "held=${LOCK_HELD:-0} by=${LOCK_CONTENDED_BY:-}"; devlog_lock_release' _ "$SCRIPT_DIR/devlog-lock.sh" "$DEVLOG_DIR")"
+ELAPSED=$(( $(date +%s) - START ))
+[ "$ELAPSED" -le 1 ] && [ "$CHILD" = "held=0 by=" ] \
+  && echo "PASS: child of holder re-enters without waiting" \
+  || { echo "FAIL: child re-entry elapsed=$ELAPSED child='$CHILD'"; FAIL=1; }
+[ -d "$DEVLOG_DIR/.lock" ] && [ "$(cat "$DEVLOG_DIR/.lock/pid")" = "$$" ] \
+  && echo "PASS: child release leaves parent's lock" \
+  || { echo "FAIL: parent's lock gone after child release"; FAIL=1; }
+# Grandchild (holder -> script -> script) inherits the owner too.
+START="$(date +%s)"
+GRAND="$(bash -c 'bash -c ". \"\$1\"; DEVLOG_DIR=\"\$2\"; devlog_lock_acquire; echo held=\${LOCK_HELD:-0}; devlog_lock_release" _ "$1" "$2"' _ "$SCRIPT_DIR/devlog-lock.sh" "$DEVLOG_DIR")"
+ELAPSED=$(( $(date +%s) - START ))
+[ "$GRAND" = "held=0" ] && [ "$ELAPSED" -le 1 ] && [ -d "$DEVLOG_DIR/.lock" ] \
+  && echo "PASS: grandchild of holder re-enters" || { echo "FAIL: grandchild got '$GRAND' elapsed=$ELAPSED"; FAIL=1; }
+devlog_lock_release
+[ -z "${DEVLOG_LOCK_OWNER:-}" ] && [ ! -d "$DEVLOG_DIR/.lock" ] \
+  && echo "PASS: release clears owner" || { echo "FAIL: owner=${DEVLOG_LOCK_OWNER:-} survives release"; FAIL=1; }
+
+# After the holder releases, a child it spawns later no longer carries the
+# owner, so it would contend on a lock someone else took meanwhile.
+OUT="$(bash -c 'echo "owner=${DEVLOG_LOCK_OWNER:-}"')"
+[ "$OUT" = "owner=" ] && echo "PASS: owner not exported after release" \
+  || { echo "FAIL: child still sees $OUT"; FAIL=1; }
+
+# A process that did not inherit the owner (another hook launched by the
+# agent while the lock is held) still waits out the timeout.
+sleep 5 &
+LIVE_PID=$!
+mkdir "$DEVLOG_DIR/.lock"
+echo "$LIVE_PID" > "$DEVLOG_DIR/.lock/pid"
+START="$(date +%s)"
+OUT="$(DEVLOG_LOCK_OWNER=12345 bash -c '. "$1"; DEVLOG_DIR="$2"; devlog_lock_acquire; echo "${LOCK_HELD:-0}"' _ "$SCRIPT_DIR/devlog-lock.sh" "$DEVLOG_DIR")"
+ELAPSED=$(( $(date +%s) - START ))
+[ "$OUT" = "0" ] && [ "$ELAPSED" -ge 2 ] \
+  && echo "PASS: unrelated owner still contends" || { echo "FAIL: unrelated owner out=$OUT elapsed=$ELAPSED"; FAIL=1; }
+kill "$LIVE_PID" 2>/dev/null || true
+wait "$LIVE_PID" 2>/dev/null || true
+rm -rf "$DEVLOG_DIR/.lock"
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

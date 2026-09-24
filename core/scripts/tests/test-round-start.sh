@@ -125,7 +125,19 @@ hello world
 ```
 EOF
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
+# round-start.sh holds .devlog/.lock while it runs close-open-round.sh as a
+# child; the child must not wait out the 2s contention timeout on its own
+# parent's lock.
+HEAL_START="$(date +%s)"
 printf '%s' '{"prompt":"second"}' | bash "$SCRIPT_DIR/round-start.sh"
+HEAL_ELAPSED=$(( $(date +%s) - HEAL_START ))
+if [ "$HEAL_ELAPSED" -le 1 ]; then
+  echo "PASS: dangling heal doesn't block on parent's lock (${HEAL_ELAPSED}s)"
+else
+  echo "FAIL: dangling heal took ${HEAL_ELAPSED}s (child waited on parent's lock)"
+  FAIL=1
+fi
+assert_file_absent "dangling heal releases .lock" "$DEVLOG_DIR/.lock"
 MAIN_BODY="$(cat "$DEVLOG_DIR/devlog.md")"
 CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
 assert_contains "Round 2 heading in .round-current.md" "## Round 2 —" "$CUR_BODY"
