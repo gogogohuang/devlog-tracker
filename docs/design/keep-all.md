@@ -233,11 +233,13 @@ One run, all or nothing, under the devlog lock.
    - A `kept` source's project summary (text between its provenance
      header and first block, present after a full keep) goes to the
      target that receives that file's first Round.
-   - Sources: moved blocks removed. `current`/`branch` files are
-     rewritten but never deleted, even if no Round is left (deleting a
-     branch file would re-trigger migration on next checkout); origin
-     marker and project summary stay. `archive` is deleted if no Round is
-     left. Consumed `kept` sources are deleted.
+   - Sources: moved blocks removed. `current` files are rewritten but
+     never deleted; origin marker and project summary stay. A `branch`
+     file left with nothing but its origin marker is deleted, unless the
+     branch is `active` (checking it out again would migrate main's
+     unfinished tail into a fresh file) or the file is `devlog.md`.
+     `archive` is deleted if no Round is left. Consumed `kept` sources
+     are deleted.
    - Verify every moved Round heading appears exactly once across the
      targets and not in any rewritten source.
 5. **Kept index.**
