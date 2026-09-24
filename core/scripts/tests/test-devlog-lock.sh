@@ -85,9 +85,21 @@ ELAPSED=$(( $(date +%s) - START ))
 [ -d "$DEVLOG_DIR/.lock" ] && [ "$(cat "$DEVLOG_DIR/.lock/pid")" = "$$" ] \
   && echo "PASS: child release leaves parent's lock" \
   || { echo "FAIL: parent's lock gone after child release"; FAIL=1; }
+# Grandchild (holder -> script -> script) inherits the owner too.
+START="$(date +%s)"
+GRAND="$(bash -c 'bash -c ". \"\$1\"; DEVLOG_DIR=\"\$2\"; devlog_lock_acquire; echo held=\${LOCK_HELD:-0}; devlog_lock_release" _ "$1" "$2"' _ "$SCRIPT_DIR/devlog-lock.sh" "$DEVLOG_DIR")"
+ELAPSED=$(( $(date +%s) - START ))
+[ "$GRAND" = "held=0" ] && [ "$ELAPSED" -le 1 ] && [ -d "$DEVLOG_DIR/.lock" ] \
+  && echo "PASS: grandchild of holder re-enters" || { echo "FAIL: grandchild got '$GRAND' elapsed=$ELAPSED"; FAIL=1; }
 devlog_lock_release
 [ -z "${DEVLOG_LOCK_OWNER:-}" ] && [ ! -d "$DEVLOG_DIR/.lock" ] \
   && echo "PASS: release clears owner" || { echo "FAIL: owner=${DEVLOG_LOCK_OWNER:-} survives release"; FAIL=1; }
+
+# After the holder releases, a child it spawns later no longer carries the
+# owner, so it would contend on a lock someone else took meanwhile.
+OUT="$(bash -c 'echo "owner=${DEVLOG_LOCK_OWNER:-}"')"
+[ "$OUT" = "owner=" ] && echo "PASS: owner not exported after release" \
+  || { echo "FAIL: child still sees $OUT"; FAIL=1; }
 
 # A process that did not inherit the owner (another hook launched by the
 # agent while the lock is held) still waits out the timeout.

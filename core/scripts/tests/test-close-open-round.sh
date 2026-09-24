@@ -316,6 +316,60 @@ fi
 rm -rf "$REC_DIR"
 export CLAUDE_PROJECT_DIR="$TMP_ROOT"
 
+# --- L1: run as a child of the lock holder (round-start.sh's dangling heal)
+#         -> no wait on the parent's lock, still stamps, and its EXIT-trap
+#         release leaves the parent's lock in place ----------------------
+# shellcheck source=../devlog-lock.sh
+. "$SCRIPT_DIR/devlog-lock.sh"
+write_skeleton
+devlog_lock_acquire
+START="$(date +%s)"
+bash "$SCRIPT_DIR/close-open-round.sh" "dangling:next_prompt"
+ELAPSED=$(( $(date +%s) - START ))
+if [ "$ELAPSED" -le 1 ]; then
+  echo "PASS: child of lock holder doesn't wait (${ELAPSED}s)"
+else
+  echo "FAIL: child of lock holder waited ${ELAPSED}s"
+  FAIL=1
+fi
+assert_contains "child of lock holder still stamps" $'### Status\nINTERRUPTED' "$(cat "$DEVLOG_DIR/devlog.md")"
+if [ -d "$DEVLOG_DIR/.lock" ] && [ "$(cat "$DEVLOG_DIR/.lock/pid" 2>/dev/null)" = "$$" ]; then
+  echo "PASS: child's exit leaves the holder's lock"
+else
+  echo "FAIL: holder's lock removed by child"
+  FAIL=1
+fi
+devlog_lock_release
+assert_file_absent "holder release removes lock" "$DEVLOG_DIR/.lock/pid"
+
+# --- L2: lock held by an unrelated live process (no inherited owner) ->
+#         still waits out the contention timeout, stamps fail-open, and
+#         leaves the foreign lock alone --------------------------------------
+write_skeleton
+sleep 5 &
+LIVE_PID=$!
+mkdir "$DEVLOG_DIR/.lock"
+echo "$LIVE_PID" > "$DEVLOG_DIR/.lock/pid"
+START="$(date +%s)"
+bash "$SCRIPT_DIR/close-open-round.sh" "dangling:next_prompt"
+ELAPSED=$(( $(date +%s) - START ))
+if [ "$ELAPSED" -ge 2 ]; then
+  echo "PASS: unrelated holder still contends (${ELAPSED}s)"
+else
+  echo "FAIL: unrelated holder skipped contention (${ELAPSED}s)"
+  FAIL=1
+fi
+assert_contains "contended run still stamps (fail-open)" $'### Status\nINTERRUPTED' "$(cat "$DEVLOG_DIR/devlog.md")"
+if [ "$(cat "$DEVLOG_DIR/.lock/pid" 2>/dev/null)" = "$LIVE_PID" ]; then
+  echo "PASS: foreign lock left in place"
+else
+  echo "FAIL: foreign lock touched"
+  FAIL=1
+fi
+kill "$LIVE_PID" 2>/dev/null || true
+wait "$LIVE_PID" 2>/dev/null || true
+rm -rf "$DEVLOG_DIR/.lock"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
