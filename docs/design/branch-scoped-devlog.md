@@ -54,26 +54,46 @@ namespace `/devlog-tracker:keep` and `/devlog-tracker:resume` already use
 another branch's sanitized form) shares that one file. This is treated as
 an accepted rare edge case, not specially guarded against.
 
-## One-time migration
+## Carrying over the unfinished tail
 
 The first time a non-default branch resolves to a `devlog.<name>.md` that
-doesn't exist yet on disk, and `.devlog/devlog.md` already has content,
-that existing `devlog.md` is **renamed** (not copied) to
-`devlog.<name>.md` before use. Rationale: whatever is currently sitting in
-`devlog.md` was written under *some* branch context — attributing it
-wholesale to the branch currently checked out is a reasonable one-time,
-best-effort call, and renaming (rather than copying) means the default
-branch cleanly starts a fresh `devlog.md` next time it's checked out
-instead of carrying a duplicate of another branch's history forward.
+doesn't exist yet on disk, only the **unfinished tail** of
+`.devlog/devlog.md` is **cut** (moved, not copied) into it: every
+`## Round` block after the last one whose `### Status` is `DONE` (all
+rounds, if none is `DONE`). `handoff.md` moves to `handoff.<name>.md`
+along with it, since it snapshots that same unfinished work.
 
-This is lossy if `devlog.md`'s existing content actually mixes multiple
-branches' history from before this feature existed — that content can't
-be retroactively split apart. Documented as a known limitation, not
-solved.
+Nothing moves, and the branch starts with an empty file, when:
 
-The rename happens under the existing `devlog-lock.sh` mutual exclusion
-(`devlog_with_lock`) to avoid a race between two concurrent hook
-invocations both trying to migrate at once.
+- the last Round in `devlog.md` is already `DONE` (or there are no Rounds);
+- HEAD doesn't contain the local `main`/`master` tip
+  (`git merge-base --is-ancestor`) — an older branch being checked out
+  (e.g. to review it) rather than one just forked from the work in
+  progress; or
+- `.devlog/.enabled` is absent.
+
+Everything that isn't a Round — the project header, `## Checkpoint`
+sections (even ones sitting between moved Rounds), `## Kept 索引`,
+`## Lessons 索引` — stays in `devlog.md`. Moved Rounds keep their numbers.
+
+Why not move the whole file (the original design): `main` keeps using
+`devlog.md`, so with no "already migrated" marker the wholesale rename
+fired on *every* new branch, not once. Each new branch took all of
+`main`'s history with it — project summary and indexes included — leaving
+`main` with an empty `devlog.md`, scattering `main`'s history across
+branch files that are abandoned after merge, and making
+`/devlog-tracker:pr` on the new branch list Rounds that had nothing to do
+with it. The only thing that genuinely belongs to a freshly cut branch is
+the work that was still in progress on `main` when it was cut (the usual
+`git checkout -b` with uncommitted changes); cutting rather than copying
+keeps a single Handoff for that work, so the next `continue` can't pick
+up the wrong file.
+
+The cut happens under the existing `devlog-lock.sh` lock. The branch file
+is written before `devlog.md` is rewritten, so a failure in between
+duplicates the tail rather than losing it. While the branch file doesn't
+exist yet, every hook re-resolves; the last Round's Status is checked
+first so the common `DONE` case costs one short scan.
 
 ## `core/scripts/devlog-path.sh` (new file)
 
@@ -90,7 +110,7 @@ devlog_resolve_paths <project_dir>
 
 Side effect: sets (and leaves set in the caller's shell) `DEVLOG_DIR` and
 `DEVLOG_FILE` following the algorithm above, performing the one-time
-migration if applicable. Every script that currently hardcodes:
+tail carry-over if applicable. Every script that currently hardcodes:
 
 ```sh
 DEVLOG_DIR="${CLAUDE_PROJECT_DIR:-.}/.devlog"
@@ -112,8 +132,8 @@ needs to know branch logic exists.
 
 | File | Change |
 |---|---|
-| `core/scripts/devlog-path.sh` | **New.** `devlog_resolve_paths`, branch detection, sanitizing, migration. |
-| `core/scripts/tests/test-devlog-path.sh` | **New.** Unit tests: main/master passthrough, feature-branch mapping, slash sanitization, detached-HEAD fallback, non-git fallback, migration rename, migration is a no-op on second call. |
+| `core/scripts/devlog-path.sh` | **New.** `devlog_resolve_paths`, branch detection, sanitizing, unfinished-tail carry-over. |
+| `core/scripts/tests/test-devlog-path.sh` | **New.** Unit tests: main/master passthrough, feature-branch mapping, slash sanitization, detached-HEAD fallback, non-git fallback, tail carry-over (DONE → nothing moves, unfinished tail + handoff cut, no-DONE, stale branch), no-op on second call. |
 | `core/scripts/round-start.sh` | Replace hardcoded `DEVLOG_DIR`/`DEVLOG_FILE` with `devlog_resolve_paths`. |
 | `core/scripts/enforce-devlog.sh` | Same. |
 | `core/scripts/segment-watch.sh` | Same. |
@@ -142,7 +162,7 @@ needs to know branch logic exists.
   Switching branches mid-session does not turn recording off.
 - **`devlog-lock.sh`**: the lock directory is `$DEVLOG_DIR/.lock`, one per
   project directory regardless of which branch file is being written —
-  unchanged, still correct (it now also serializes the rare migration
+  unchanged, still correct (it now also serializes the rare tail carry-over
   rename against concurrent writers).
 - **`/devlog-tracker:keep` / `/devlog-tracker:resume` /
   `/devlog-tracker:lessons`**: unaffected, continue to operate on
@@ -156,19 +176,23 @@ needs to know branch logic exists.
   `INTERRUPTED` onto an already-finished Round in a different branch's
   file. A `.round-open` written before this guard existed (no `file`
   field) is treated leniently, same as before.
-- **One-time migration** now only fires while `.devlog/.enabled` is
+- **Tail carry-over** only fires while `.devlog/.enabled` is
   present, so read-only/informational commands (e.g.
-  `/devlog-tracker:status`, `/devlog-tracker:lessons`) can no longer
-  trigger the `devlog.md` → `devlog.<name>.md` rename on a project that
+  `/devlog-tracker:status`, `/devlog-tracker:lessons`) can't
+  cut Rounds out of `devlog.md` on a project that
   was never `/devlog-tracker:start`-ed, or one that's currently
   `/devlog-tracker:pause`-d.
 
 ## Known Limitations
 
 - Content written before this feature existed, if it mixes history from
-  multiple branches, cannot be retroactively split — the one-time
-  migration attributes all of a pre-existing `devlog.md` to whichever
-  branch first triggers migration.
+  multiple branches, cannot be retroactively split — it stays in
+  `devlog.md`, apart from any unfinished tail the first new branch cuts.
+- Tail carry-over treats every non-`DONE` Round after the last `DONE` as
+  belonging to the new branch. If `main` had unfinished work that the
+  new branch isn't about, those Rounds still move; move them back by hand.
+- Projects upgraded from the wholesale-rename version keep whatever was
+  already renamed into branch files; nothing is moved back.
 - Sanitized name collisions (two branches, or a branch and a manually
   `/keep`-saved name, mapping to the same `devlog.<name>.md`) share one
   file. Not detected or warned about — except for the two names this

@@ -70,7 +70,7 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 ## 檔案位置
 
 - 主檔：`.devlog/devlog.md`——在 `main`／`master` 分支上工作時使用
-- 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案、且 `.devlog/devlog.md` 已有內容時，會把它改名（非複製）成該分支的檔案。細節見 `docs/design/branch-scoped-devlog.md`。
+- 分支主檔：`.devlog/devlog.<branch>.md`——在同一個 worktree 裡切換到其他分支時，主檔會依目前 checkout 的分支自動分開（斜線轉成 `-`）；detached HEAD 退回用 worktree 目錄名。另開一個 `git worktree`（不同目錄）本來就有自己獨立的 `.devlog/`，不受這個機制影響。第一次在某分支偵測到還沒有專屬檔案時，只會把 `devlog.md` 裡還沒完成的尾巴（最後一個 `DONE` 之後的 Round，連同 `handoff.md`）剪到該分支的檔案；`main` 自己的歷史、專案摘要、Checkpoint、Kept／Lessons 索引都留在 `devlog.md`。最後一輪已經是 `DONE`，或切到的是不含目前 `main` 最新 commit 的舊分支時，什麼都不搬，新分支從空檔開始。細節見 `docs/design/branch-scoped-devlog.md`。
 - 歸檔：`.devlog/devlog.archive.md`
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep` 搬走的主題檔；SessionStart 不讀這些檔）
 - 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
