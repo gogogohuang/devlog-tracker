@@ -233,7 +233,7 @@ When Claude ends a turn with a plain-text question and the next message is the a
 
 #### Per-branch devlog files
 
-Switching branches within the same working directory automatically splits the main file by the checked-out branch: `main`/`master` keeps using `.devlog/devlog.md`, while other branches each use `.devlog/devlog.<branch>.md` (slashes converted to `-`). A separate `git worktree` (a different directory) already has its own independent `.devlog/` and is unaffected by this mechanism. The first time a branch is detected without its own file while `devlog.md` already has content, it gets renamed (not copied) into that branch's file. See [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md).
+Switching branches within the same working directory automatically splits the main file by the checked-out branch: `main`/`master` keeps using `.devlog/devlog.md`, while other branches each use `.devlog/devlog.<branch>.md` (slashes converted to `-`). A separate `git worktree` (a different directory) already has its own independent `.devlog/` and is unaffected by this mechanism. The first time a branch is detected without its own file, only the unfinished tail of `devlog.md` (the Rounds after the last `DONE`, plus `handoff.md`) is cut into that branch's file; `main`'s own history, project summary, Checkpoints, and Kept/Lessons indexes stay in `devlog.md`. If the last Round is already `DONE`, or the branch checked out doesn't contain the current `main` tip (an older branch), nothing moves and the branch starts with an empty file. See [`docs/design/branch-scoped-devlog.md`](docs/design/branch-scoped-devlog.md).
 
 #### Lessons Mode (off by default, not automatic)
 
