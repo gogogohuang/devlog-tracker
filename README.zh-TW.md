@@ -75,7 +75,7 @@ npx devlog-tracker init
 
 沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
-會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。
+會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
 
 `init` 會把這台機器專屬的絕對路徑寫進各平台的 hooks 設定檔與 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與產生出來的 hooks 設定檔加進 `.gitignore`。
 
@@ -88,7 +88,9 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/start-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/status-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/segment-watch-set.sh" 600
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
-# pause / span-open / span-close / compact / keep-move / clean / resume：見 commands/*.md
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/report-devlog.sh" --json
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/timeline-devlog.sh"
+# pause / span-open / span-close / compact / keep-move / clean / resume / pr / promote：見 commands/*.md
 ```
 
 ## 快速開始
@@ -130,6 +132,17 @@ $devlog-start           # npx init --codex
 | `/devlog-tracker:lessons-off` | 關閉 Lessons Mode，不動任何已寫的 `devlog.lessons.*.md` 或索引。 |
 | `/devlog-tracker:lessons [<topic>]` | 沒給 topic：印 `## Lessons 索引`。給 topic：印該主題檔全文。純讀取，不核對工作區、不等確認。 |
 | `/devlog-tracker:lessons-drift <次數>` | 調整 Lessons Mode「工作區漂移重複發生」機制性提醒的門檻（預設 3 次）。隸屬 Lessons Mode，沒開會回報 `LESSONS_NOT_ENABLED`。 |
+
+## 善用記下來的內容
+
+有四個指令能把 devlog 變成可以交給別人、或回流到專案的東西：
+
+- **`report`**：只給數字（Round 數、各 Status 分布、BLOCKED 比例、Checkpoint／keep／lessons 數量）。`npx devlog-tracker report --json` 是給 CI 或儀表板用的機器可讀格式；加 `--rounds` 會附上每個 Round 的資料。
+- **`timeline`**：產生 `.devlog/timeline.html`，一頁離線就能開的網頁，可以用瀏覽器看，也可以附在交接資料裡。重跑就會更新，會直接覆寫。
+- **`pr`**：在 feature branch 上，從這個 branch 的 Rounds 和 `git log` 產生 `.devlog/pr-body.md` 草稿，要跑 `gh` 前會先問你。沒有 `gh` 或沒登入時，就停在草稿。
+- **`promote`**：把 keep 檔、lessons、Checkpoint 決策裡該長期遵守的規則，寫進 `CLAUDE.md`／`AGENTS.md` 的受管區塊。它會列出編號候選，只寫入你選的那幾條；區塊裡的規則要改或刪，請直接手動編輯。
+
+這四個指令都不會把 `### User Input` 原文複製進輸出（唯一的例外是明確加上 `report --with-input`）。`pr-body.md` 和 `timeline.html` 放在 `.devlog/` 底下，這個目錄通常已被 gitignore；如果你的專案會 commit `.devlog/`，別把這兩個檔 commit 進去。`report` 和 `timeline` 跟 `status` 一樣不會開 Round；`pr` 和 `promote` 會，因為它們會動到 `.devlog/` 以外的東西。細節見 [`docs/design/read-side-and-promote.md`](docs/design/read-side-and-promote.md)。
 
 ## 強制記錄開著之後
 
@@ -229,10 +242,9 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 ## 測試
 
 ```
-bash core/scripts/run-tests.sh
+bash core/scripts/run-tests.sh   # hook 自檢，含 Cursor 與 Codex 轉接層
+npm test                          # CLI、timeline renderer 與 scripts 的 node 測試
 ```
-
-含 Cursor adapter。
 
 ## License
 
