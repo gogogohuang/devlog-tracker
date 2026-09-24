@@ -44,7 +44,7 @@ APPLY="$(bash "$SCRIPT_DIR/keep-all.sh" --apply "$TMP/plan.tsv" --fingerprint "$
 if [ $? -eq 0 ]; then echo "PASS: apply exits 0"; else echo "FAIL: apply exits 0"; FAIL=1; fi
 [ -f "$R/.devlog/devlog.old-branches.md" ] && grep -q "^KEPT=.*devlog.old-branches.md ROUNDS=2" <<<"$APPLY" \
   && echo "PASS: named file written" || { echo "FAIL: named file written"; FAIL=1; }
-check "branch files keep their marker and are not deleted" '[ "$(head -n 1 "$R/.devlog/devlog.feat-merged.md")" = "<!-- devlog-origin: branch=feat/merged -->" ]'
+check "emptied merged/gone branch files deleted" '[ ! -e "$R/.devlog/devlog.feat-merged.md" ] && [ ! -e "$R/.devlog/devlog.feat-deleted.md" ] && grep -q "^DELETED=.*devlog.feat-merged.md" <<<"$APPLY"'
 check "index written to the current branch file" 'grep -q "devlog.old-branches.md\`：keep-all，2 輪" "$R/.devlog/devlog.feat-live.md"'
 check "lock released" '[ ! -e "$R/.devlog/.lock" ] && [ ! -d "$R/.devlog/.lock.d" ]'
 

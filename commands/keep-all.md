@@ -45,6 +45,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
      <來源檔> Round <編號…>（#<id…>）、<來源檔> Round <編號…>（#<id…>，分支 <origin> <state>）
   2. ...
 會被重整並刪除的既有 keep 檔：<檔名，逗號分隔，或「無」>
+會被搬空並刪除的分支檔：<檔名，逗號分隔，或「無」>
 可搬但偏瑣碎、留在原檔：<來源檔與 Round，或「無」>
 不能搬、保持原樣：<各分支未完成尾巴與開著的 Round，或「無」>
 
@@ -56,6 +57,8 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 ```
 
 同一則回覆可以合併多條修改；`N` 一律對應原始編號。使用者用文字要求把某些 Round 換段，照做後重新列一次再等。然後停止，使用者回覆前不要寫任何檔。
+
+「會被搬空並刪除的分支檔」＝所有 Round 都分進某段、`state` 不是 `active`、且不是 `devlog.md` 的 `kind=branch` 來源（腳本會照這個規則刪）。
 
 - 取消 → 不改檔，結束。
 - `移除第 N 段`：該段若含 `kind=kept` 的 Round，拒絕並說明只能 `併入`；其餘 Round 留在原檔。
@@ -77,7 +80,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
   --apply "<專案根目錄絕對路徑>/.devlog/.keep-all-plan.tsv" --fingerprint <fp> --count <n>
 ```
 
-`<fp>`／`<n>` 用步驟 1 的值。不要自己搬檔、刪檔或改索引——腳本是唯一的實作：驗證計畫、把所有會動到的檔備份到 `.devlog/.keep-all-backup/<時間戳>/`、組好新檔、改寫來源、刪除被整理掉的 kept 檔與清空的 archive、重建 `## Kept 索引`（新索引行寫在目前分支的主檔）。分支檔與目前主檔即使搬空也不會被刪。
+`<fp>`／`<n>` 用步驟 1 的值。不要自己搬檔、刪檔或改索引——腳本是唯一的實作：驗證計畫、把所有會動到的檔備份到 `.devlog/.keep-all-backup/<時間戳>/`、組好新檔、改寫來源、刪除被整理掉的 kept 檔、清空的 archive 與搬空的分支檔、重建 `## Kept 索引`（新索引行寫在目前分支的主檔）。搬空的分支檔只在該分支不是 `active` 時才刪；目前主檔與 `devlog.md` 一律不刪。
 
 - exit 1：原樣顯示 stderr，不要自行重試或手動補做。驗證錯誤時不會寫任何檔；fingerprint 不符代表掃描後檔案被改過，回到步驟 1 重新掃描。
 - 成功後刪除 `.devlog/.keep-all-plan.tsv`。

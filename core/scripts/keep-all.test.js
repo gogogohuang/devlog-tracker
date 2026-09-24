@@ -135,6 +135,26 @@ test('apply moves a cross-file topic into one file in time order and consumes ke
   assert.ok(fs.existsSync(path.join(backup, 'devlog.md')));
 });
 
+test('apply deletes a branch file it emptied, but not an active branch or devlog.md', () => {
+  const d = setup({
+    'devlog.feat-main.md': '<!-- devlog-origin: branch=feat/main -->\n\n' + round(1, '2026-09-05T10:00:00+0800', 'IN_PROGRESS'),
+    'devlog.md': '# proj\n\n' + round(1, '2026-09-01T10:00:00+0800', 'DONE'),
+    'devlog.old.md': '<!-- devlog-origin: branch=old -->\n\n' + round(1, '2026-09-02T10:00:00+0800', 'DONE'),
+    'devlog.keep-me.md': '<!-- devlog-origin: branch=keep-me -->\n\n' + round(1, '2026-09-03T10:00:00+0800', 'DONE') +
+      '\n' + round(2, '2026-09-03T11:00:00+0800', 'DONE'),
+  });
+  const c = ctx(d, { current: 'devlog.feat-main.md', open: '1' });
+  const s = scan(c);
+  const ids = [...idsOf(s, 'devlog.md', [1]), ...idsOf(s, 'devlog.old.md', [1]), ...idsOf(s, 'devlog.keep-me.md', [1])];
+  const out = apply(c, `alpha\t\t${ids.join(',')}\n`, s.fingerprint, s.rounds.length);
+  assert.ok(!exists(d, 'devlog.old.md'), 'emptied branch file deleted');
+  assert.match(out, /^DELETED=.*devlog\.old\.md$/m);
+  assert.ok(exists(d, 'devlog.keep-me.md'), 'branch file with rounds left stays');
+  assert.ok(exists(d, 'devlog.md'), 'devlog.md is never deleted');
+  const backup = out.match(/^BACKUP=(.*)$/m)[1];
+  assert.ok(fs.existsSync(path.join(backup, 'devlog.old.md')), 'deleted branch file is backed up');
+});
+
 test('apply may reuse the name of a kept file it consumes', () => {
   const d = world();
   const c = ctx(d);

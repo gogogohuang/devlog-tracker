@@ -267,6 +267,7 @@ function apply(c, planText, expected, count) {
   const prefixes = new Map(segs.map(seg => [seg, []]));
   const rewritten = new Map(); // file -> new text | null (delete)
   const movedFromCurrent = new Set();
+  const touchedFiles = new Set();
 
   for (const src of s.sources) {
     const { lines, blocks, firstBlock } = src.parsed;
@@ -310,6 +311,7 @@ function apply(c, planText, expected, count) {
       continue;
     }
     if (!touched) continue;
+    touchedFiles.add(src.file);
     const text = joinPieces([lines.slice(0, firstBlock), ...stay]);
     const left = stay.length && parseBlocks(text).blocks.some(b => b.round !== null);
     rewritten.set(src.file, src.kind === 'archive' && !left && trimBlank(lines.slice(0, firstBlock)).length === 0 ? null : text);
@@ -330,6 +332,15 @@ function apply(c, planText, expected, count) {
     const base = rewritten.has(src.file) ? rewritten.get(src.file) : src.text;
     const updated = rewriteIndex(base, staleIndex, src.kind === 'current' ? newIndex : []);
     if (updated !== base) rewritten.set(src.file, updated);
+  }
+  // A branch file keep-all emptied (only its origin marker left) is
+  // deleted, unless the branch is still active: checking it out again
+  // would migrate main's unfinished tail into a fresh file.
+  for (const src of s.sources) {
+    const t = rewritten.get(src.file);
+    if (src.kind !== 'branch' || src.file === 'devlog.md' || src.state === 'active' || typeof t !== 'string') continue;
+    if (!touchedFiles.has(src.file)) continue;
+    if (t.split('\n').every(l => l.trim() === '' || ORIGIN.test(l))) rewritten.set(src.file, null);
   }
   if (!s.sources.some(x => x.kind === 'current')) {
     const head = c.origin ? `<!-- devlog-origin: ${c.origin} -->\n` : '';

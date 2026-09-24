@@ -432,7 +432,7 @@ keep 只整理目前分支的主檔；keep-all 一次整理 `.devlog/` 裡**所�
 主檔、其他分支的 `devlog.<branch>.md`、`devlog.archive.md`，以及既有的具名檔。Round 依時間
 拿到全域編號，Claude 跨檔依主題重新分段、一次列出建議，確認後 `core/scripts/keep-all.sh`
 整批執行（全有或全無，先備份到 `.devlog/.keep-all-backup/`）。既有 kept 檔的 Round 必須全部
-重新分配；各分支最後一個 `DONE` 之後的未完成尾巴與開著的那一輪不搬；分支檔搬空也不刪。
+重新分配；各分支最後一個 `DONE` 之後的未完成尾巴與開著的那一輪不搬；搬空的分支檔（分支非 `active`）會刪除，目前主檔與 `devlog.md` 不刪。
 新索引行寫進目前分支主檔的 `## Kept 索引`。需要 Node。步驟見 `commands/keep-all.md`。不要自動觸發。
 
 ## 接續具名保存：`/devlog-tracker:resume <name>`
