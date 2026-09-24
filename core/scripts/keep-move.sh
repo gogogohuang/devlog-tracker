@@ -97,12 +97,18 @@ while IFS="$(printf '\t')" read -r start heading; do
   esac
 done < "$H2"
 
+# A branch file's origin marker (line 1) is the file's identity, not part
+# of the project summary: it never moves, even on full keep.
+MARKER=0
+[ -z "$(devlog_origin_of "$MAIN")" ] || MARKER=1
+
 KEPT_AT="$(date -Iseconds 2>/dev/null || date '+%Y-%m-%dT%H:%M:%S%z')"
 {
   printf '# Kept log\n\n- source: `.devlog/devlog.md`\n- rounds: %s-%s\n- kept_at: %s\n\n' \
     "$FROM" "$TO" "$KEPT_AT"
-  awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" '
+  awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v marker="$MARKER" '
     BEGIN { while ((getline n < selected) > 0) move[n] = 1 }
+    marker && NR == 1 { next }
     /^[ \t]*```/ { fence = !fence }
     !fence && /^## / { moving = (NR in move) }
     full && NR < first_round { print; next }
@@ -115,8 +121,9 @@ while read -r start round; do
   grep -Fqx "$heading" "$TARGET" || { echo "具名檔驗證失敗" >&2; exit 1; }
 done < "$MOVE_ROUNDS"
 
-awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v open="$OPEN" '
+awk -v selected="$MOVE_BLOCKS" -v full="$FULL" -v first_round="$FIRST_ROUND" -v open="$OPEN" -v marker="$MARKER" '
   BEGIN { while ((getline n < selected) > 0) move[n] = 1 }
+  marker && NR == 1 { print; next }
   /^[ \t]*```/ { fence = !fence }
   !fence && /^## / { moving = (NR in move) }
   full && NR < first_round { next }

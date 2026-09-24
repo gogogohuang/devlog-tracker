@@ -169,13 +169,30 @@ devlog_round_segments_body() {
   ' "$1"
 }
 
+# The first line of a branch-scoped devlog file: records which branch (or
+# detached worktree dir) it belongs to, since the sanitized filename can't
+# be mapped back. $1 is DEVLOG_ORIGIN ("branch=feat/x"). An HTML comment,
+# so it neither renders nor parses as a `## ` block.
+devlog_origin_line() {
+  printf '<!-- devlog-origin: %s -->\n' "$1"
+}
+
+# Prints the origin ("branch=feat/x") if line 1 of $1 is an origin marker.
+devlog_origin_of() {
+  [ -f "$1" ] || return 0
+  sed -n '1s/^<!-- devlog-origin: \(.*\) -->$/\1/p' "$1"
+}
+
 devlog_merge_round_current() {
   # Appends $2's content onto $1 (one blank line separator, matching the
   # existing "\n## Round N" append convention) and removes $2. No-op if $2
-  # is absent or empty — nothing to merge.
+  # is absent or empty — nothing to merge. When $1 doesn't exist yet and
+  # DEVLOG_ORIGIN is set (a branch file being created), its origin marker
+  # goes first.
   local devlog="$1" current="$2"
   [ -s "$current" ] || return 0
   {
+    [ -s "$devlog" ] || [ -z "${DEVLOG_ORIGIN:-}" ] || devlog_origin_line "$DEVLOG_ORIGIN"
     printf '\n'
     cat "$current"
   } >> "$devlog" 2>/dev/null || return 1

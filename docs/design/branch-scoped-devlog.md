@@ -54,6 +54,26 @@ namespace `/devlog-tracker:keep` and `/devlog-tracker:resume` already use
 another branch's sanitized form) shares that one file. This is treated as
 an accepted rare edge case, not specially guarded against.
 
+## Origin marker
+
+The sanitized filename can't be mapped back to a branch (`feat/x` and
+`feat-x` both give `devlog.feat-x.md`), and it shares the
+`devlog.<name>.md` namespace with kept files. So a branch file records
+its origin as its first line:
+
+```
+<!-- devlog-origin: branch=feat/x -->
+<!-- devlog-origin: detached=<worktree dirname> -->
+```
+
+`devlog_resolve_paths` exports it as `DEVLOG_ORIGIN` (empty for
+`devlog.md`). It is written only when a branch file is created: prepended
+to a migrated tail, or by `devlog_merge_round_current` when the target is
+missing or empty. `devlog.md` never gets one, existing branch files are
+not backfilled, and `keep-move.sh`'s full keep leaves it in place instead
+of moving it with the project summary. `/devlog-tracker:keep-all` is the
+consumer (see `docs/design/keep-all.md`).
+
 ## Carrying over the unfinished tail
 
 The first time a non-default branch resolves to a `devlog.<name>.md` that
