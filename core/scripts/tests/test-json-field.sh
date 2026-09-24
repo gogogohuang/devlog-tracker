@@ -70,5 +70,10 @@ assert_eq "slugify basic" "foo-bar" "$(slugify 'foo bar')"
 assert_eq "slugify collapses runs" "foo-bar" "$(slugify 'foo   bar')"
 assert_eq "slugify trims edges" "foo" "$(slugify ' foo ')"
 
+assert_eq "json_escape quotes and backslash" 'a \"q\" \\ b' "$(json_escape 'a "q" \ b')"
+assert_eq "json_escape tab" 'x\ty' "$(json_escape "$(printf 'x\ty')")"
+assert_eq "json_escape newline" 'l1\nl2' "$(json_escape "$(printf 'l1\nl2')")"
+assert_eq "json_escape CJK passthrough" '中文' "$(json_escape '中文')"
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

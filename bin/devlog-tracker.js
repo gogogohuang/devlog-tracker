@@ -11,7 +11,7 @@ async function main(argv) {
     return 0;
   }
   if (!command || command === '--help' || command === '-h') {
-    console.log('Usage: devlog-tracker <init|status> [--codex] [--cursor]');
+    console.log('Usage: devlog-tracker <init|status|report|timeline> [--codex] [--cursor] [--json] [--all-branches] [--out <path>]');
     return 0;
   }
   if (command === 'init') {
@@ -37,6 +37,19 @@ async function main(argv) {
       );
     }
     return 0;
+  }
+  const CORE_COMMANDS = { report: 'report-devlog.sh', timeline: 'timeline-devlog.sh' };
+  if (Object.prototype.hasOwnProperty.call(CORE_COMMANDS, command)) {
+    const { runCoreScript } = require('../cli/core-script');
+    const r = runCoreScript({
+      targetDir: process.cwd(),
+      repoRoot: path.join(__dirname, '..'),
+      name: CORE_COMMANDS[command],
+      args: rest,
+    });
+    process.stdout.write(r.stdout);
+    process.stderr.write(r.stderr);
+    return r.status;
   }
   console.error(`Unknown command: ${command}`);
   return 1;

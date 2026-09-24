@@ -75,7 +75,7 @@ npx devlog-tracker init
 
 Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
-Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind.
+Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
 
 `init` writes this machine's absolute paths into each platform's hooks config and into `.devlog-tracker/env.sh`. If you commit these files to git, each teammate needs to run `npx devlog-tracker init` on their own machine (paths differ per machine); alternatively, add `.devlog-tracker/` and the generated hooks config files to `.gitignore`.
 
@@ -88,7 +88,9 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/start-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/status-devlog.sh"
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/segment-watch-set.sh" 600
 bash "$DEVLOG_TRACKER_ROOT/core/scripts/checkpoint-set.sh" 20
-# pause / span-open / span-close / compact / keep-move / clean / resume: see commands/*.md
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/report-devlog.sh" --json
+bash "$DEVLOG_TRACKER_ROOT/core/scripts/timeline-devlog.sh"
+# pause / span-open / span-close / compact / keep-move / clean / resume / pr / promote: see commands/*.md
 ```
 
 ## Quick start
@@ -115,7 +117,11 @@ The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --cla
 | `/devlog-tracker:compact` | A script moves older `DONE` rounds into `devlog.archive.md` (Checkpoints and unfinished rounds stay in the main file). |
 | `/devlog-tracker:keep` | Scans the whole file, groups it by topic, lists suggestions at once, then — after confirmation — moves each section out into its own `devlog.<name>.md` (leaving a `## Kept index` pointer line with a one-sentence topic description in the main file); can also extract a single section or merge everything into one history file. Not the same as compact. See [`docs/design/keep.md`](docs/design/keep.md). |
 | `/devlog-tracker:overview` | Reads all kept `devlog.<name>.md` files and merges them into a cross-topic overview, plus a list of candidate rules that look like they belong in `CLAUDE.md`. Read-only — no workspace check, no confirmation, no writes. See the Kept index section of [`docs/design/keep.md`](docs/design/keep.md). |
+| `/devlog-tracker:promote` | Picks rule candidates from kept files, lessons files and Checkpoint `### 決策` sections, lists them numbered, and — only for the ones you choose — appends them to a managed `<!-- devlog-tracker:rules:begin/end -->` block in `CLAUDE.md` (or `AGENTS.md` when `CLAUDE.md` is just `@AGENTS.md`, or on Codex-only projects). Append-only, exact duplicates skipped; `init` never rewrites this block. |
 | `/devlog-tracker:search <keyword>` | Case-insensitive string search across `devlog.md`/`devlog.archive.md`/kept `devlog.<name>.md`/`devlog.lessons.<topic>.md`; Claude answers in its own words from the hits (with file/heading/line as evidence). Read-only — no workspace check, no confirmation, no writes. |
+| `/devlog-tracker:report` | Prints devlog stats: round counts (main + archive), per-Status counts, BLOCKED ratio, Checkpoint / kept / lessons counts, and first/last round time. `--all-branches` sums every branch file. Read-only. Also `npx devlog-tracker report [--json]` for machine-readable output. |
+| `/devlog-tracker:timeline` | Renders the devlog into a self-contained, offline HTML timeline at `.devlog/timeline.html` (round cards coloured by Status, Checkpoints interleaved, Status/branch/keyword filters, dark mode). No User Input text. Needs Node ≥18; `--all-branches` includes every branch file. Also `npx devlog-tracker timeline`. |
+| `/devlog-tracker:pr` | Drafts a PR description from this branch's devlog Rounds plus `git log` (Summary / Decisions / Changes / Test plan; no User Input text), writes it to `.devlog/pr-body.md`, and — only after you confirm — runs `gh pr create` or `gh pr edit`. Refuses on `main`/`master`. |
 | `/devlog-tracker:resume <name>` | Reads the last round and Handoff of a named saved file, checks the "Workspace" section, and proposes how to continue; new work is still written back to the main `devlog.md`. |
 | `/devlog-tracker:clean` | Unconditionally clears `devlog.md` (including the project summary and all Round history) — no move, no backup, not reversible; it always asks first, and only proceeds once you explicitly reply "clear". Keeps only the currently open round, renumbered as `## Round 1`. |
 | `/devlog-tracker:status` | Shows whether enforced recording is on, Span, Checkpoint, Segment Watch, the Lessons Mode workspace-drift count, and the last round's Status. |
@@ -126,6 +132,17 @@ The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --cla
 | `/devlog-tracker:lessons-off` | Turns off Lessons Mode; doesn't touch any already-written `devlog.lessons.*.md` files or the index. |
 | `/devlog-tracker:lessons [<topic>]` | No topic given: prints the `## Lessons index`. Topic given: prints that topic file's full content. Read-only — no workspace check, no confirmation. |
 | `/devlog-tracker:lessons-drift <count>` | Adjusts the threshold for Lessons Mode's "recurring workspace drift" mechanical reminder (default 3). Subordinate to Lessons Mode; reports `LESSONS_NOT_ENABLED` if it's off. |
+
+## Using what's recorded
+
+Four commands turn the devlog into something you can hand to others or feed back into the project:
+
+- **`report`** — counts only (rounds, Status mix, BLOCKED ratio, Checkpoint / kept / lessons totals). `npx devlog-tracker report --json` is the machine-readable form for CI or dashboards; `--rounds` adds per-Round data.
+- **`timeline`** — renders `.devlog/timeline.html`, one offline page you can open in a browser or attach to a hand-off. Re-run it to refresh; it overwrites the file.
+- **`pr`** — on a feature branch, drafts `.devlog/pr-body.md` from that branch's Rounds and `git log`, then asks before running `gh`. Without `gh` (or not logged in) it stops at the draft.
+- **`promote`** — lifts lasting rules out of kept files, lessons and Checkpoint decisions into a managed block in `CLAUDE.md`/`AGENTS.md`. It lists numbered candidates and writes only the ones you pick; edit or delete rules in that block by hand.
+
+None of these copy `### User Input` text into their output (`report --with-input` is the one explicit opt-in). `pr-body.md` and `timeline.html` live under `.devlog/`, which is usually gitignored — if your project commits `.devlog/`, don't commit those two files. `report` and `timeline` are treated like `status` and don't open a Round; `pr` and `promote` do, because they change things outside `.devlog/`. See [`docs/design/read-side-and-promote.md`](docs/design/read-side-and-promote.md).
 
 ## Once enforced recording is on
 
@@ -225,10 +242,9 @@ When enabled, a development-lesson entry is only considered when a `BLOCKED` sta
 ## Tests
 
 ```
-bash core/scripts/run-tests.sh
+bash core/scripts/run-tests.sh   # hook self-checks, including the Cursor and Codex adapters
+npm test                          # CLI, timeline renderer and scripts (Node)
 ```
-
-Includes the Cursor adapter.
 
 ## License
 

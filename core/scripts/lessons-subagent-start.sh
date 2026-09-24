@@ -10,6 +10,8 @@ set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
 HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$HOOKS_DIR/json-field.sh"
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 [ -f "$PROJECT_DIR/.devlog/.lessons-enabled" ] || exit 0
@@ -21,16 +23,6 @@ MSG="[devlog-tracker Lessons Mode] 這個專案開著 Lessons Mode：記錄開�
 DEVLOG_PROJECT_DIR='${PROJECT_DIR}' bash '${HOOKS_DIR}/lessons-append.sh' --topic '<kebab-case 主題，2–4 段>' --text '<一段自由散文：卡在哪、怎麼解開、下次怎麼避免>'
 
 路徑都是絕對路徑，在 worktree 裡也照原樣用，不要改成相對路徑。有記的話，在最終回報裡用一句話說明記了哪個主題；腳本回報 NEW_TOPIC 時可改用它列出的既有主題重跑。"
-
-json_escape() {
-  printf '%s' "$1" | awk '
-    BEGIN { ORS = "" }
-    {
-      gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
-      if (NR > 1) print "\\n"
-      print
-    }'
-}
 
 printf '{"hookSpecificOutput":{"hookEventName":"SubagentStart","additionalContext":"%s"}}\n' "$(json_escape "$MSG")"
 exit 0

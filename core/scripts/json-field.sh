@@ -94,3 +94,19 @@ json_str_field() {
 slugify() {
   printf '%s' "$1" | tr ' ' '-' | sed -E 's/-+/-/g; s/^-//; s/-$//'
 }
+
+json_escape() {
+  printf '%s' "$1" | awk '
+    BEGIN {
+      ORS = ""
+      # Same control-char handling as report-scan.awk esc(): \t \r get short
+      # escapes below, the rest of 0x01-0x1F (e.g. pasted ANSI \033) -> \u00XX.
+      for (ci = 1; ci <= 31; ci++) { cchar[ci] = sprintf("%c", ci); cesc[ci] = sprintf("\\u%04x", ci) }
+    }
+    {
+      gsub(/\\/, "\\\\"); gsub(/"/, "\\\""); gsub(/\t/, "\\t"); gsub(/\r/, "\\r")
+      for (ci = 1; ci <= 31; ci++) if (index($0, cchar[ci]) > 0) gsub(cchar[ci], cesc[ci])
+      if (NR > 1) print "\\n"
+      print
+    }'
+}
