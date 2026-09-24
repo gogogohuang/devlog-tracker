@@ -203,6 +203,65 @@ else
   FAIL=1
 fi
 
+# --- origin marker: DEVLOG_ORIGIN reflects the raw branch / detached dir ----
+devlog_resolve_paths "$MAINREPO"
+[ -z "$DEVLOG_ORIGIN" ] \
+  && echo "PASS: main has no DEVLOG_ORIGIN" \
+  || { echo "FAIL: main DEVLOG_ORIGIN=$DEVLOG_ORIGIN"; FAIL=1; }
+devlog_resolve_paths "$NONGIT"
+[ -z "$DEVLOG_ORIGIN" ] \
+  && echo "PASS: non-git has no DEVLOG_ORIGIN" \
+  || { echo "FAIL: non-git DEVLOG_ORIGIN=$DEVLOG_ORIGIN"; FAIL=1; }
+devlog_resolve_paths "$SLASHREPO"
+[ "$DEVLOG_ORIGIN" = "branch=feature/foo" ] \
+  && echo "PASS: DEVLOG_ORIGIN keeps the raw (unsanitized) branch name" \
+  || { echo "FAIL: slash DEVLOG_ORIGIN=$DEVLOG_ORIGIN"; FAIL=1; }
+devlog_resolve_paths "$DETACHEDREPO"
+[ "$DEVLOG_ORIGIN" = "detached=detached-repo" ] \
+  && echo "PASS: detached DEVLOG_ORIGIN names the worktree dir" \
+  || { echo "FAIL: detached DEVLOG_ORIGIN=$DEVLOG_ORIGIN"; FAIL=1; }
+
+# --- origin marker: written as line 1 when the tail migrates -------------
+MARKREPO="$TMP/markrepo"
+mig_repo "$MARKREPO"
+write_main_devlog "$MARKREPO/.devlog/devlog.md" 1:DONE 2:IN_PROGRESS
+git -C "$MARKREPO" checkout -q -b feat/mark
+devlog_resolve_paths "$MARKREPO"
+if [ "$(head -n 1 "$DEVLOG_FILE")" = "<!-- devlog-origin: branch=feat/mark -->" ] \
+  && [ "$(devlog_list_round_starts "$DEVLOG_FILE" | awk '{print $2}' | tr '\n' ' ')" = "2 " ] \
+  && ! grep -q "devlog-origin" "$MARKREPO/.devlog/devlog.md"; then
+  echo "PASS: migrated branch file starts with its origin marker"
+else
+  echo "FAIL: migrated marker"; cat "$DEVLOG_FILE" 2>/dev/null; FAIL=1
+fi
+
+# --- origin marker: first merge into a missing branch file writes it -----
+MERGEREPO="$TMP/mergerepo"
+mig_repo "$MERGEREPO"
+git -C "$MERGEREPO" checkout -q -b feat/merge
+devlog_resolve_paths "$MERGEREPO"
+printf '## Round 1 — t\n\n### Status\nDONE\n' > "$TMP/rc1.md"
+devlog_merge_round_current "$DEVLOG_FILE" "$TMP/rc1.md"
+printf '## Round 2 — t\n\n### Status\nDONE\n' > "$TMP/rc2.md"
+devlog_merge_round_current "$DEVLOG_FILE" "$TMP/rc2.md"
+if [ "$(head -n 1 "$DEVLOG_FILE")" = "<!-- devlog-origin: branch=feat/merge -->" ] \
+  && [ "$(grep -c "devlog-origin" "$DEVLOG_FILE")" = 1 ] \
+  && [ "$(devlog_list_round_starts "$DEVLOG_FILE" | awk '{print $2}' | tr '\n' ' ')" = "1 2 " ]; then
+  echo "PASS: first merge into a new branch file writes the marker once"
+else
+  echo "FAIL: merge marker"; cat "$DEVLOG_FILE" 2>/dev/null; FAIL=1
+fi
+
+# --- origin marker: devlog.md never gets one -----------------------------
+MAINMERGE="$TMP/mainmerge"
+mig_repo "$MAINMERGE"
+devlog_resolve_paths "$MAINMERGE"
+printf '## Round 1 — t\n\n### Status\nDONE\n' > "$TMP/rc3.md"
+devlog_merge_round_current "$DEVLOG_FILE" "$TMP/rc3.md"
+! grep -q "devlog-origin" "$DEVLOG_FILE" \
+  && echo "PASS: devlog.md gets no origin marker" \
+  || { echo "FAIL: devlog.md got a marker"; FAIL=1; }
+
 # --- HANDOFF_FILE mirrors DEVLOG_FILE naming (no rename migration) --------
 devlog_resolve_paths "$NONGIT"
 [ "$HANDOFF_FILE" = "$NONGIT/.devlog/handoff.md" ] \

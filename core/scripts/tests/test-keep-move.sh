@@ -123,5 +123,17 @@ case "$LINE_NO_DESC" in
   *) echo "FAIL: index line for no-desc missing: $LINE_NO_DESC"; FAIL=1 ;;
 esac
 
+MARK="$TMP/marker"
+mkdir -p "$MARK/.devlog"
+export CLAUDE_PROJECT_DIR="$MARK"
+printf '<!-- devlog-origin: branch=feat/x -->\n# project\n\n' > "$MARK/.devlog/devlog.md"
+make_round "$MARK/.devlog/devlog.md" 1 DONE
+make_round "$MARK/.devlog/devlog.md" 2 IN_PROGRESS
+printf '%s\n' '{"round": 2, "opened_at": "now"}' > "$MARK/.devlog/.round-open"
+bash "$SCRIPT_DIR/keep-move.sh" --from 1 --to 1 --name all >/dev/null
+assert_eq "full keep leaves origin marker on line 1" "<!-- devlog-origin: branch=feat/x -->" "$(head -n 1 "$MARK/.devlog/devlog.md")"
+grep -q 'devlog-origin' "$MARK/.devlog/devlog.all.md" && { echo "FAIL: marker copied into kept file"; FAIL=1; } || echo "PASS: kept file has no origin marker"
+grep -q '^# project' "$MARK/.devlog/devlog.all.md" && echo "PASS: project summary still moves on full keep" || { echo "FAIL: summary not moved"; FAIL=1; }
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

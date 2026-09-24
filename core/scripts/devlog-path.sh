@@ -21,12 +21,14 @@ _devlog_sanitize_name() {
 # whose Status is DONE. Nothing moves when the last round is DONE, when
 # there are no rounds, or when HEAD doesn't contain the local main/master
 # tip (an older branch being checked out, not one just forked from the
-# work in progress). The project header, Checkpoints, and Kept/Lessons
+# work in progress). When $6 (an origin like "branch=feat/x") is given,
+# the branch file starts with its origin marker. The project header,
+# Checkpoints, and Kept/Lessons
 # indexes always stay in $2. When rounds move, $4 (handoff.md) moves to
 # $5 too, since it snapshots that same unfinished work. Caller holds the
 # devlog lock.
 _devlog_migrate_unfinished_tail() {
-  local dir="$1" src="$2" dst="$3" src_handoff="$4" dst_handoff="$5"
+  local dir="$1" src="$2" dst="$3" src_handoff="$4" dst_handoff="$5" origin="${6:-}"
   [ -s "$src" ] || return 0
 
   # Cheap early exit first: until the branch file exists, every hook
@@ -71,7 +73,10 @@ _devlog_migrate_unfinished_tail() {
       print moved ? "M" $0 : "K" $0
     }
   ' "$src" > "$src.split" 2>/dev/null || { rm -f "$src.split"; return 0; }
-  sed -n 's/^M//p' "$src.split" | awk "$drop_trailing_blanks" > "$dst.tmp" 2>/dev/null
+  {
+    [ -z "$origin" ] || { devlog_origin_line "$origin"; printf '\n'; }
+    sed -n 's/^M//p' "$src.split" | awk "$drop_trailing_blanks"
+  } > "$dst.tmp" 2>/dev/null
   sed -n 's/^K//p' "$src.split" | awk "$drop_trailing_blanks" > "$src.tmp" 2>/dev/null
   rm -f "$src.split"
 
@@ -94,14 +99,18 @@ _devlog_migrate_unfinished_tail() {
 # time a branch resolves to a file that doesn't exist yet, only
 # devlog.md's unfinished tail is cut into it (see
 # _devlog_migrate_unfinished_tail); main's own history stays in devlog.md.
+# Also sets DEVLOG_ORIGIN ("branch=<raw name>" / "detached=<dir>", empty
+# for devlog.md): the first line written into a new branch file records it
+# as an origin marker (docs/design/keep-all.md "Origin marker").
 devlog_resolve_paths() {
   local dir="${1:-.}"
   DEVLOG_DIR="$dir/.devlog"
   DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
   # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
   HANDOFF_FILE="$DEVLOG_DIR/handoff.md"
+  DEVLOG_ORIGIN=""
 
-  local branch raw name
+  local branch raw name origin
   branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
 
   case "$branch" in
@@ -110,9 +119,11 @@ devlog_resolve_paths() {
       ;;
     HEAD)
       raw="$(basename "$(cd "$dir" 2>/dev/null && pwd)" 2>/dev/null || echo '')"
+      origin="detached=$raw"
       ;;
     *)
       raw="$branch"
+      origin="branch=$raw"
       ;;
   esac
   [ -n "$raw" ] || return 0
@@ -139,10 +150,11 @@ devlog_resolve_paths() {
   if [ -f "$DEVLOG_DIR/.enabled" ] && [ ! -f "$resolved" ] && [ -s "$DEVLOG_FILE" ]; then
     devlog_lock_acquire
     [ -f "$resolved" ] || _devlog_migrate_unfinished_tail \
-      "$dir" "$DEVLOG_FILE" "$resolved" "$HANDOFF_FILE" "$resolved_handoff"
+      "$dir" "$DEVLOG_FILE" "$resolved" "$HANDOFF_FILE" "$resolved_handoff" "$origin"
     devlog_lock_release
   fi
   DEVLOG_FILE="$resolved"
   # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
   HANDOFF_FILE="$resolved_handoff"
+  DEVLOG_ORIGIN="$origin"
 }
