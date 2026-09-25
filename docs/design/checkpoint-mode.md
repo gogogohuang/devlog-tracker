@@ -48,11 +48,19 @@ everything until the final Summary / Handoff:
 ### Summary
 把 XXX 模組拆成 A/B 兩個檔案，測試全過。
 
+### Reply
+告訴使用者拆分完成、測試全過，還沒 commit。
+
 ### Handoff
 #### 決策
 拆成 A/B，理由是三處耦合都集中在同一個檔。
 #### 檔案
-新增 a.ts、b.ts；刪除 xxx.ts。尚未 commit。
+尚未 commit：
+新增：a.ts, b.ts
+刪除：xxx.ts
+#### 工作區
+main @ a1b2c3d
+未提交：xxx.ts, a.ts, b.ts
 #### 現況
 拆分完成，測試全過。
 
@@ -63,7 +71,7 @@ DONE
 **When to write a segment** is Claude's judgment call — "a meaningful
 stage result," the same bar `Status: IN_PROGRESS` already uses — not a
 rule triggered by elapsed time or tool-call count. A short round with no
-real phases still gets Summary / Handoff as today, with no segment headings; segments are for
+real phases still gets Summary / Reply / Handoff, with no segment headings; segments are for
 rounds long enough that a single end-of-round summary would hide real
 intermediate decisions.
 
