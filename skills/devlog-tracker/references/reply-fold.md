@@ -52,7 +52,7 @@
 3. 用 Bash 執行：
 
 ```bash
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh"
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh"
 ```
 
 這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個

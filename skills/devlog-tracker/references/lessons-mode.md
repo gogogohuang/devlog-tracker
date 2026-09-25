@@ -24,7 +24,7 @@
 **寫法**：跑（`PLUGIN_ROOT` 同其他指令）：
 
 ```bash
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/lessons-append.sh" \
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${PLUGIN_ROOT}/core/scripts/lessons-append.sh" \
   --topic "<主題 kebab-case slug，跟 keep 的 <name> 同一套正規化規則>" \
   --text "<自由散文，一段就好：卡在哪、怎麼解開、下次怎麼避免>"
 ```
