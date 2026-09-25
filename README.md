@@ -2,7 +2,7 @@
 
 *English | [繁體中文](README.zh-TW.md)*
 
-**Version** 0.33.1
+**Version** 0.33.2
 
 Maintains a `.devlog/devlog.md` in your project, turning each conversation round's requests, decisions, and outcomes into a permanent record. A conversation disappears the moment you `/clear` or switch sessions; this file fills that gap so work can pause and resume. Nothing is touched until you explicitly run `/devlog-tracker:start` — installing the plugin alone doesn't create or modify any files.
 
