@@ -8,7 +8,7 @@ description: 查看這個專案 devlog 強制記錄是否開著、span / checkpo
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
 ```
 ```
 把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態；`LESSONS_ADVISORY=<count>/<threshold>`：Lessons Mode 開著時，機制性訊號（工作區漂移不符、或

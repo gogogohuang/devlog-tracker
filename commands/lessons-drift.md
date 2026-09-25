@@ -6,7 +6,7 @@ description: 調整 Lessons Mode 機制性提醒的共用門檻——工作區�
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/lessons-drift-set.sh" <次數>
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/lessons-drift-set.sh" <次數>
 ```
 
 不要自己手改 `.devlog/.lessons-advisory-state`。

@@ -84,7 +84,7 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/keep-move.sh" \
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/keep-move.sh" \
   --from <from> --to <to> --name "<name>" --desc "<這段在做什麼的一句話>"
 ```
 

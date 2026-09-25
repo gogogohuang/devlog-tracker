@@ -6,7 +6,7 @@ description: 查看 devlog 統計：Round 數、各 Status、BLOCKED 比例、Ch
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/report-devlog.sh"
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/report-devlog.sh"
 ```
 
 使用者要看所有 branch 的合計時加 `--all-branches`。
