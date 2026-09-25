@@ -34,7 +34,7 @@ description: 無條件清空 .devlog/devlog.md（含專案摘要與所有 Round 
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/clean-devlog.sh" --confirmed
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/clean-devlog.sh" --confirmed
 ```
 ```
 

@@ -16,7 +16,7 @@ description: 把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.a
    先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
    ```bash
    PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-   DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/compact-devlog.sh"
+   DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/compact-devlog.sh"
    ```
    檔案不存在時腳本 exit 1：告知沒有東西可壓縮。
 5. 用 stdout 的 `MOVED` / `REMAINING` / `ARCHIVE` 回報一句話。

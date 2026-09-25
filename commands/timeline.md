@@ -6,7 +6,7 @@ description: 把 devlog 產生成一份離線可開的 HTML 時間軸（.devlog/
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/timeline-devlog.sh"
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/timeline-devlog.sh"
 ```
 
 使用者要看所有 branch 時加 `--all-branches`；要寫到別的位置時加 `--out <路徑>`。

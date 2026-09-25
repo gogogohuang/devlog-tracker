@@ -7,7 +7,7 @@ description: 啟動這個專案的 devlog 強制記錄機制。之後每一輪�
 1. 先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
    ```bash
    PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-   DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/start-devlog.sh"
+   DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/start-devlog.sh"
    ```
    不要自己用手建 `.enabled` / `.checkpoint-state` / `.segment-state`。
 2. 若 stdout 有 `GITIGNORE_DEVLOG=no`：鄭重提醒——`.devlog/` 會寫入使用者原文（遮罩只覆蓋常見 token 前綴，不是通用掃密）。**強烈建議**把 `.devlog/` 加進專案 `.gitignore`。問要不要現在加。只有使用者明確說要，才在 `.gitignore` 末尾追加一行 `.devlog/`（檔案不存在就建立）。不要改其他行。若使用者拒絕，再警告一次「之後若不小心 commit，prompt／殘留密鑰可能進版控」，然後繼續步驟 3。

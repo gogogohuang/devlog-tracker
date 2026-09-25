@@ -7,7 +7,7 @@ description: 調整 Checkpoint Mode 的沉默門檻——累積多少輪沒寫 #
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="$(pwd)" bash "${PLUGIN_ROOT}/core/scripts/checkpoint-set.sh" <rounds>
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/checkpoint-set.sh" <rounds>
 ```
 
 不要自己手改 `.devlog/.checkpoint-state`。
