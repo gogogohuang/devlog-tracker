@@ -50,7 +50,7 @@
 | Hard：上一輪工作區漂移擋工具 | PreToolUse（continue 同 session） | `SKILL.md`「接續」；`commands/continue.md` |
 | Hard：Segment Watch 逾時先補段落 | PreToolUse | `references/round-segments.md` |
 | Soft：Checkpoint／Lessons 建議 | hook 提示，不強制寫入本身 | `references/checkpoint-mode.md`／`lessons-mode.md` |
-| fail-open／loop guard | hook 穩健性 | `SKILL.md`「兩個穩健性設計」 |
+| fail-open／loop guard | hook 穩健性 | `core/scripts/enforce-devlog.sh` 開頭註解 |
 
 ## Transformation
 

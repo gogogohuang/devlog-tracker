@@ -58,7 +58,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DE
 這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
 Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 
-上面第 2 步已經讓這一輪正常收尾（Summary／Handoff／Status 都有效），所以
+上面第 2 步已經讓這一輪正常收尾（Summary／Reply／Handoff／Status 都有效），所以
 這個 turn 結束時它會照一般流程併回 `.devlog/devlog.md`。也就是說，**提問
 出去、答案還沒進來的這段期間**（使用者可能過很久才回覆），這一輪確實已經
 完整躺在 `devlog.md` 的歷史裡，不是懸在 `.devlog/.round-current.md` 裡假裝

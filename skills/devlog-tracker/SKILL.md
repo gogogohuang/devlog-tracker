@@ -3,10 +3,7 @@ name: devlog-tracker
 description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者下 /devlog-tracker:start 後 Stop hook 強制每輪寫入；SessionStart 在 startup / resume / compact / fork 注入進度，/clear 不注入；要接續用 /devlog-tracker:continue。當使用者提到「devlog-tracker」「.devlog/devlog.md」「/devlog-tracker:continue」或明確要寫／接續這份紀錄時使用。
 ---
 
-# Devlog Tracker（簡化版）
-
-參考 agfnow/agentflow 的 devlog 基礎協定做的簡化版，只保留「逐輪對話紀錄」這一層，
-不含原版的 10 步驟 SDD pipeline、多模型對抗審查、external worker 外包等進階機制。
+# Devlog Tracker
 
 ## Contract
 
@@ -104,9 +101,7 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 
 1. 使用者送出新訊息時，`UserPromptSubmit` hook（`core/scripts/round-start.sh`）
    若開關開著，就在 `.devlog/.round-current.md` 寫入這一輪的 skeleton（`### User Input`
-   + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。`.turn-start` 雜湊是
-   **寫完 skeleton 之後**才對 `.round-current.md` 拍的，所以 Stop 仍能判斷 Claude
-   有沒有再補收尾。
+   + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。
 2. Claude 編輯**同一個** Round：不要再 append 一個新的 `## Round`。不要改 User Input
    （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Reply` / `### Handoff`，
    把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。這一輪還開著的時候，編輯的對象
@@ -123,21 +118,14 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 這個事件上。
 
 需要誠實說明的邊界：User Input 在送出當下就已經在 `.devlog/.round-current.md`
-（收尾成功或被判定中斷後才會併回 `devlog.md`）。正常結束時 Stop 仍保證有 Summary / Handoff。
+（收尾成功或被判定中斷後才會併回 `devlog.md`）。正常結束時 Stop 仍保證有 Summary / Reply / Handoff。
 意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
 **下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上）。
 `PostToolUseFailure` 的 `is_interrupt` 若有觸發，只是 best-effort 的額外路徑，不能當成 Esc
 會立刻蓋章。中間沒寫成 `### 段落` 的過程仍會丟——Segment Watch 只在還有下一個工具呼叫時催促。
 
-### 兩個穩健性設計（參考 agfnow/agentflow 的 stop-hook.js）
-
-- **loop guard**：`enforce-devlog.sh` 一開始會讀 stdin 的 `stop_hook_active` 欄位——這是
-  Claude Code 官方標準欄位，代表「這輪已經被本支 hook 擋下來一次、Claude 正在重跑」，
-  此時直接放行，不會一直卡住同一輪。Claude Code 本身也有連續擋 8 次的上限保護，這是多
-  一層保險。
-- **fail-open**：三支 hook 腳本都不用 `set -e`，每一步可能失敗的地方（讀不到檔案、雜湊
-  算不出來）都明確接住、失敗就直接放行。這些腳本的職責是「檢查」，不該因為自己的臭蟲
-  就意外把使用者的 session 卡死。
+hook 本身出錯時一律放行（fail-open），同一輪被 Stop 擋過一次後重跑也會放行（loop guard）；
+設計說明見 `core/scripts/enforce-devlog.sh` 開頭註解。
 
 ## 自動接續與 `/clear`
 
@@ -149,8 +137,8 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 
 1. 若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空，先注入這份 Session Handoff 快照
 2. 再讀取 `.devlog/devlog.md`，注入最後一個 `## Checkpoint`（若有）、最後一個 `## Kept 索引`（若有；不是具名檔內容）、最後一個 `## Lessons 索引`（若有），加上最近 2 輪的 Summary / Handoff / Status（沒有 Summary 的 skeleton 才帶 User Input）
-3. 印到 stdout，Claude Code 會把這段文字當成這次 session 的 additionalContext 自動注入
-4. Claude 收到這段 context 後，開場就已經知道目前進度
+
+這段摘要會出現在 session 開頭的 context 裡。
 
 `/clear` 時 hook 仍可能把殘留的開著 Round 標成 `INTERRUPTED`，但 stdout 什麼都不印。
 之後只有使用者下 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時，
