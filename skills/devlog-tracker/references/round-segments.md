@@ -23,11 +23,19 @@
 ### Summary
 把 XXX 模組拆成 A/B 兩個檔案，測試全過。
 
+### Reply
+告訴使用者拆分完成、測試全過，還沒 commit。
+
 ### Handoff
 #### 決策
 拆成 A/B，理由是三處耦合都集中在同一個檔。
 #### 檔案
-新增 a.ts、b.ts；刪除 xxx.ts。尚未 commit。
+尚未 commit：
+新增：a.ts, b.ts
+刪除：xxx.ts
+#### 工作區
+main @ a1b2c3d
+未提交：xxx.ts, a.ts, b.ts
 #### 現況
 拆分完成，測試全過。
 
@@ -35,7 +43,7 @@
 DONE
 `````
 
-這個範例是 DONE 且沒有後續，所以沒有 `#### 工作區` 與 `#### 下一步`；這兩節只有 IN_PROGRESS／BLOCKED 才寫。
+這個範例是 DONE 且沒有後續，所以沒有 `#### 完成條件` 與 `#### 下一步`；「檔案」有內容，所以 `#### 工作區` 仍要寫（Stop 會核對）。
 
 **什麼時候該寫一個段落**：跟判斷 `Status: IN_PROGRESS` 用的同一套標準——「有意義的
 階段性結果」，不是照時間或工具呼叫次數機械觸發。短的、沒什麼階段可言的一輪，
@@ -52,4 +60,4 @@ dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門�
 `/devlog-tracker:segment-watch <時間長度>`（例如 `/devlog-tracker:segment-watch 5 分鐘`）
 調整，不用手改 `.devlog/.segment-state` 的 `max_silent_seconds`。
 
-收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary` 與 `### Handoff`。
+收尾時 Stop hook 仍會要求最後一個 Round 上看得到 `### Summary`、`### Reply` 與 `### Handoff`。

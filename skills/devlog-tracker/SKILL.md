@@ -139,14 +139,6 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
   算不出來）都明確接住、失敗就直接放行。這些腳本的職責是「檢查」，不該因為自己的臭蟲
   就意外把使用者的 session 卡死。
 
-更新（Span Mode 之後）：agentflow 的 Stop hook 會依「這一輪是不是還在進行中」
-放寬檢查強度，這裡原本認為 Claude Code 原生的「一個使用者訊息 = 一輪」架構沒有
-對應的地方可以搬這個設計過來。後來為了支援 `/loop`／`Workflow` 這類會被自動
-排程反覆喚醒的長任務，加了上面的 Span Mode，算是這個設計的一個窄化版本——只在
-Claude 主動宣告「接下來會有一串自動續接」時才放寬，且用 tick 計數做安全閥，
-不是像 agentflow 那樣泛用地判斷「這輪是否還在進行中」。一般互動式對話仍然是
-完整的「一個訊息 = 一輪」強制模式，沒有變。
-
 ## 自動接續與 `/clear`
 
 這個 plugin 內建一個 SessionStart hook（`claude/hooks.json` + `core/scripts/session-start-devlog.sh`），
@@ -408,7 +400,7 @@ hook 會要求補一段。
 
 ## 壓縮歸檔：`/devlog-tracker:compact`
 
-歸檔不再是自動觸發，而是使用者主動下 `/devlog-tracker:compact` 指令時才做（見 `commands/compact.md`）。
+歸檔只在使用者下 `/devlog-tracker:compact` 時做，不會自動觸發（見 `commands/compact.md`）。
 規則：
 
 - 保留：專案摘要（如果有）、最近 5 輪、所有還沒 `DONE`（`IN_PROGRESS`/`BLOCKED`/`INTERRUPTED`）的輪次

@@ -41,14 +41,14 @@
 devlog.md 完全不用動。一旦累積到門檻，Stop hook 會退回正常模式，**這一輪就
 會被要求寫東西才能結束**——看到這種擋下來的訊息，代表這個 span 的「安靜額度」
 用完了，寫點輕量的進度（不用完整 Round，一行都可以）就能讓它繼續運作。
-前提是最後一個 Round 裡已經有 `### Summary` 與 `### Handoff`——一行是追加到那個 Round，不是新開一個缺標題的 Round。若這輪是新開的 Round，兩個標題都要有。
+前提是最後一個 Round 裡已經有 `### Summary`、`### Reply` 與 `### Handoff`——一行是追加到那個 Round，不是新開一個缺標題的 Round。若這輪是新開的 Round，三個標題都要有。
 
 ## 怎麼關掉一個 span
 
 整個 Ask 真的做完時：**開一個新的 Round**（不要回頭改寫當初開 span 那個
-Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」；Summary 用 2–4 句
-給人看這段自動化的結論；Handoff 依小節總結整段期間做了什麼（決策／檔案／工作區／現況／
-下一步；`DONE` 省略工作區與下一步）；Status 正常寫 `DONE`／`IN_PROGRESS`／`BLOCKED`；然後刪掉 `.devlog/.span-open`。
+Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」，其餘照 SKILL.md
+「每一輪的紀錄格式」完整收尾（Summary／Reply／Handoff／Status，Handoff 小節的
+必寫與省略規則相同），內容總結整段 span 做了什麼；然後刪掉 `.devlog/.span-open`。
 
 ## 已知限制：分辨不出「這是自動續接還是真人插話」
 
