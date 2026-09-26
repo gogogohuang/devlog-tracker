@@ -4,6 +4,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/xml-fixture.sh
+. "$SCRIPT_DIR/tests/lib/xml-fixture.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -79,6 +81,7 @@ write_unfinished() {
     echo "### Status"
     echo "$status"
   } > "$DEVLOG_DIR/.round-current.md"
+  xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
 }
 
 # 1) IN_PROGRESS without Session Handoff -> blocked
@@ -144,6 +147,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE -> allowed" 0 $?
 if [ ! -f "$DEVLOG_DIR/handoff.md" ]; then
