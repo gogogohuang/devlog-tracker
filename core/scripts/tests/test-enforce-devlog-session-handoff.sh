@@ -198,4 +198,62 @@ MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "legacy Session Handoff blocked" 2 $?
 case "$MSG" in *"migrate-handoff.sh"*) echo "PASS: legacy session message" ;; *) echo "FAIL: $MSG"; FAIL=1 ;; esac
 
+# 7) DONE round quoting a fenced ### Session Handoff example in its Reply, no
+# real Session Handoff -> allowed (presence check must ignore fences)
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF2'
+## Round 1 — 2026-09-22T02:00:00+08:00
+
+### Summary
+done
+
+### Reply
+範例格式：
+```markdown
+### Session Handoff
+<session-handoff>
+<decisions>
+- x
+</decisions>
+</session-handoff>
+```
+
+### Handoff
+<handoff>
+<state>
+finished
+</state>
+</handoff>
+
+### Status
+DONE
+EOF2
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "DONE with fenced Session Handoff example -> allowed" 0 $?
+[ -n "$MSG" ] && echo "note: stderr was: $MSG"
+
+# 8) IN_PROGRESS with only a look-alike heading (### Session Handoff（補充）)
+# -> blocked as missing: the writer only accepts the exact heading
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_unfinished IN_PROGRESS "
+### Session Handoff（補充）
+<session-handoff>
+<decisions>
+- x
+</decisions>
+<open-questions>
+- y
+</open-questions>
+<failed-attempts>
+- z
+</failed-attempts>
+</session-handoff>
+"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "look-alike Session Handoff heading -> blocked" 2 $?
+case "$MSG" in
+  *"缺少 ### Session Handoff"*) echo "PASS: look-alike heading reported as missing" ;;
+  *) echo "FAIL: expected missing Session Handoff message, got: $MSG"; FAIL=1 ;;
+esac
+
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

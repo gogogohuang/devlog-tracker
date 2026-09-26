@@ -209,6 +209,16 @@ if [ -n "$LAST_ROUND" ]; then
     '
   }
 
+  # True when heading regex $1 matches a line outside ``` fences (same
+  # fence／NOFENCE rules as section_body).
+  section_present() {
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$1" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; next }
+      !fence && $0 ~ h { found = 1; exit }
+      END { exit(found ? 0 : 1) }
+    '
+  }
+
   nonempty_body() {
     section_body "$1" | grep -q '[^[:space:]]'
   }
@@ -522,9 +532,11 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
   # docs/design/handoff-xml.md）。Present in any status → must be XML;
   # required for IN_PROGRESS／BLOCKED.
   # 放在其他 IN_PROGRESS／BLOCKED 檢查之後，避免搶先蓋掉既有失敗訊息。
-  SESSION_BODY="$(section_body '^### Session Handoff')"
+  # Exact heading only (same as handoff_section_of, which handoff_write uses).
+  SESSION_HEADING_RE='^### Session Handoff[ \t]*$'
+  SESSION_BODY="$(section_body "$SESSION_HEADING_RE")"
   HAS_SESSION=0
-  printf '%s\n' "$LAST_ROUND" | grep -q '^### Session Handoff' && HAS_SESSION=1
+  section_present "$SESSION_HEADING_RE" && HAS_SESSION=1
   if [ "$HAS_SESSION" -eq 1 ] && [ "$(handoff_format "$SESSION_BODY")" = "md" ]; then
     handoff_legacy_message "$SCRIPT_DIR/migrate-handoff.sh" "$(cd "$PROJECT_DIR" 2>/dev/null && pwd || printf '%s' "$PROJECT_DIR")" >&2
     exit 2
@@ -573,11 +585,11 @@ if [ -n "$LAST_ROUND" ]; then
     case "${STATUS_VAL:-}" in
       IN_PROGRESS|BLOCKED)
         handoff_write "$HANDOFF_FILE" "$LAST_ROUND" 2>/dev/null || \
-          echo "警告：無法寫入 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+          echo "警告：無法寫入 Session Handoff 檔（${HANDOFF_FILE}），本輪仍已收尾。" >&2
         ;;
       DONE)
         handoff_clear "$HANDOFF_FILE" 2>/dev/null || \
-          echo "警告：無法清除 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+          echo "警告：無法清除 Session Handoff 檔（${HANDOFF_FILE}），本輪仍已收尾。" >&2
         ;;
     esac
   fi
