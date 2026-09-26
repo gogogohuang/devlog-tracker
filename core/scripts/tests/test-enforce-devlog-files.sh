@@ -98,7 +98,7 @@ write_round() {
     echo "### Status"
     echo "$status"
   } > "$DEVLOG_DIR/.round-current.md"
-  xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+  xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 ws_clean() {

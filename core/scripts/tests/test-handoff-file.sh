@@ -16,80 +16,102 @@ s
 r
 
 ### Handoff
-#### 現況
+<handoff>
+<state>
 c
-#### 完成條件
+</state>
+<done-when>
 done when tests pass
-#### 下一步
+</done-when>
+<next>
 edit core/scripts/handoff-file.sh
+</next>
+</handoff>
 
 ### Session Handoff
-
-#### 決策
+<session-handoff>
+<decisions>
 - pick route A
-
-#### 待解問題
+</decisions>
+<open-questions>
 - （無）
-
-#### 失敗嘗試
+</open-questions>
+<failed-attempts>
 - tried parse-in-place
+</failed-attempts>
+</session-handoff>
 
 ### Status
 IN_PROGRESS
 '
 
+EXPECTED='<session-handoff>
+<decisions>
+- pick route A
+</decisions>
+<open-questions>
+- （無）
+</open-questions>
+<failed-attempts>
+- tried parse-in-place
+</failed-attempts>
+</session-handoff>'
+
 BAD_ORDER='### Session Handoff
-#### 待解問題
+<session-handoff>
+<open-questions>
 - x
+</open-questions>
+<decisions>
+- y
+</decisions>
+<failed-attempts>
+- z
+</failed-attempts>
+</session-handoff>
+'
+
+MISSING='### Session Handoff
+<session-handoff>
+<decisions>
+- x
+</decisions>
+</session-handoff>
+'
+
+LEGACY='### Session Handoff
 #### 決策
+- x
+#### 待解問題
 - y
 #### 失敗嘗試
 - z
 '
 
-MISSING='### Session Handoff
-#### 決策
-- x
-#### 失敗嘗試
-- z
-'
-
-if handoff_session_section_ok "$GOOD_ROUND"; then
-  echo "PASS: good round validates"
-else
-  echo "FAIL: good round should validate"; FAIL=1
-fi
-
-if handoff_session_section_ok "$BAD_ORDER"; then
-  echo "FAIL: bad order should fail"; FAIL=1
-else
-  echo "PASS: bad order rejected"
-fi
-
-if handoff_session_section_ok "$MISSING"; then
-  echo "FAIL: missing 待解問題 should fail"; FAIL=1
-else
-  echo "PASS: missing subsection rejected"
-fi
-
-OUT="$(handoff_extract_file_body "$GOOD_ROUND")" || { echo "FAIL: extract exited $?"; FAIL=1; OUT=""; }
-if printf '%s\n' "$OUT" | grep -q '^## Session Handoff' \
-  && printf '%s\n' "$OUT" | grep -q '^### 決策' \
-  && printf '%s\n' "$OUT" | grep -q 'pick route A' \
-  && printf '%s\n' "$OUT" | grep -q '^### 待解問題' \
-  && printf '%s\n' "$OUT" | grep -q '（無）' \
-  && printf '%s\n' "$OUT" | grep -q '^### 失敗嘗試' \
-  && printf '%s\n' "$OUT" | grep -q 'tried parse-in-place'; then
-  echo "PASS: extract shape"
-else
-  echo "FAIL: extract shape, got: $OUT"; FAIL=1
-fi
-
 TARGET="$TMP/handoff.md"
-handoff_write "$TARGET" "$GOOD_ROUND" || { echo "FAIL: write"; FAIL=1; }
-[ -s "$TARGET" ] && grep -q 'pick route A' "$TARGET" \
-  && echo "PASS: write creates file" \
-  || { echo "FAIL: write"; FAIL=1; }
+if handoff_write "$TARGET" "$GOOD_ROUND"; then
+  if [ "$(cat "$TARGET")" = "$EXPECTED" ]; then
+    echo "PASS: write stores <session-handoff> block verbatim"
+  else
+    echo "FAIL: handoff.md content, got:"; cat "$TARGET"; FAIL=1
+  fi
+else
+  echo "FAIL: write good round returned non-zero"; FAIL=1
+fi
+
+expect_rejected() {
+  local name="$1" blob="$2" bad_target="$TMP/bad-$1.md"
+  if handoff_write "$bad_target" "$blob"; then
+    echo "FAIL: $name should be rejected"; FAIL=1
+  elif [ -e "$bad_target" ]; then
+    echo "FAIL: $name left a file behind"; FAIL=1
+  else
+    echo "PASS: $name rejected, no file written"
+  fi
+}
+expect_rejected BAD_ORDER "$BAD_ORDER"
+expect_rejected MISSING "$MISSING"
+expect_rejected LEGACY "$LEGACY"
 
 handoff_clear "$TARGET"
 [ ! -f "$TARGET" ] && echo "PASS: clear removes file" \

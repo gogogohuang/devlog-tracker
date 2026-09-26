@@ -518,11 +518,32 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
     fi
   fi
 
-  # Session Handoff → .devlog/handoff.md（docs/design/session-handoff-file.md）
+  # Session Handoff → .devlog/handoff.md（docs/design/session-handoff-file.md,
+  # docs/design/handoff-xml.md）。Present in any status → must be XML;
+  # required for IN_PROGRESS／BLOCKED.
   # 放在其他 IN_PROGRESS／BLOCKED 檢查之後，避免搶先蓋掉既有失敗訊息。
-  if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
-    if ! handoff_session_section_ok "$LAST_ROUND"; then
-      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，必須有 \`### Session Handoff\`，且依序包含 \`#### 決策\`／\`#### 待解問題\`／\`#### 失敗嘗試\`（可寫 \`- （無）\`）。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session。" >&2
+  SESSION_BODY="$(section_body '^### Session Handoff')"
+  HAS_SESSION=0
+  printf '%s\n' "$LAST_ROUND" | grep -q '^### Session Handoff' && HAS_SESSION=1
+  if [ "$HAS_SESSION" -eq 1 ] && [ "$(handoff_format "$SESSION_BODY")" = "md" ]; then
+    handoff_legacy_message "$SCRIPT_DIR/migrate-handoff.sh" "$(cd "$PROJECT_DIR" 2>/dev/null && pwd || printf '%s' "$PROJECT_DIR")" >&2
+    exit 2
+  fi
+  NEED_SESSION=0
+  case "$STATUS_VAL" in IN_PROGRESS|BLOCKED) NEED_SESSION=1 ;; esac
+  if [ "$HAS_SESSION" -eq 1 ] || [ "$NEED_SESSION" -eq 1 ]; then
+    if [ "$HAS_SESSION" -eq 0 ]; then
+      SESSION_ERR="缺少 ### Session Handoff（Status 是 IN_PROGRESS 或 BLOCKED 時必寫）"
+    elif SESSION_ERR="$(handoff_xml_check "$SESSION_BODY" session-handoff)"; then
+      SESSION_ERR=""
+    fi
+    if [ -n "$SESSION_ERR" ]; then
+      {
+        echo "Session Handoff 格式不對：${SESSION_ERR}"
+        echo ""
+        echo "正確格式（三個標籤都要有，沒有內容就寫 - （無））。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session："
+        handoff_xml_template session-handoff
+      } >&2
       exit 2
     fi
   fi

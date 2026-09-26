@@ -84,7 +84,7 @@ fixture
 ### Status
 DONE
 EOF
-  xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+  xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 # Seeds *prior, already-closed* history directly into devlog.md — content
@@ -364,7 +364,7 @@ DONE
 
 ## Checkpoint（Round 2 摘要）
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "genuine checkpoint write above the corrected stored value -> allowed" 0 $?
 assert_round_merged "genuine checkpoint write above the corrected stored value" "## Checkpoint（Round 2 摘要）"
@@ -433,7 +433,7 @@ missing summary
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "last Round missing ### Summary -> blocked" 2 $?
 
@@ -451,7 +451,7 @@ has reply
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 HEADING_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "last Round missing ### Handoff -> blocked" 2 $?
 case "$HEADING_MISS_MSG" in
@@ -474,7 +474,7 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "both headings present with empty bodies -> blocked" 2 $?
 EMPTY_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
@@ -578,7 +578,7 @@ complete
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo "## Checkpoint（Round 6 摘要）" >> "$DEVLOG_DIR/devlog.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "Checkpoint-only append after a complete last Round -> allowed" 0 $?
@@ -608,7 +608,7 @@ complete
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 cat > "$DEVLOG_DIR/.span-open" <<'SPANEOF'
 {
   "round": 6,
@@ -644,7 +644,7 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'DEVEOF'
 ## Round 7 — 2026-09-09T10:30:00+08:00
 incomplete new round
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "span at max, new Round missing headings -> blocked" 2 $?
 SPAN_TICKS_HELD="$(grep -o '"ticks_since_checkin"[[:space:]]*:[[:space:]]*[0-9]\+' "$DEVLOG_DIR/.span-open" | grep -o '[0-9]\+$')"
@@ -685,7 +685,7 @@ fixture reply.
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "last Round complete, fenced ## Round 15 and ## 安裝 in body -> allowed" 0 $?
 assert_round_merged "last Round complete, fenced ## Round 15 and ## 安裝 in body" "已回覆格式問題"
@@ -724,7 +724,7 @@ complete last Round
 ### Status
 DONE
 DEVEOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "older Round still uses ### Response, complete last Round -> allowed" 0 $?
 assert_round_merged "older Round still uses ### Response, complete last Round" "complete last Round"
@@ -771,7 +771,7 @@ done
 ### Status
 DONE
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
 cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
@@ -821,7 +821,7 @@ esc
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 touch "$DEVLOG_DIR/.interrupted"
@@ -876,7 +876,7 @@ round finished normally
 ### Status
 DONE
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 printf '%s\n' '{"round": 1, "opened_at": "2026-09-09T12:00:00+08:00"}' > "$DEVLOG_DIR/.round-open"
 cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 printf '\n' >> "$DEVLOG_DIR/.round-current.md"
@@ -909,7 +909,7 @@ mkdir -p "$RECOVER_DIR/.devlog"
 touch "$RECOVER_DIR/.devlog/.enabled"
 : > "$RECOVER_DIR/.devlog/devlog.md"
 printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### User Input\n```text\nX\n```\n\n### Summary\n完成\n\n### Handoff\n#### 現況\nok\n\n### Status\nDONE\n' > "$RECOVER_DIR/.devlog/.round-current.md"
-xml_fixture_handoff_only "$RECOVER_DIR/.devlog/.round-current.md"
+xml_fixture "$RECOVER_DIR/.devlog/.round-current.md"
 printf '{"round": 1}\n' > "$RECOVER_DIR/.devlog/.round-open"
 echo "stale" > "$RECOVER_DIR/.devlog/.turn-start"
 touch "$RECOVER_DIR/.devlog/.interrupted"
@@ -952,7 +952,7 @@ stale interrupt
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 cksum < "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.turn-start"
 rm -f "$DEVLOG_DIR/.round-open"
 touch "$DEVLOG_DIR/.interrupted"
@@ -1033,7 +1033,7 @@ fixture reply.
 ### Status
 DONE
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with bodies and no 下一步 -> allowed" 0 $?
 assert_round_merged "DONE with bodies and no 下一步" "做完了"
@@ -1068,9 +1068,50 @@ fixture reply.
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "IN_PROGRESS without 下一步 -> blocked" 2 $?
+
+# --- Heading Scenario 13b: IN_PROGRESS with <done-when> but no <next> ------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
+## Round 91 — 2026-09-09T10:41:00+08:00
+
+### Summary
+還在做。
+
+### Reply
+fixture reply.
+
+### Handoff
+<handoff>
+<state>
+做到一半。
+</state>
+<done-when>
+observable done via test.
+</done-when>
+</handoff>
+
+### Session Handoff
+<session-handoff>
+<decisions>
+- （無）
+</decisions>
+<open-questions>
+- fixture open
+</open-questions>
+<failed-attempts>
+- （無）
+</failed-attempts>
+</session-handoff>
+
+### Status
+IN_PROGRESS
+EOF
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "IN_PROGRESS with <done-when> but no <next> -> blocked" 2 $?
+assert_contains "missing <next> message names <next>" "<next>" "$MSG"
 
 # --- Heading Scenario 14: IN_PROGRESS with 下一步 -> allowed --------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -1108,7 +1149,7 @@ fixture reply.
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "IN_PROGRESS with 下一步 -> allowed" 0 $?
 assert_round_merged "IN_PROGRESS with 下一步" "打開 foo.ts 繼續"
@@ -1131,7 +1172,7 @@ y
 ### Status
 WIP
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "illegal Status -> blocked" 2 $?
 
@@ -1170,7 +1211,7 @@ fixture reply.
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 BLACKLIST_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
 assert_exit "下一步 is pure filler phrase '繼續完成' -> blocked" 2 $?
 case "$BLACKLIST_MSG" in
@@ -1212,7 +1253,7 @@ fixture reply.
 ### Status
 BLOCKED
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 is '持續優化。' with trailing punctuation -> blocked (BLOCKED status too)" 2 $?
 
@@ -1253,7 +1294,7 @@ fixture reply.
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 contains 繼續完成 inside a concrete sentence -> allowed" 0 $?
 assert_round_merged "下一步 contains 繼續完成 inside a concrete sentence" "錯誤處理"
@@ -1297,7 +1338,7 @@ fixture reply.
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "下一步 multi-line body including a filler line -> allowed" 0 $?
 assert_round_merged "下一步 multi-line body including a filler line" "bar.ts"
@@ -1317,7 +1358,7 @@ y
 ### Status
 DONE
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 REPLY_MISS_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
 assert_exit "last Round missing ### Reply -> blocked" 2 $?
 case "$REPLY_MISS_MSG" in
@@ -1361,7 +1402,7 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ### Status
 IN_PROGRESS
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 ACTION_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
 assert_exit "IN_PROGRESS 下一步 without path/cmd/skill -> blocked" 2 $?
 case "$ACTION_MSG" in
@@ -1405,7 +1446,7 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ### Status
 BLOCKED
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 BLOCKED_MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1 >/dev/null)"
 assert_exit "BLOCKED without 缺件句式 -> blocked" 2 $?
 case "$BLOCKED_MSG" in
@@ -1449,7 +1490,7 @@ cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ### Status
 BLOCKED
 EOF
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "BLOCKED with 缺件句式 -> allowed" 0 $?
 

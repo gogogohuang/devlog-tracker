@@ -91,7 +91,7 @@ write_round() {
     echo "### Status"
     echo "IN_PROGRESS"
   } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 # --- exact match -> allowed --------------------------------------------------
@@ -153,7 +153,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "BLOCKED"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "BLOCKED with missing workspace -> blocked" 2 $?
 
@@ -175,13 +175,15 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with no workspace section -> allowed (check does not apply)" 0 $?
 assert_round_merged "DONE with no workspace section"
 
-# --- fenced example quoting #### 工作區 before the real section -> ignored,
-# extractor still finds the real (unfenced) 工作區 body -------------------
+# --- fenced example quoting a legacy `#### 工作區` inside <decisions> before
+# the real <workspace> -> the quoted text stays plain content of <decisions>
+# after xml_fixture, and the workspace check still reads the real <workspace>
+# body -------------------------------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 {
   echo "## Round 4 — 2026-09-10T00:15:00+08:00"
@@ -224,7 +226,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "IN_PROGRESS"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
 assert_round_merged "fenced example quoting #### 工作區 before the real section"
@@ -263,35 +265,36 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo ""
   echo ""
   echo "### Session Handoff"
-  echo ""
-  echo "#### 決策"
+  echo "<session-handoff>"
+  echo "<decisions>"
   echo "- （無）"
-  echo ""
-  echo "#### 待解問題"
+  echo "</decisions>"
+  echo "<open-questions>"
   echo "- fixture open"
-  echo ""
-  echo "#### 失敗嘗試"
+  echo "</open-questions>"
+  echo "<failed-attempts>"
   echo "- （無）"
+  echo "</failed-attempts>"
+  echo "</session-handoff>"
   echo ""
   echo "### Status"
   echo "IN_PROGRESS"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
 assert_round_merged "unterminated fence in 現況"
 
-# --- DONE with a non-empty #### 檔案 (claims files were touched/committed)
+# --- DONE with a non-empty <files> (claims files were touched/committed)
 # IS now checked: a DONE round that reports file changes but has no/wrong
-# #### 工作區 is exactly the "已 commit 完成" false-claim case
+# <workspace> is exactly the "已 commit 完成" false-claim case
 # devlog-as-ssot-assessment.md flags as uncaught — machine-verify it the
 # same way IN_PROGRESS/BLOCKED already are. A trivial DONE round with no
-# #### 檔案 stays exempt (previous test above), matching SKILL.md's
+# <files> stays exempt (previous test above), matching SKILL.md's
 # "瑣碎輪只留現況一句（沒有工作區）" convention untouched.
 #
-# The #### 檔案 body below is just "尚未 commit：" with no claimed paths —
-# this suite only cares about triggering the 工作區 check via a non-empty
-# #### 檔案, not about 檔案 content itself (that's
+# The <files> body below is just "尚未 commit：" with no claimed paths —
+# this suite only cares about triggering the <workspace> check via a non-empty
+# <files>, not about <files> content itself (that's
 # test-enforce-devlog-files.sh's job, Phase 4). Any grammar-valid,
 # always-passing body works here. ------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -313,7 +316,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 MSG_DONE="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "DONE with #### 檔案 but no #### 工作區 -> blocked" 2 $?
 case "$MSG_DONE" in
@@ -342,7 +345,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and stale 工作區 hash -> blocked" 2 $?
 
@@ -367,7 +370,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
-xml_fixture_handoff_only "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and matching 工作區 -> allowed" 0 $?
 assert_round_merged "DONE with #### 檔案 and matching 工作區"
