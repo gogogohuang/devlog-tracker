@@ -27,23 +27,29 @@
 告訴使用者拆分完成、測試全過，還沒 commit。
 
 ### Handoff
-#### 決策
+<handoff>
+<decisions>
 拆成 A/B，理由是三處耦合都集中在同一個檔。
-#### 檔案
+</decisions>
+<files>
 尚未 commit：
 新增：a.ts, b.ts
 刪除：xxx.ts
-#### 工作區
+</files>
+<workspace>
 main @ a1b2c3d
 未提交：xxx.ts, a.ts, b.ts
-#### 現況
+</workspace>
+<state>
 拆分完成，測試全過。
+</state>
+</handoff>
 
 ### Status
 DONE
 `````
 
-這個範例是 DONE 且沒有後續，所以沒有 `#### 完成條件` 與 `#### 下一步`；「檔案」有內容，所以 `#### 工作區` 仍要寫（Stop 會核對）。
+這個範例是 DONE 且沒有後續，所以沒有 `<done-when>` 與 `<next>`；「檔案」有內容，所以 `<workspace>` 仍要寫（Stop 會核對）。Handoff／Session Handoff 用 XML 標籤（`<decisions>`／`<files>`／…），格式細節見 `SKILL.md`「每一輪的紀錄格式」。
 
 **什麼時候該寫一個段落**：跟判斷 `Status: IN_PROGRESS` 用的同一套標準——「有意義的
 階段性結果」，不是照時間或工具呼叫次數機械觸發。短的、沒什麼階段可言的一輪，

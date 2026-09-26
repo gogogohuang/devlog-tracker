@@ -19,9 +19,10 @@
 | 產出 | 權威位置 |
 |---|---|
 | Round 骨架：User Input + Summary + Reply + Handoff + Status | `SKILL.md`「每一輪的紀錄格式」 |
-| Handoff 小節順序與可省略規則 | 同上（寫入原則） |
-| `#### 工作區` 七種格式 | 同上；生產者 `core/scripts/workspace-snapshot.sh` |
-| `#### 檔案` machine-verify 區塊 | 同上；`docs/design/files-verify.md`；`core/scripts/files-snapshot.sh` |
+| Handoff／Session Handoff 用 XML 標籤（`<decisions>`／`<files>`／…；舊格式 `#### 決策`／`#### 檔案`／…） | `SKILL.md`「每一輪的紀錄格式」；`core/scripts/handoff-fields.sh`；`docs/design/handoff-xml.md` |
+| Handoff 標籤順序與可省略規則 | 同上（寫入原則） |
+| 工作區（`<workspace>`；舊格式 `#### 工作區`）七種格式 | 同上；生產者 `core/scripts/workspace-snapshot.sh` |
+| 檔案（`<files>`；舊格式 `#### 檔案`）machine-verify 區塊 | 同上；`docs/design/files-verify.md`；`core/scripts/files-snapshot.sh` |
 | Checkpoint 三段 | `references/checkpoint-mode.md` |
 | Session Handoff 三段（揮發快照） | `docs/design/session-handoff-file.md`；`SKILL.md` 格式節 |
 | `### 段落` 格式 | `references/round-segments.md`；Reply Fold 見 `references/reply-fold.md` |
