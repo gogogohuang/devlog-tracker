@@ -33,6 +33,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/devlog-md.sh"
 # shellcheck source=handoff-file.sh
 . "$SCRIPT_DIR/handoff-file.sh"
+# shellcheck source=handoff-fields.sh
+. "$SCRIPT_DIR/handoff-fields.sh"
 
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
@@ -207,15 +209,13 @@ if [ -n "$LAST_ROUND" ]; then
     '
   }
 
-  handoff_subsection_body() {
-    local heading="$1"
-    printf '%s\n' "$LAST_ROUND" | awk -v h="$heading" -v nofence="$NOFENCE" '
-      /^[ \t]*```/ { if (!nofence) fence = !fence; if (grab) print; next }
-      !fence && $0 ~ h { grab=1; next }
-      grab && !fence && /^#### / { exit }
-      grab && !fence && /^### / { exit }
-      grab && !fence && /^## / { exit }
-      grab { print }
+  # True when heading regex $1 matches a line outside ``` fences (same
+  # fence／NOFENCE rules as section_body).
+  section_present() {
+    printf '%s\n' "$LAST_ROUND" | awk -v h="$1" -v nofence="$NOFENCE" '
+      /^[ \t]*```/ { if (!nofence) fence = !fence; next }
+      !fence && $0 ~ h { found = 1; exit }
+      END { exit(found ? 0 : 1) }
     '
   }
 
@@ -234,44 +234,23 @@ if [ -n "$LAST_ROUND" ]; then
     exit 2
   fi
 
-  # --- Handoff subsection order check (docs/design/devlog-as-ssot-assessment.md,
-  # Phase 2 + L1 完成條件). 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
-  # is a fixed order. Detect a present-but-reordered or duplicated recognized
-  # subsection. Unrecognized #### headings are ignored.
+  # --- Handoff format gate (docs/design/handoff-xml.md): the round Stop
+  # validates must use the XML form; legacy `#### ` rounds are history only.
   HANDOFF_BODY="$(section_body '^### Handoff')"
-  ORDER_ERR="$(printf '%s\n' "$HANDOFF_BODY" | awk -v nofence="$NOFENCE" '
-    BEGIN {
-      order["決策"] = 1; order["檔案"] = 2; order["工作區"] = 3
-      order["現況"] = 4; order["完成條件"] = 5; order["下一步"] = 6
-      last = 0; prev_name = ""
-    }
-    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
-    fence { next }
-    /^#### / {
-      name = $0
-      sub(/^#### [ \t]*/, "", name)
-      sub(/[ \t]+$/, "", name)
-      if (!(name in order)) next
-      idx = order[name]
-      if (seen[name]) { print "duplicate:" name; exit }
-      seen[name] = 1
-      if (idx < last) { print "order:" prev_name ">" name; exit }
-      last = idx
-      prev_name = name
-    }
-  ')"
-  if [ -n "$ORDER_ERR" ]; then
-    case "$ORDER_ERR" in
-      duplicate:*)
-        DUP_NAME="${ORDER_ERR#duplicate:}"
-        echo "Handoff 的「#### ${DUP_NAME}」出現超過一次。請合併成一節。" >&2
-        ;;
-      order:*)
-        echo "Handoff 小節順序錯了（應該是 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步）：${ORDER_ERR#order:}" >&2
-        ;;
-    esac
+  if [ "$(handoff_format "$HANDOFF_BODY")" = "md" ]; then
+    handoff_legacy_message "$SCRIPT_DIR/migrate-handoff.sh" "$(cd "$PROJECT_DIR" 2>/dev/null && pwd || printf '%s' "$PROJECT_DIR")" >&2
     exit 2
   fi
+  if ! HANDOFF_ERR="$(handoff_xml_check "$HANDOFF_BODY" handoff)"; then
+    {
+      echo "Handoff 格式不對：${HANDOFF_ERR}"
+      echo ""
+      echo "正確格式（標籤自己一行、沒有的欄位整個省略）："
+      handoff_xml_template handoff
+    } >&2
+    exit 2
+  fi
+  hf() { handoff_field "$HANDOFF_BODY" "$1"; }
 
   STATUS_VAL="$(printf '%s\n' "$LAST_ROUND" | awk '
     /^### Status/ { grab=1; val=""; next }
@@ -289,25 +268,17 @@ if [ -n "$LAST_ROUND" ]; then
   esac
 
   if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
-    HAS_DONE_CRITERIA=0
-    printf '%s\n' "$LAST_ROUND" | grep -q '^#### 完成條件' && HAS_DONE_CRITERIA=1
     DONE_CRITERIA_OK=0
-    if [ "$HAS_DONE_CRITERIA" -eq 1 ]; then
-      handoff_subsection_body '^#### 完成條件' | grep -q '[^[:space:]]' && DONE_CRITERIA_OK=1
-    fi
+    hf done-when | grep -q '[^[:space:]]' && DONE_CRITERIA_OK=1
     if [ "$DONE_CRITERIA_OK" -eq 0 ]; then
-      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 完成條件」且後面有內容（可觀察的做完判準）。" >&2
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有 \`<done-when>\`（完成條件）且裡面有內容（可觀察的做完判準）。" >&2
       exit 2
     fi
 
-    HAS_NEXT=0
-    printf '%s\n' "$LAST_ROUND" | grep -q '^#### 下一步' && HAS_NEXT=1
     NEXT_OK=0
-    if [ "$HAS_NEXT" -eq 1 ]; then
-      handoff_subsection_body '^#### 下一步' | grep -q '[^[:space:]]' && NEXT_OK=1
-    fi
+    hf next | grep -q '[^[:space:]]' && NEXT_OK=1
     if [ "$NEXT_OK" -eq 0 ]; then
-      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有「#### 下一步」且後面有內容。" >&2
+      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，Handoff 必須有 \`<next>\`（下一步）且裡面有內容。" >&2
       exit 2
     fi
 
@@ -318,7 +289,7 @@ if [ -n "$LAST_ROUND" ]; then
     # around one of these phrases always passes — see the design doc's
     # Match rule). Deliberately scoped to 下一步 only, never Summary/
     # 決策/現況.
-    NEXT_BODY_TRIMMED="$(handoff_subsection_body '^#### 下一步' \
+    NEXT_BODY_TRIMMED="$(hf next \
       | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' \
       | grep -v '^$' || true)"
     NEXT_LINE_COUNT="$(printf '%s\n' "$NEXT_BODY_TRIMMED" | grep -c '.' || true)"
@@ -326,7 +297,7 @@ if [ -n "$LAST_ROUND" ]; then
       NEXT_STRIPPED="$(printf '%s' "$NEXT_BODY_TRIMMED" | sed -e 's/[。.！!]*$//')"
       case "$NEXT_STRIPPED" in
         繼續完成|持續完成|持續優化|持續改進|之後再看|視情況調整|待確認|繼續|持續推進|繼續處理)
-          echo "「#### 下一步」目前只寫了「${NEXT_STRIPPED}」，這是空話，不算具體下一步。請寫清楚下一輪打開就能做的具體動作（路徑／指令／要載入的 skill）。" >&2
+          echo "\`<next>\`（下一步）目前只寫了「${NEXT_STRIPPED}」，這是空話，不算具體下一步。請寫清楚下一輪打開就能做的具體動作（路徑／指令／要載入的 skill）。" >&2
           exit 2
           ;;
       esac
@@ -337,7 +308,7 @@ if [ -n "$LAST_ROUND" ]; then
     # skill mention. False negatives OK; avoid scoring prose.
     if [ "$STATUS_VAL" = "IN_PROGRESS" ]; then
       if ! printf '%s\n' "$NEXT_BODY_TRIMMED" | grep -qE '/|`|\.[A-Za-z0-9]{1,10}([^A-Za-z0-9]|$)|[Ss][Kk][Ii][Ll][Ll]|hooks/|docs/|commands/|skills/'; then
-        echo "Status 是 IN_PROGRESS 時，「#### 下一步」須含可執行跡象（路徑、反引號指令、檔名或 skill）。請寫到下一輪打開就能做。" >&2
+        echo "Status 是 IN_PROGRESS 時，\`<next>\`（下一步）須含可執行跡象（路徑、反引號指令、檔名或 skill）。請寫到下一輪打開就能做。" >&2
         exit 2
       fi
     fi
@@ -345,29 +316,29 @@ if [ -n "$LAST_ROUND" ]; then
     # --- BLOCKED: 缺件句式 in 現況 or 下一步 (binary check for next agent).
     if [ "$STATUS_VAL" = "BLOCKED" ]; then
       BLOCKED_HINT="$( {
-        handoff_subsection_body '^#### 現況'
-        handoff_subsection_body '^#### 下一步'
+        hf state
+        hf next
       } | tr '\n' ' ')"
       if ! printf '%s\n' "$BLOCKED_HINT" | grep -qE '缺|等待|等使用者|需要.*提供|尚未|出現.*算|出現即'; then
-        echo "Status 是 BLOCKED 時，「#### 現況」或「#### 下一步」須寫清楚缺什麼、出現長怎樣（缺件句式），讓下一輪能判斷缺件是否已到。" >&2
+        echo "Status 是 BLOCKED 時，\`<state>\`（現況）或 \`<next>\`（下一步）須寫清楚缺什麼、出現長怎樣（缺件句式），讓下一輪能判斷缺件是否已到。" >&2
         exit 2
       fi
     fi
   fi
 
   # --- 工作區 machine-verify (docs/design/devlog-as-ssot-assessment.md,
-  # Phase 1 + DONE-with-檔案 extension): #### 工作區 must match a freshly
+  # Phase 1 + DONE-with-檔案 extension): <workspace> must match a freshly
   # computed git snapshot exactly. Turns it from an unverified claim into a
   # write-time fact instead of something only continue/resume catch on the
   # next turn.
   #
   # Required for IN_PROGRESS/BLOCKED (unchanged from Phase 1) and for DONE
-  # only when this round's Handoff has a non-empty #### 檔案 — i.e. it
+  # only when this round's Handoff has a non-empty <files> — i.e. it
   # claims to have touched/committed files. Without this, "已 commit 完成，
   # Status: DONE" was never checked against live git: the single most
   # common false-completion claim, and one prose-quality checks elsewhere
   # in this file explicitly leave unverified. A trivial DONE round with no
-  # #### 檔案 still omits 工作區 entirely per SKILL.md's 瑣碎輪 convention —
+  # <files> still omits 工作區 entirely per SKILL.md's 瑣碎輪 convention —
   # unaffected.
   #
   # git unavailable -> fail-open, skip this check like every other one here.
@@ -375,15 +346,15 @@ if [ -n "$LAST_ROUND" ]; then
   case "$STATUS_VAL" in
     IN_PROGRESS|BLOCKED) NEEDS_WORKSPACE_CHECK=1 ;;
     DONE)
-      handoff_subsection_body '^#### 檔案' | grep -q '[^[:space:]]' && NEEDS_WORKSPACE_CHECK=1
+      hf files | grep -q '[^[:space:]]' && NEEDS_WORKSPACE_CHECK=1
       ;;
   esac
   if [ "$NEEDS_WORKSPACE_CHECK" -eq 1 ] && command -v git >/dev/null 2>&1; then
     EXPECTED_WS="$(workspace_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
     if [ -n "$EXPECTED_WS" ]; then
-      ACTUAL_WS="$(handoff_subsection_body '^#### 工作區' | sed -e '/^[[:space:]]*$/d')"
+      ACTUAL_WS="$(hf workspace | sed -e '/^[[:space:]]*$/d')"
       if [ "$ACTUAL_WS" != "$EXPECTED_WS" ]; then
-        echo "#### 工作區 跟目前 git 狀態不符（或缺漏）。請把這一節內容換成以下逐字內容：" >&2
+        echo "\`<workspace>\`（工作區）跟目前 git 狀態不符（或缺漏）。請把 \`<workspace>\` 裡的內容換成以下逐字內容：" >&2
         echo "" >&2
         printf '%s\n' "$EXPECTED_WS" >&2
         exit 2
@@ -392,9 +363,9 @@ if [ -n "$LAST_ROUND" ]; then
   fi
 
   # --- 檔案 machine-verify (docs/design/files-verify.md, devlog ssot
-  # Phase 4): #### 檔案 must describe real git changes. Runs whenever this
-  # round's Handoff has a non-empty #### 檔案, independent of Status — a
-  # trivial round with no #### 檔案 (the 瑣碎輪 convention) is unaffected.
+  # Phase 4): <files> must describe real git changes. Runs whenever this
+  # round's Handoff has a non-empty <files>, independent of Status — a
+  # trivial round with no <files> (the 瑣碎輪 convention) is unaffected.
   #
   # Grammar: zero or more "commit <hash>：" blocks (checked exactly,
   # category-precise, against files_snapshot $PROJECT_DIR $hash) followed
@@ -404,9 +375,9 @@ if [ -n "$LAST_ROUND" ]; then
   # residue, see docs/design/files-verify.md Decision 4). A line that
   # isn't a recognized header or category line is a format violation and
   # blocks (not fail-open — Claude is expected to produce this grammar,
-  # same as #### 工作區's seven formats). git unavailable, or a commit
+  # same as <workspace>'s seven formats). git unavailable, or a commit
   # hash that doesn't resolve, skips just that check (fail-open).
-  FILES_BODY="$(handoff_subsection_body '^#### 檔案')"
+  FILES_BODY="$(hf files)"
   if printf '%s\n' "$FILES_BODY" | grep -q '[^[:space:]]' && command -v git >/dev/null 2>&1; then
     FILES_ERR=""
     CUR_KIND=""
@@ -414,7 +385,7 @@ if [ -n "$LAST_ROUND" ]; then
     CUR_CLAIM=""
     UNCOMMITTED_CLAIM_PATHS=""
     # Printed after a format-violation message so Claude has the exact
-    # grammar to correct against, same rigor #### 工作區 already gets on
+    # grammar to correct against, same rigor <workspace> already gets on
     # mismatch (it prints its own EXPECTED_WS). Category lines can be
     # omitted per block for a category with nothing to report, same as
     # files-snapshot.sh's own output.
@@ -430,7 +401,7 @@ commit <hash>：
 刪除：<path>"
 
     files_body_parse() {
-      # Normalizes #### 檔案's body into tagged records, one per input
+      # Normalizes <files>'s body into tagged records, one per input
       # line (blank/whitespace-only lines dropped):
       #   HDR\tcommit\t<hash>
       #   HDR\tuncommitted
@@ -476,7 +447,7 @@ commit ${h}：
 ${expected}"
         else
           FILES_ERR="$FILES_ERR
-這個 commit 在 .devlog/ 以外沒有變更，「#### 檔案」裡不該有這個 commit 區塊（或整節省略，如果沒有其他 commit／尚未 commit 內容要報）。"
+這個 commit 在 .devlog/ 以外沒有變更，\`<files>\`（檔案）裡不該有這個 commit 區塊（或整個 \`<files>\` 省略，如果沒有其他 commit／尚未 commit 內容要報）。"
         fi
       fi
     }
@@ -518,14 +489,14 @@ ${expected}"
               UNCOMMITTED_CLAIM_PATHS="${UNCOMMITTED_CLAIM_PATHS:+$UNCOMMITTED_CLAIM_PATHS, }${b}"
               ;;
             *)
-              FILES_ERR="#### 檔案 格式不對：分類行出現在任何 commit/尚未 commit 標頭之前。
+              FILES_ERR="\`<files>\`（檔案）格式不對：分類行出現在任何 commit/尚未 commit 標頭之前。
 
 ${FILES_GRAMMAR}"
               ;;
           esac
           ;;
         ERR)
-          FILES_ERR="#### 檔案 格式不對，看不懂這一行：${a}
+          FILES_ERR="\`<files>\`（檔案）格式不對，看不懂這一行：${a}
 
 ${FILES_GRAMMAR}"
           ;;
@@ -544,7 +515,7 @@ ${FILES_GRAMMAR}"
         _p="$(printf '%s' "$_p" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         [ -n "$_p" ] || continue
         if ! path_in_list "$_p" "$ACTUAL_JOINED"; then
-          FILES_ERR="#### 檔案 的「尚未 commit」宣稱了 ${_p}，但它目前不在實際變更的檔案裡。目前實際的未提交變更是：
+          FILES_ERR="\`<files>\`（檔案）的「尚未 commit」宣稱了 ${_p}，但它目前不在實際變更的檔案裡。目前實際的未提交變更是：
 ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
           break
         fi
@@ -557,11 +528,34 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
     fi
   fi
 
-  # Session Handoff → .devlog/handoff.md（docs/design/session-handoff-file.md）
+  # Session Handoff → .devlog/handoff.md（docs/design/session-handoff-file.md,
+  # docs/design/handoff-xml.md）。Present in any status → must be XML;
+  # required for IN_PROGRESS／BLOCKED.
   # 放在其他 IN_PROGRESS／BLOCKED 檢查之後，避免搶先蓋掉既有失敗訊息。
-  if [ "$STATUS_VAL" = "IN_PROGRESS" ] || [ "$STATUS_VAL" = "BLOCKED" ]; then
-    if ! handoff_session_section_ok "$LAST_ROUND"; then
-      echo "Status 是 IN_PROGRESS 或 BLOCKED 時，必須有 \`### Session Handoff\`，且依序包含 \`#### 決策\`／\`#### 待解問題\`／\`#### 失敗嘗試\`（可寫 \`- （無）\`）。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session。" >&2
+  # Exact heading only (same as handoff_section_of, which handoff_write uses).
+  SESSION_HEADING_RE='^### Session Handoff[ \t]*$'
+  SESSION_BODY="$(section_body "$SESSION_HEADING_RE")"
+  HAS_SESSION=0
+  section_present "$SESSION_HEADING_RE" && HAS_SESSION=1
+  if [ "$HAS_SESSION" -eq 1 ] && [ "$(handoff_format "$SESSION_BODY")" = "md" ]; then
+    handoff_legacy_message "$SCRIPT_DIR/migrate-handoff.sh" "$(cd "$PROJECT_DIR" 2>/dev/null && pwd || printf '%s' "$PROJECT_DIR")" >&2
+    exit 2
+  fi
+  NEED_SESSION=0
+  case "$STATUS_VAL" in IN_PROGRESS|BLOCKED) NEED_SESSION=1 ;; esac
+  if [ "$HAS_SESSION" -eq 1 ] || [ "$NEED_SESSION" -eq 1 ]; then
+    if [ "$HAS_SESSION" -eq 0 ]; then
+      SESSION_ERR="缺少 ### Session Handoff（Status 是 IN_PROGRESS 或 BLOCKED 時必寫）"
+    elif SESSION_ERR="$(handoff_xml_check "$SESSION_BODY" session-handoff)"; then
+      SESSION_ERR=""
+    fi
+    if [ -n "$SESSION_ERR" ]; then
+      {
+        echo "Session Handoff 格式不對：${SESSION_ERR}"
+        echo ""
+        echo "正確格式（三個標籤都要有，沒有內容就寫 - （無））。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session："
+        handoff_xml_template session-handoff
+      } >&2
       exit 2
     fi
   fi
@@ -591,11 +585,11 @@ if [ -n "$LAST_ROUND" ]; then
     case "${STATUS_VAL:-}" in
       IN_PROGRESS|BLOCKED)
         handoff_write "$HANDOFF_FILE" "$LAST_ROUND" 2>/dev/null || \
-          echo "警告：無法寫入 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+          echo "警告：無法寫入 Session Handoff 檔（${HANDOFF_FILE}），本輪仍已收尾。" >&2
         ;;
       DONE)
         handoff_clear "$HANDOFF_FILE" 2>/dev/null || \
-          echo "警告：無法清除 Session Handoff 檔（$HANDOFF_FILE），本輪仍已收尾。" >&2
+          echo "警告：無法清除 Session Handoff 檔（${HANDOFF_FILE}），本輪仍已收尾。" >&2
         ;;
     esac
   fi

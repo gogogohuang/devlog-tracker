@@ -352,6 +352,27 @@ EXPECTED_BODY='feat/foo @ abc1234
 未提交：a.txt'
 assert_eq "workspace body two lines" "$EXPECTED_BODY" "$WS_BODY"
 
+cat > "$TMP_ROOT/xmlws.md" <<'EOF'
+## Round 1 — t
+
+### Handoff
+<handoff>
+<workspace>
+main @ abc1234
+未提交：a.txt
+</workspace>
+<next>
+x
+</next>
+</handoff>
+
+### Status
+IN_PROGRESS
+EOF
+XMLWS_END="$(wc -l < "$TMP_ROOT/xmlws.md" | tr -d ' ')"
+assert_eq "workspace body from XML" "main @ abc1234
+未提交：a.txt" "$(devlog_round_workspace_body "$TMP_ROOT/xmlws.md" 1 "$XMLWS_END")"
+
 cat > "$TMP_ROOT/segments.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 

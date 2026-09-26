@@ -87,7 +87,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 
 ## 5. 選配：摘要
 
-只對使用者標記「摘要第 N 段」的段落做，規則同 `/devlog-tracker:keep` 步驟 5.5（只改寫 `### Summary`、`### Reply`、`#### 決策`、`#### 現況` 的敘事；標題、`### User Input`、`#### 工作區`、`#### 檔案`、`#### 完成條件`、`#### 下一步`、`### Status` 一律不動；用 Edit 不用 Write）。
+只對使用者標記「摘要第 N 段」的段落做，規則同 `/devlog-tracker:keep` 步驟 5.5（只改寫 `### Summary`、`### Reply`、`<decisions>`／舊格式 `#### 決策`、`<state>`／舊格式 `#### 現況` 的敘事；標題、`### User Input`、`<workspace>`／舊格式 `#### 工作區`、`<files>`／舊格式 `#### 檔案`、`<done-when>`／舊格式 `#### 完成條件`、`<next>`／舊格式 `#### 下一步`、`### Status` 一律不動；改寫 XML 欄位內容時，標籤行本身不動；用 Edit 不用 Write）。
 
 ## 6. 回報
 

@@ -6,6 +6,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=../json-field.sh
 . "$SCRIPT_DIR/json-field.sh"
+# shellcheck source=lib/xml-fixture.sh
+. "$SCRIPT_DIR/tests/lib/xml-fixture.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -664,6 +666,16 @@ else
 fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
+# Codex invokes project skills through $devlog-<name> in the prompt.
+for ADMIN_PROMPT in '$devlog-status' '$devlog-report --json'; do
+  printf '{"prompt":"%s"}' "$ADMIN_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+  assert_file_absent "Codex admin $ADMIN_PROMPT: no .round-current.md" "$DEVLOG_DIR/.round-current.md"
+done
+printf '{"prompt":"%s"}' '$devlog-continue' | bash "$SCRIPT_DIR/round-start.sh"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "Codex continue still opens a Round" "## Round 1 —" "$CUR_BODY"
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+
 # --- 19b: report / timeline / keep-all are admin commands too -------------
 for ADMIN_CMD in report timeline keep-all; do
   rm -f "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.round-open"
@@ -772,13 +784,54 @@ do x
 IN_PROGRESS
 EOF
 OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
-assert_contains "mismatch stdout names 工作區" "#### 工作區" "$OUT"
+assert_contains "mismatch stdout names 工作區（<workspace>）" "工作區（\`<workspace>\`" "$OUT"
 assert_contains "mismatch stdout has 宣稱" "宣稱：" "$OUT"
 assert_contains "mismatch stdout has 實際" "實際：" "$OUT"
 assert_contains "mismatch stdout has live snapshot" "$LIVE" "$OUT"
 [ -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: mismatch writes marker" || { echo "FAIL: no marker"; FAIL=1; }
 MARKER="$(cat "$WS/.devlog/.workspace-mismatch")"
 [ "$MARKER" = "$LIVE" ] && echo "PASS: marker is live snapshot" || { echo "FAIL: marker [$MARKER]"; FAIL=1; }
+
+# --- same MISMATCH injection, Handoff in XML form (docs/design/handoff-xml.md) --
+WS2="$TMP_ROOT/ws-xml"
+mkdir -p "$WS2/.devlog"
+touch "$WS2/.devlog/.enabled"
+git -C "$WS2" init -q -b main
+git -C "$WS2" config user.email test@example.com
+git -C "$WS2" config user.name test
+echo hello > "$WS2/a.txt"
+git -C "$WS2" add a.txt
+git -C "$WS2" commit -q -m init
+cat > "$WS2/.devlog/devlog.md" <<EOF
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 工作區
+main @ deadbeef，工作樹乾淨
+#### 現況
+going
+#### 完成條件
+`bash hooks/scripts/tests/test-enforce-devlog.sh` 相關情境通過。
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF
+xml_fixture "$WS2/.devlog/devlog.md"
+export CLAUDE_PROJECT_DIR="$WS2"
+XML_OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_contains "XML Handoff mismatch stdout names 工作區（<workspace>）" "工作區（\`<workspace>\`" "$XML_OUT"
+assert_contains "XML Handoff mismatch stdout has 宣稱" "宣稱：" "$XML_OUT"
+assert_contains "XML Handoff mismatch stdout has 實際" "實際：" "$XML_OUT"
+[ -f "$WS2/.devlog/.workspace-mismatch" ] && echo "PASS: XML Handoff mismatch writes marker" || { echo "FAIL: XML Handoff mismatch: no marker"; FAIL=1; }
+export CLAUDE_PROJECT_DIR="$WS"
 
 # --- lessons drift counter: mechanical nudge on repeated mismatch --------
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md" "$WS/.devlog/.workspace-mismatch"

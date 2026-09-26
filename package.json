@@ -21,8 +21,8 @@
     "node": ">=18"
   },
   "scripts": {
-    "test": "node --test cli/*.test.js cli/platforms/*.test.js scripts/*.test.js core/scripts/*.test.js",
-    "version": "node scripts/sync-version.js && git add .claude-plugin/plugin.json .claude-plugin/marketplace.json README.md README.zh-TW.md"
+    "test": "node scripts/sync-codex-plugin.js --check && node --test cli/*.test.js cli/platforms/*.test.js scripts/*.test.js core/scripts/*.test.js",
+    "version": "node scripts/sync-version.js && git add .claude-plugin/plugin.json .codex-plugin/plugin.json .claude-plugin/marketplace.json README.md README.zh-TW.md"
   },
   "license": "Apache-2.0",
   "author": {

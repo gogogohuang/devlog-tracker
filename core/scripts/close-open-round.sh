@@ -129,8 +129,11 @@ awk -v reason="$REASON" -v detail="$DETAIL" -v recovered="$RECOVERED" '
         }
         if (!has_h) {
           print "### Handoff"
-          print "#### 現況"
+          print "<handoff>"
+          print "<state>"
           print handoff_stub()
+          print "</state>"
+          print "</handoff>"
           print ""
         }
         print "### Status"
@@ -154,8 +157,11 @@ awk -v reason="$REASON" -v detail="$DETAIL" -v recovered="$RECOVERED" '
       }
       if (!has_h) {
         print "### Handoff"
-        print "#### 現況"
+        print "<handoff>"
+        print "<state>"
         print handoff_stub()
+        print "</state>"
+        print "</handoff>"
         print ""
       }
       print "### Status"

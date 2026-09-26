@@ -94,8 +94,19 @@ case "$PROMPT" in
     CMD_NAME="${CMD_NAME#/}"
     ;;
 esac
+# Codex exposes project commands as skills. An explicit $devlog-name mention
+# is the first token of the submitted prompt, rather than a command-name tag.
+if [ -z "$CMD_NAME" ]; then
+  case "$PROMPT" in
+    \$devlog-*)
+      CMD_NAME="${PROMPT%%[[:space:]]*}"
+      CMD_NAME="${CMD_NAME#\$devlog-}"
+      CMD_NAME="devlog-tracker:$CMD_NAME"
+      ;;
+  esac
+fi
 case "$CMD_NAME" in
-  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
+  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:migrate|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
     exit 0
     ;;
 esac
@@ -165,7 +176,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
     LIVE_WS="$(workspace_snapshot "$PROJECT_DIR")"
     if [ -n "$LIVE_WS" ]; then
       printf '%s\n' "$LIVE_WS" > "$MISMATCH_FILE" 2>/dev/null || true
-      printf '%s\n' "上一輪 Handoff「#### 工作區」跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
+      printf '%s\n' "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
       printf '\n宣稱：\n%s\n\n實際：\n%s\n' "$CLAIMED_WS" "$LIVE_WS"
 
       if [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then

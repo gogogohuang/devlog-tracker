@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { render, renderMarkdown, safeHref, escapeHtml } = require('./timeline-render');
+const { render, renderMarkdown, safeHref, escapeHtml, handoffToMarkdown, HANDOFF_FIELDS } = require('./timeline-render');
 
 function round(extra) {
   return { branch: 'main', file: 'devlog.md', line: 1, n: 1, at: '2026-09-01T10:00:00+0800',
@@ -88,6 +88,28 @@ test('render: unknown status renders as NONE; no input section by default', () =
 
 test('render: empty data shows an empty-state message', () => {
   assert.ok(render({ started: true, rounds: [], checkpoint_blocks: [] }).includes('沒有 Round 可顯示'));
+});
+
+test('handoffToMarkdown turns XML fields into headings and drops block tags', () => {
+  const md = handoffToMarkdown('<handoff>\n<state>\nok\n</state>\n<next>\nrun `x`\n</next>\n</handoff>');
+  assert.equal(md, '#### 現況\nok\n#### 下一步\nrun `x`');
+});
+
+test('handoffToMarkdown leaves legacy Handoff untouched', () => {
+  assert.equal(handoffToMarkdown('#### 現況\nok'), '#### 現況\nok');
+});
+
+test('XML Handoff renders as headings, never as raw tags', () => {
+  const html = render({ rounds: [round({ handoff: '<handoff>\n<state>\nok\n</state>\n</handoff>' })], checkpoint_blocks: [] });
+  assert.ok(!html.includes('&lt;state&gt;'));
+  assert.ok(html.includes('現況'));
+});
+
+test('HANDOFF_FIELDS matches handoff-fields.sh', () => {
+  const script = path.join(__dirname, 'handoff-fields.sh');
+  const r = spawnSync('bash', ['-c', `. "${script}"; for k in $HANDOFF_KEYS $SESSION_HANDOFF_KEYS; do printf '%s=%s\\n' "$k" "$(handoff_key_heading "$k")"; done`], { encoding: 'utf8' });
+  const fromBash = Object.fromEntries(r.stdout.trim().split('\n').map((l) => l.split('=')));
+  assert.deepEqual(fromBash, HANDOFF_FIELDS);
 });
 
 test('CLI: stdin JSON -> stdout HTML; invalid JSON -> exit 1', () => {

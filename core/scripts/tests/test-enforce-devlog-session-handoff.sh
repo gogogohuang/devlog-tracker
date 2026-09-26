@@ -4,6 +4,8 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/xml-fixture.sh
+. "$SCRIPT_DIR/tests/lib/xml-fixture.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -79,6 +81,7 @@ write_unfinished() {
     echo "### Status"
     echo "$status"
   } > "$DEVLOG_DIR/.round-current.md"
+  xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 # 1) IN_PROGRESS without Session Handoff -> blocked
@@ -87,8 +90,8 @@ write_unfinished IN_PROGRESS ""
 MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "IN_PROGRESS without Session Handoff -> blocked" 2 $?
 case "$MSG" in
-  *"Session Handoff"*) echo "PASS: message mentions Session Handoff" ;;
-  *) echo "FAIL: expected Session Handoff in message, got: $MSG"; FAIL=1 ;;
+  *"<session-handoff>"*) echo "PASS: message shows <session-handoff> template" ;;
+  *) echo "FAIL: expected <session-handoff> in message, got: $MSG"; FAIL=1 ;;
 esac
 
 # 2) IN_PROGRESS with Session Handoff -> write handoff.md
@@ -97,7 +100,7 @@ write_unfinished IN_PROGRESS "$SESSION_OK"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "IN_PROGRESS with Session Handoff -> allowed" 0 $?
 if [ -f "$DEVLOG_DIR/handoff.md" ] && grep -q 'pick route A' "$DEVLOG_DIR/handoff.md" \
-  && grep -q '^## Session Handoff' "$DEVLOG_DIR/handoff.md"; then
+  && grep -q '^<session-handoff>$' "$DEVLOG_DIR/handoff.md"; then
   echo "PASS: handoff.md written from Session Handoff"
 else
   echo "FAIL: handoff.md missing or wrong"; FAIL=1
@@ -144,6 +147,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE -> allowed" 0 $?
 if [ ! -f "$DEVLOG_DIR/handoff.md" ]; then
@@ -152,27 +156,104 @@ else
   echo "FAIL: handoff.md survived DONE"; FAIL=1
 fi
 
-# 5) wrong order -> blocked; existing handoff unchanged
+# 5) wrong order -> blocked; existing handoff unchanged. Written as XML by
+# hand: the converter skips a Session Handoff in the wrong order, so a legacy
+# fixture would be stopped by the legacy gate instead of the order check.
 echo "keep-me" > "$DEVLOG_DIR/handoff.md"
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 write_unfinished IN_PROGRESS "
 ### Session Handoff
-
-#### 待解問題
+<session-handoff>
+<open-questions>
 - x
-
-#### 決策
+</open-questions>
+<decisions>
 - y
-
-#### 失敗嘗試
+</decisions>
+<failed-attempts>
 - z
+</failed-attempts>
+</session-handoff>
 "
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "wrong Session Handoff order -> blocked" 2 $?
+case "$MSG" in
+  *"順序"*) echo "PASS: wrong order message mentions 順序" ;;
+  *) echo "FAIL: expected 順序 in message, got: $MSG"; FAIL=1 ;;
+esac
 if [ -f "$DEVLOG_DIR/handoff.md" ] && grep -q 'keep-me' "$DEVLOG_DIR/handoff.md"; then
   echo "PASS: handoff.md unchanged on validation failure"
 else
   echo "FAIL: handoff.md should be untouched on validation failure"; FAIL=1
 fi
+
+# 6) legacy Session Handoff under an XML Handoff -> blocked with migrate hint
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_unfinished IN_PROGRESS "$SESSION_OK"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
+# re-inject a legacy Session Handoff after conversion
+awk '/^### Session Handoff/{skip=1; print "### Session Handoff\n#### 決策\n- x\n#### 待解問題\n- y\n#### 失敗嘗試\n- z\n"; next} skip && /^### /{skip=0} !skip' \
+  "$DEVLOG_DIR/.round-current.md" > "$DEVLOG_DIR/.rc" && mv "$DEVLOG_DIR/.rc" "$DEVLOG_DIR/.round-current.md"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "legacy Session Handoff blocked" 2 $?
+case "$MSG" in *"migrate-handoff.sh"*) echo "PASS: legacy session message" ;; *) echo "FAIL: $MSG"; FAIL=1 ;; esac
+
+# 7) DONE round quoting a fenced ### Session Handoff example in its Reply, no
+# real Session Handoff -> allowed (presence check must ignore fences)
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+cat > "$DEVLOG_DIR/.round-current.md" <<'EOF2'
+## Round 1 — 2026-09-22T02:00:00+08:00
+
+### Summary
+done
+
+### Reply
+範例格式：
+```markdown
+### Session Handoff
+<session-handoff>
+<decisions>
+- x
+</decisions>
+</session-handoff>
+```
+
+### Handoff
+<handoff>
+<state>
+finished
+</state>
+</handoff>
+
+### Status
+DONE
+EOF2
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "DONE with fenced Session Handoff example -> allowed" 0 $?
+[ -n "$MSG" ] && echo "note: stderr was: $MSG"
+
+# 8) IN_PROGRESS with only a look-alike heading (### Session Handoff（補充）)
+# -> blocked as missing: the writer only accepts the exact heading
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_unfinished IN_PROGRESS "
+### Session Handoff（補充）
+<session-handoff>
+<decisions>
+- x
+</decisions>
+<open-questions>
+- y
+</open-questions>
+<failed-attempts>
+- z
+</failed-attempts>
+</session-handoff>
+"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "look-alike Session Handoff heading -> blocked" 2 $?
+case "$MSG" in
+  *"缺少 ### Session Handoff"*) echo "PASS: look-alike heading reported as missing" ;;
+  *) echo "FAIL: expected missing Session Handoff message, got: $MSG"; FAIL=1 ;;
+esac
 
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1

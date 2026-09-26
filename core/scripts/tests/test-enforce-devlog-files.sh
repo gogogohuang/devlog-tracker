@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Self-check for enforce-devlog.sh's #### 檔案 machine-verify (Phase 4,
+# Self-check for enforce-devlog.sh's <files> machine-verify (Phase 4,
 # docs/design/files-verify.md). Separate file from test-enforce-devlog.sh
 # and test-enforce-devlog-workspace.sh; still auto-discovered by
 # run-tests.sh's tests/test-*.sh glob.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/xml-fixture.sh
+. "$SCRIPT_DIR/tests/lib/xml-fixture.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -96,6 +98,7 @@ write_round() {
     echo "### Status"
     echo "$status"
   } > "$DEVLOG_DIR/.round-current.md"
+  xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 ws_clean() {

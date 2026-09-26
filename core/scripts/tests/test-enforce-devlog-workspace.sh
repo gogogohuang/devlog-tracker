@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Self-check for enforce-devlog.sh's #### 工作區 machine-verify (Phase 1,
+# Self-check for enforce-devlog.sh's <workspace> machine-verify (Phase 1,
 # docs/design/devlog-as-ssot-assessment.md). Separate file from
 # test-enforce-devlog.sh to avoid growing that suite further; still
 # auto-discovered by run-tests.sh's tests/test-*.sh glob.
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/xml-fixture.sh
+. "$SCRIPT_DIR/tests/lib/xml-fixture.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 
@@ -89,6 +91,7 @@ write_round() {
     echo "### Status"
     echo "IN_PROGRESS"
   } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 }
 
 # --- exact match -> allowed --------------------------------------------------
@@ -150,6 +153,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "BLOCKED"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "BLOCKED with missing workspace -> blocked" 2 $?
 
@@ -171,12 +175,15 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with no workspace section -> allowed (check does not apply)" 0 $?
 assert_round_merged "DONE with no workspace section"
 
-# --- fenced example quoting #### 工作區 before the real section -> ignored,
-# extractor still finds the real (unfenced) 工作區 body -------------------
+# --- fenced example quoting a legacy `#### 工作區` inside <decisions> before
+# the real <workspace> -> the quoted text stays plain content of <decisions>
+# after xml_fixture, and the workspace check still reads the real <workspace>
+# body -------------------------------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 {
   echo "## Round 4 — 2026-09-10T00:15:00+08:00"
@@ -219,17 +226,15 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "IN_PROGRESS"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "fenced example quoting #### 工作區 before the real section -> allowed" 0 $?
 assert_round_merged "fenced example quoting #### 工作區 before the real section"
 
-# --- unterminated fence in an earlier subsection -> fail-open, not a false
-# block (final-review Fix 1). A ``` fence that never closes (odd fence-marker
-# count) must never make a present, filled-in #### 下一步 register as missing.
-# Pre-fix, the odd fence opened by #### 現況's (malformed) example got
-# `fence` stuck at 1 for the rest of the round, so handoff_subsection_body()
-# could no longer even find the "#### 下一步" heading — even though #### 工作區
-# above it is exactly correct and #### 下一步 below it has real content.
+# --- unterminated fence in an earlier field -> not a false block. A ```
+# fence that never closes must never make a present, filled-in <next>
+# register as missing: XML fields don't track fences at all. Written as XML
+# directly — the legacy converter leaves odd-fence rounds untouched.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
 {
   echo "## Round 5 — 2026-09-10T00:20:00+08:00"
@@ -241,28 +246,36 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "fixture reply."
   echo ""
   echo "### Handoff"
-  echo "#### 工作區"
+  echo "<handoff>"
+  echo "<workspace>"
   echo "main @ ${HASH}，工作樹乾淨"
-  echo "#### 現況"
+  echo "</workspace>"
+  echo "<state>"
   echo "一段沒收尾的範例："
   echo '```markdown'
   echo "沒收尾內容，一路吃到這個 Round 結尾"
-  echo "#### 完成條件"
+  echo "</state>"
+  echo "<done-when>"
   echo "observable done via test."
-  echo "#### 下一步"
+  echo "</done-when>"
+  echo "<next>"
   echo "edit hooks/scripts/enforce-devlog.sh"
+  echo "</next>"
+  echo "</handoff>"
   echo ""
   echo ""
   echo "### Session Handoff"
-  echo ""
-  echo "#### 決策"
+  echo "<session-handoff>"
+  echo "<decisions>"
   echo "- （無）"
-  echo ""
-  echo "#### 待解問題"
+  echo "</decisions>"
+  echo "<open-questions>"
   echo "- fixture open"
-  echo ""
-  echo "#### 失敗嘗試"
+  echo "</open-questions>"
+  echo "<failed-attempts>"
   echo "- （無）"
+  echo "</failed-attempts>"
+  echo "</session-handoff>"
   echo ""
   echo "### Status"
   echo "IN_PROGRESS"
@@ -271,17 +284,17 @@ echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "unterminated fence in 現況 -> fail-open, 下一步 still recognized" 0 $?
 assert_round_merged "unterminated fence in 現況"
 
-# --- DONE with a non-empty #### 檔案 (claims files were touched/committed)
+# --- DONE with a non-empty <files> (claims files were touched/committed)
 # IS now checked: a DONE round that reports file changes but has no/wrong
-# #### 工作區 is exactly the "已 commit 完成" false-claim case
+# <workspace> is exactly the "已 commit 完成" false-claim case
 # devlog-as-ssot-assessment.md flags as uncaught — machine-verify it the
 # same way IN_PROGRESS/BLOCKED already are. A trivial DONE round with no
-# #### 檔案 stays exempt (previous test above), matching SKILL.md's
+# <files> stays exempt (previous test above), matching SKILL.md's
 # "瑣碎輪只留現況一句（沒有工作區）" convention untouched.
 #
-# The #### 檔案 body below is just "尚未 commit：" with no claimed paths —
-# this suite only cares about triggering the 工作區 check via a non-empty
-# #### 檔案, not about 檔案 content itself (that's
+# The <files> body below is just "尚未 commit：" with no claimed paths —
+# this suite only cares about triggering the <workspace> check via a non-empty
+# <files>, not about <files> content itself (that's
 # test-enforce-devlog-files.sh's job, Phase 4). Any grammar-valid,
 # always-passing body works here. ------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
@@ -303,6 +316,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 MSG_DONE="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "DONE with #### 檔案 but no #### 工作區 -> blocked" 2 $?
 case "$MSG_DONE" in
@@ -331,6 +345,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and stale 工作區 hash -> blocked" 2 $?
 
@@ -355,6 +370,7 @@ bash "$SCRIPT_DIR/round-start.sh" < /dev/null
   echo "### Status"
   echo "DONE"
 } > "$DEVLOG_DIR/.round-current.md"
+xml_fixture "$DEVLOG_DIR/.round-current.md"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "DONE with #### 檔案 and matching 工作區 -> allowed" 0 $?
 assert_round_merged "DONE with #### 檔案 and matching 工作區"

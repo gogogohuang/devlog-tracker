@@ -24,7 +24,7 @@ DEVLOG_PROJECT_DIR="<剛才記下的專案根目錄絕對路徑>" bash "${PLUGIN
 ## 2. 讀資料
 
 - 跑 `git log --reverse --format='%h %s%n%b' <BASE_REF>..HEAD` 與 `git diff --stat <BASE_REF>...HEAD`。
-- 有 `ROUNDS` 時，用 Read 讀 `DEVLOG_FILE` 全文，只看這些 Round（`ROUNDS` 是每個 `## Round` 標題的行號）。每個 Round 取 `### Summary`、`#### 決策`、`#### 檔案`、驗證紀錄（測試指令與結果，通常在 Summary、`#### 現況` 或 `### 段落`）。**不要讀或引用 `### User Input`。**
+- 有 `ROUNDS` 時，用 Read 讀 `DEVLOG_FILE` 全文，只看這些 Round（`ROUNDS` 是每個 `## Round` 標題的行號）。每個 Round 取 `### Summary`、`<decisions>`（舊格式 `#### 決策`）、`<files>`（舊格式 `#### 檔案`）、驗證紀錄（測試指令與結果，通常在 Summary、`<state>`（舊格式 `#### 現況`）或 `### 段落`）。**不要讀或引用 `### User Input`。**
 - `NO_BRANCH_DEVLOG` 時只依 git log 與 diff 產生，並在對話裡說明「這個 branch 沒有 devlog 紀錄，描述只根據 commit 產生」。
 
 ## 3. 產生 PR body
@@ -32,8 +32,8 @@ DEVLOG_PROJECT_DIR="<剛才記下的專案根目錄絕對路徑>" bash "${PLUGIN
 語言跟使用者一致。四節固定，順序不變：
 
 1. **Summary**：這個 branch 做了什麼，2–4 條，寫結果不寫過程。
-2. **Decisions**：取自 Rounds 的 `#### 決策`，只留最終版本；被後面 Round 推翻或改掉的不列。沒有就寫「無」。
-3. **Changes**：依 commit 或檔案分組，每組一行說明。用 `#### 檔案` 與 git log 交叉比對；兩邊對不上時以 git 為準。
+2. **Decisions**：取自 Rounds 的 `<decisions>`（舊格式 `#### 決策`），只留最終版本；被後面 Round 推翻或改掉的不列。沒有就寫「無」。
+3. **Changes**：依 commit 或檔案分組，每組一行說明。用 `<files>`（舊格式 `#### 檔案`）與 git log 交叉比對；兩邊對不上時以 git 為準。
 4. **Test plan**：取自 Rounds 的驗證紀錄，列出實際跑過的指令與結果。沒有紀錄就寫「未記錄」——**不要捏造沒跑過的測試。**
 
 專案的 CLAUDE.md／AGENTS.md 若規定 PR 描述結尾格式（例如署名行），照做；此外不要自己加簽名。

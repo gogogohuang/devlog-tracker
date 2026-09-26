@@ -45,19 +45,43 @@ Merges the hooks into `.claude/settings.local.json` (not `settings.json` — the
 
 ### Codex
 
+**Option 1: plugin marketplace**
+
+To try an unpublished checkout, run these commands **from this repository's root**:
+
+```bash
+codex plugin marketplace add .
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+After the branch is merged and pushed, install from GitHub instead:
+
+```bash
+codex plugin marketplace add gogogohuang/devlog-tracker
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+Start a new Codex session in the project you want to track, review and trust the bundled hooks with `/hooks`, then use `$devlog-start` (or pick it from `/skills`). The plugin keeps its scripts in Codex's plugin cache; it does not create a `.devlog-tracker/` directory in each project. Tracking data is created under `.devlog/` only after `$devlog-start`. If this project already uses `npx devlog-tracker init --codex`, remove the devlog-tracker entries from its project-level `.codex/hooks.json` before enabling the plugin to avoid running each hook twice.
+
+**Option 2: npx (vendored into the project, version pinnable)**
+
 ```bash
 npx devlog-tracker init --codex
 ```
 
 Merges the `hooks` from `codex/hooks.json` into the project's `.codex/hooks.json`, and generates `.agents/skills/devlog-<name>/SKILL.md` from `commands/*.md`, invoked with `$devlog-<name>` (or picked from `/skills`); it also adds the same kind of fallback block to `AGENTS.md`. Files the older 0.25.0 version wrote to `.codex/prompts/` are cleared out on the next `init` run — Codex doesn't read project-level custom prompts.
 
-**Hooks require approval before they run.** Codex requires approval for new or changed hooks; an unapproved hook is silently skipped — **with no warning at all**, so it looks like devlog just isn't recording. This is independent of whether the project is set to `trust_level = "trusted"`; project trust doesn't make hooks active.
+**Hooks require trust review before they run.** Codex skips new or changed hooks until you trust their current definitions. For npx installs, the project `.codex/` layer must also be trusted to load project hooks. Use `/hooks` to review the active definitions.
 
-- Interactive mode: the first time you open it, Codex prompts that hooks need approval; they only run once approved. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require approval again.
+- Interactive mode: Codex warns at startup when hooks need review. Use `/hooks` to inspect and trust them. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require another review.
 - Non-interactive `codex exec` (CI, scripts): unapproved hooks are silently skipped. `--dangerously-bypass-hook-trust` lets them run, but that flag skips trust checks for *all* hooks, so it's only appropriate for automation environments where you've already vetted the hook sources yourself.
 - To confirm it's working: after `start`, send a message and check whether `.devlog/.round-current.md` shows this round's User Input skeleton; if not, the hook didn't run.
 
-Codex currently has no equivalent to "user interrupted" (Claude Code's `PostToolUseFailure`/`is_interrupt`) or "this round ended abnormally" (`StopFailure`); these two detailed states won't be marked `INTERRUPTED` on Codex, but the core enforcement mechanism (the `Stop` event blocking unfinished rounds) is unaffected.
+When the silence or workspace guard blocks a tool, Codex can read the current round with a single `cat <project>/.devlog/.round-current.md` command and update it with `apply_patch`. The block message includes the project path.
+
+Codex's `Interrupt` hook records an interrupted main-thread turn as `INTERRUPTED`. Codex has no `StopFailure` event for other abnormal endings; an open round is recovered on the next prompt or session start, or when `SessionEnd` runs. Codex's `SessionEnd` reason is currently only `other`, and it may run after an idle session rather than immediately when you switch conversations. The `Stop` hook still enforces completion of normal turns. Codex can also start from a subdirectory of an installed project; the hooks find the installation root.
+
+With Lessons Mode enabled, Codex's `SubagentStart` hook gives subagents the recording guidance and project path. For npx installs, it preserves the main project's path when a subagent runs in a separate worktree; plugin installs use that worktree's path.
 
 ### Cursor
 
@@ -76,6 +100,8 @@ npx devlog-tracker init
 Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
 Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
+
+`.devlog-tracker/` contains the installed program. `.devlog/` contains your project's tracking data and is created only when you run the start command. Therefore, seeing `.devlog-tracker/` immediately after `npx init` is expected; `init` alone does not start recording.
 
 `init` writes this machine's absolute paths into each platform's hooks config and into `.devlog-tracker/env.sh`. If you commit these files to git, each teammate needs to run `npx devlog-tracker init` on their own machine (paths differ per machine); alternatively, add `.devlog-tracker/` and the generated hooks config files to `.gitignore`.
 
@@ -100,19 +126,20 @@ Run once in your project (pick whichever matches your install method):
 ```
 /devlog-tracker:start   # Claude Code plugin
 /devlog-start           # npx init --claude
-$devlog-start           # npx init --codex
+$devlog-start           # Codex plugin or npx init --codex
 ```
 
 After that, just converse normally — every round is enforced-checked and `.devlog/devlog.md` gets updated before it can end. After `/clear`, context is empty; to pick up prior work, run the matching `continue` command. See the command table below for pause, archive, named export, status, and span.
 
 ## Commands
 
-The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --claude` installs `/devlog-<name>`, and `npx init --codex` installs `$devlog-<name>` — the command content is the same.
+The table below uses the Claude plugin's `/devlog-tracker:*` namespace; `npx init --claude` installs `/devlog-<name>`, while either Codex installation method uses `$devlog-<name>` — the command content is the same.
 
 | Command | What it does |
 |---|---|
 | `/devlog-tracker:start` | Runs a script that creates `.devlog/.enabled` (missing state files are backfilled; existing thresholds aren't reset). Reads the file to check progress; doesn't auto-start work. `.devlog/` contains a prompt suggesting adding it to `.gitignore`, and only edits it with your consent. |
 | `/devlog-tracker:continue` | Reads `.devlog/devlog.md`, checks the last round's Handoff "Workspace" section, then continues per its next step. Use this after `/clear` to resume. See [`docs/design/continue.md`](docs/design/continue.md). |
+| `/devlog-tracker:migrate` | Converts legacy `####` Handoff/Session Handoff in `devlog.md`, branch files, the open round and `handoff.md` to XML (backups as `*.pre-migrate`). The Stop hook tells the agent to run it when it blocks a legacy Handoff. |
 | `/devlog-tracker:pause` | Pauses enforced recording; history files are untouched, and you can `start` again later. |
 | `/devlog-tracker:compact` | A script moves older `DONE` rounds into `devlog.archive.md` (Checkpoints and unfinished rounds stay in the main file). |
 | `/devlog-tracker:keep` | Scans the current branch's main file (to reorganize every devlog at once, use `keep-all`), groups it by topic, lists suggestions at once, then — after confirmation — moves each section out into its own `devlog.<name>.md` (leaving a `## Kept index` pointer line with a one-sentence topic description in the main file); can also extract a single section or merge everything into one history file. Not the same as compact. See [`docs/design/keep.md`](docs/design/keep.md). |
@@ -170,20 +197,24 @@ Every round has these fixed sections:
 - **`User Input`** — the raw submitted text takes priority (written by the hook; Claude shouldn't rewrite it), common tokens are masked
 - **`Summary`** — a conclusion a human can scan
 - **`Reply`** — what was said/promised to the user this round
-- **`Handoff`** — for the next round to pick up (decisions / files / workspace / current state / completion criteria / next steps)
+- **`Handoff`** — for the next round to pick up (decisions / files / workspace / current state / completion criteria / next steps). `Handoff` and `Session Handoff` are written as line-based XML tags (`<handoff>` … `<next>` …) because only the next agent and the Stop hook read them; `Summary`/`Reply` stay Markdown for humans. See [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md).
 - **`Status`** — one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`
 
 "Workspace" is a git snapshot taken at wrap-up time; required whenever in progress or blocked. `DONE` also requires it if "Files" has content (claiming files were touched/committed). "Completion criteria" is required whenever in progress or blocked.
 
 The Stop hook does the following:
 
-1. Confirms `Summary`/`Reply`/`Handoff` headings have content underneath, and Status is one of the four values above; Handoff subsections must be in the order Decisions → Files → Workspace → Current state → Completion criteria → Next steps
+1. Confirms `Summary`/`Reply`/`Handoff` headings have content underneath, and Status is one of the four values above; Handoff must use the XML tag form, with tags in the order `decisions` → `files` → `workspace` → `state` → `done-when` → `next`
 2. In-progress/blocked rounds must have "Completion criteria" and "Next steps"; "Next steps" can't be pure blacklisted filler (e.g. a section that just says "continue finishing up" — string matching, not semantic scoring; see [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)); in-progress rounds get an additional lightweight actionability check; blocked rounds require "Current state" or "Next steps" to contain a missing-piece phrasing
 3. Machine-verifies that "Workspace" matches the actual git state at wrap-up time, verbatim (always checked when in progress/blocked; only checked for `DONE` when "Files" is non-empty) — this catches claims like "already committed" that don't actually match reality
 
-When `#### Files` is non-empty, it's likewise machine-verified: the commit section must match that commit's actual content verbatim; for uncommitted sections, it only requires that the claimed paths actually have changes (not full coverage, so leftovers from a previous round aren't counted as missing from this one).
+When `<files>` is non-empty, it's likewise machine-verified: the commit section must match that commit's actual content verbatim; for uncommitted sections, it only requires that the claimed paths actually have changes (not full coverage, so leftovers from a previous round aren't counted as missing from this one).
 
-See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md), [`docs/design/files-verify.md`](docs/design/files-verify.md), and SKILL.md for details.
+See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md), [`docs/design/files-verify.md`](docs/design/files-verify.md), [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md), and SKILL.md for details.
+
+### Upgrading to XML Handoff
+
+Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run the migrate command (`/devlog-tracker:migrate` on the Claude plugin or `$devlog-migrate` on Codex; underlying script: `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, the open round (`.round-current.md`) and `handoff.md`／`handoff.<branch>.md` in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, update the plugin or rerun `npx devlog-tracker init`, then use the start command for your installation (`/devlog-tracker:start` on the Claude plugin or `$devlog-start` on Codex).
 
 ## What the hooks do automatically
 

@@ -10,4 +10,19 @@ if command -v jq >/dev/null 2>&1; then
 else
   ROOT="$(printf '%s' "$INPUT" | grep -o '"cwd"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
 fi
-printf '%s\n' "${ROOT:-.}"
+[ -n "$ROOT" ] || ROOT=.
+# Codex can start from a subdirectory while loading the repo's hooks.json.
+# npx uses the vendored marker; a Codex plugin has no project-local vendor
+# directory, so use the nearest tracked project or existing .devlog root.
+SEARCH="$ROOT"
+while [ -d "$SEARCH" ]; do
+  if [ -d "$SEARCH/.devlog-tracker" ] || [ -d "$SEARCH/.devlog" ] || [ -e "$SEARCH/.git" ]; then
+    printf '%s\n' "$SEARCH"
+    exit 0
+  fi
+  PARENT="${SEARCH%/*}"
+  [ -n "$PARENT" ] || PARENT=/
+  [ "$PARENT" != "$SEARCH" ] || break
+  SEARCH="$PARENT"
+done
+printf '%s\n' "$ROOT"

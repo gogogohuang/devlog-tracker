@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Codex SessionEnd wrapper. on-session-end.sh (shared) reads a "reason"
-# field. Codex's own field for "why the session ended" is documented
-# inconsistently as either "why" or "reason" - try both, default to
+# field. Codex documents `reason` (currently only `other`); accept older
+# `why` payloads too and default to
 # "unknown" rather than guessing further, and rebuild a synthetic payload
 # so the shared script's json_str_field lookup always finds "reason".
 set -uo pipefail
@@ -14,10 +14,10 @@ export DEVLOG_PROJECT_DIR="$ROOT"
 
 REASON=""
 if command -v jq >/dev/null 2>&1; then
-  REASON="$(printf '%s' "$INPUT" | jq -r '.why // .reason // empty' 2>/dev/null || true)"
+  REASON="$(printf '%s' "$INPUT" | jq -r '.reason // .why // empty' 2>/dev/null || true)"
 else
-  REASON="$(printf '%s' "$INPUT" | grep -o '"why"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"why"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
-  [ -n "$REASON" ] || REASON="$(printf '%s' "$INPUT" | grep -o '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"reason"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+  REASON="$(printf '%s' "$INPUT" | grep -o '"reason"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"reason"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+  [ -n "$REASON" ] || REASON="$(printf '%s' "$INPUT" | grep -o '"why"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"why"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
 fi
 [ -n "$REASON" ] || REASON="unknown"
 

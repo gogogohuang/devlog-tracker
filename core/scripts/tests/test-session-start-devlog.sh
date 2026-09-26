@@ -539,6 +539,51 @@ else
   FAIL=1
 fi
 
+# --- XML Handoff + XML handoff.md: both injected --------------------------
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/handoff.md"
+cat > "$DEVLOG_DIR/devlog.md" <<'EOF'
+## Round 1 — 2026-09-22T00:00:00+08:00
+
+### Summary
+summary 1
+
+### Reply
+fixture reply.
+
+### Handoff
+<handoff>
+<state>
+xml state line
+</state>
+<done-when>
+tests pass
+</done-when>
+<next>
+edit xml-next-target.sh
+</next>
+</handoff>
+
+### Status
+IN_PROGRESS
+EOF
+cat > "$DEVLOG_DIR/handoff.md" <<'EOF'
+<session-handoff>
+<decisions>
+- keep route A
+</decisions>
+<open-questions>
+- xml open Q
+</open-questions>
+<failed-attempts>
+- （無）
+</failed-attempts>
+</session-handoff>
+EOF
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "XML handoff <next> content injected" "edit xml-next-target.sh" "$OUTPUT"
+assert_contains "XML handoff.md block injected" "<session-handoff>" "$OUTPUT"
+assert_contains "XML handoff.md body injected" "xml open Q" "$OUTPUT"
+
 # --- no handoff.md: excerpt only -----------------------------------------
 rm -f "$DEVLOG_DIR/handoff.md"
 OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"

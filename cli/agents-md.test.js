@@ -92,6 +92,16 @@ test('init --codex writes AGENTS.md and project skills; --cursor alone does not'
     assert.match(skill, new RegExp(`^---\\nname: ${name}\\ndescription: ".+"\\n---\\n`));
   }
   assert.ok(!fs.existsSync(path.join(withCodex, '.codex', 'prompts')));
+  const installedHooks = JSON.parse(fs.readFileSync(path.join(withCodex, '.codex', 'hooks.json'), 'utf8'));
+  assert.equal(installedHooks.hooks.Interrupt[0].hooks[0].timeout, 3);
+  assert.equal(
+    installedHooks.hooks.Interrupt[0].hooks[0].command,
+    `bash "${path.join(withCodex, '.devlog-tracker', 'codex', 'hooks', 'on-interrupt.sh')}"`
+  );
+  assert.equal(
+    installedHooks.hooks.SubagentStart[0].hooks[0].command,
+    `bash "${path.join(withCodex, '.devlog-tracker', 'codex', 'hooks', 'on-subagent-start.sh')}"`
+  );
 
   const upgraded = tmp();
   const legacy = path.join(upgraded, '.codex', 'prompts');

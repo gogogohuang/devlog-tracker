@@ -8,11 +8,12 @@ set -uo pipefail
 _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../core/scripts" 2>/dev/null && pwd)"
-[ -d "$PLUGIN_SCRIPTS" ] || exit 0
+[ -d "$PLUGIN_SCRIPTS" ] || { printf '{}\n'; exit 0; }
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
 export DEVLOG_PROJECT_DIR="$ROOT"
-printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/enforce-devlog.sh"
+printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/enforce-devlog.sh" >/dev/null
 RC=$?
 [ "$RC" -eq 2 ] && exit 2
+printf '{}\n'
 exit 0

@@ -45,19 +45,43 @@ npx devlog-tracker init --claude
 
 ### Codex
 
+**方式一：plugin marketplace**
+
+要測試尚未發布的 checkout，先在**這個 repo 的根目錄**用本機版本安裝：
+
+```bash
+codex plugin marketplace add .
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+合併並推送後，才改用 GitHub 來源安裝：
+
+```bash
+codex plugin marketplace add gogogohuang/devlog-tracker
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+在要追蹤的專案開新 Codex session，用 `/hooks` 審核並信任 plugin 附帶的 hooks，再執行 `$devlog-start`（或從 `/skills` 選）。plugin 腳本放在 Codex 的快取中，不會在每個專案建立 `.devlog-tracker/`；執行 `$devlog-start` 後才會在專案建立 `.devlog/` 紀錄資料。若專案之前跑過 `npx devlog-tracker init --codex`，啟用 plugin 前先從專案的 `.codex/hooks.json` 移除 devlog-tracker 的 hook 項目，避免同一個 hook 執行兩次。
+
+**方式二：npx（vendor 進專案，版本可鎖定）**
+
 ```bash
 npx devlog-tracker init --codex
 ```
 
 會把 `codex/hooks.json` 的 `hooks` 合併進專案 `.codex/hooks.json`，並從 `commands/*.md` 產生 `.agents/skills/devlog-<名稱>/SKILL.md`，用 `$devlog-<名稱>`（或 `/skills` 選）執行；同時在 `AGENTS.md` 加上同一種 fallback 說明區塊。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——Codex 不讀專案層級的 custom prompts。
 
-**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成 `trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
+**hook 需要信任審核才會執行。** Codex 會略過尚未信任的新 hook 或變更過的 hook。若使用 npx 安裝，專案的 `.codex/` 設定層也須先被信任，專案 hook 才會載入；之後可用 `/hooks` 查看哪些 hook 定義仍待審核。
 
-- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
+- 互動模式：有 hook 待審核時，Codex 啟動時會顯示警告。用 `/hooks` 檢查並信任它們。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再審核一次。
 - 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。
 - 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
 
-Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在 Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的輪次）不受影響。
+沉默或工作區檢查擋住工具時，Codex 可用單一 `cat <專案>/.devlog/.round-current.md` 指令讀取當輪，再用 `apply_patch` 修改；封鎖訊息會附上專案路徑。
+
+Codex 的 `Interrupt` hook 會把主執行緒被中斷的輪次標成 `INTERRUPTED`。Codex 沒有處理其他異常結束的 `StopFailure` 事件；未收尾輪次會在下次訊息、下次 session start，或 `SessionEnd` 執行時補記。Codex 的 `SessionEnd` 原因目前只有 `other`，切換對話後也可能等閒置一段時間才觸發。正常輪次仍由 `Stop` hook 強制收尾。從已安裝專案的子目錄啟動 Codex 時，hook 也會找到安裝根目錄。
+
+Lessons Mode 開啟時，Codex 的 `SubagentStart` hook 會把記錄指引與專案路徑交給子代理。npx 安裝在子代理使用獨立 worktree 時仍會傳主專案路徑；plugin 安裝則使用該 worktree 的路徑。
 
 ### Cursor
 
@@ -76,6 +100,8 @@ npx devlog-tracker init
 沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
 會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
+
+`.devlog-tracker/` 放的是安裝進專案的程式；`.devlog/` 放的是這個專案的紀錄資料，執行 start 指令後才會建立。因此 `npx init` 後先看到 `.devlog-tracker/` 是預期行為，單跑 `init` 不會開始記錄。
 
 `init` 會把這台機器專屬的絕對路徑寫進各平台的 hooks 設定檔與 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與產生出來的 hooks 設定檔加進 `.gitignore`。
 
@@ -100,19 +126,20 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/timeline-devlog.sh"
 ```
 /devlog-tracker:start   # Claude Code plugin
 /devlog-start           # npx init --claude
-$devlog-start           # npx init --codex
+$devlog-start           # Codex plugin 或 npx init --codex
 ```
 
 之後正常對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下對應的 `continue` 指令。暫停、歸檔、具名搬走、狀態與 span 見下方指令表。
 
 ## 指令
 
-下表以 plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，`npx init --codex` 裝的是 `$devlog-<名稱>`，指令內容相同。
+下表以 Claude plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，Codex 兩種安裝方式都用 `$devlog-<名稱>`，指令內容相同。
 
 | 指令 | 做什麼 |
 |---|---|
 | `/devlog-tracker:start` | 跑腳本建立 `.devlog/.enabled`（缺的 state 檔會補上，已有門檻不重置）。讀檔對進度，不自動開工。`.devlog/` 含 prompt，會建議加進 `.gitignore`，要你同意才改。 |
 | `/devlog-tracker:continue` | 讀 `.devlog/devlog.md`，核對最後一輪 Handoff「工作區」後再依下一步接著做。`/clear` 之後要接續用這個。細節見 [`docs/design/continue.md`](docs/design/continue.md)。 |
+| `/devlog-tracker:migrate` | 把 `devlog.md`、分支檔、開著的那一輪與 `handoff.md` 裡舊格式 `####` 的 Handoff／Session Handoff 轉成 XML（備份成 `*.pre-migrate`）。Stop hook 擋下舊格式的 Handoff 時，會叫 agent 自己跑這個指令。 |
 | `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
 | `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
 | `/devlog-tracker:keep` | 掃目前分支的主檔分主題（要一次整理所有 devlog 用 `keep-all`），一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
@@ -170,20 +197,24 @@ sequenceDiagram
 - **`User Input`** — 送出原文優先（hook 寫入；Claude 不要改寫），常見 token 會遮罩
 - **`Summary`** — 給人掃的結論
 - **`Reply`** — 這輪對使用者說過／答應過的話
-- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）
+- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）。`Handoff` 與 `Session Handoff` 用以行為單位的 XML 標籤寫（`<handoff>` … `<next>` …），因為讀者只有下一輪的 agent 與 Stop hook；`Summary`／`Reply` 仍是給人看的 Markdown。細節見 [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md)。
 - **`Status`** — `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED` 四選一
 
 其中「工作區」是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。「完成條件」在進行中／卡住必寫。
 
 Stop hook 會做這些事：
 
-1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 小節順序為 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
+1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 必須是 XML 標籤格式，標籤順序為 `decisions` → `files` → `workspace` → `state` → `done-when` → `next`
 2. 進行中／卡住時有「完成條件」與「下一步」；「下一步」不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)）；進行中另做輕量可執行檢查；卡住時「現況」或「下一步」須含缺件句式
 3. 機器核對「工作區」是否跟收尾當下的 git 狀態逐字相符（進行中／卡住一律核對，`DONE` 只在「檔案」非空時核對），避免「已 commit 完成」卻其實沒 commit 這類宣稱跟實際不符
 
-`#### 檔案` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
+`<files>` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
 
-細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)、[`docs/design/files-verify.md`](docs/design/files-verify.md) 和 SKILL.md。
+細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)、[`docs/design/files-verify.md`](docs/design/files-verify.md)、[`docs/design/handoff-xml.md`](docs/design/handoff-xml.md) 和 SKILL.md。
+
+### 升級到 XML Handoff
+
+舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑對應的 migrate 指令（Claude plugin 用 `/devlog-tracker:migrate`，Codex 用 `$devlog-migrate`；底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、開著的 Round（`.round-current.md`）與 `handoff.md`／`handoff.<branch>.md`，每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，請更新 plugin 或重跑 `npx devlog-tracker init`，再使用對應的 start 指令（Claude plugin 用 `/devlog-tracker:start`，Codex 用 `$devlog-start`）。
 
 ## Hook 會自動做的事
 

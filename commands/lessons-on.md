@@ -14,7 +14,7 @@ description: 開啟 Lessons Mode（開發歷程教訓，預設關閉）。隸屬
 3. stdout 是 `LESSONS_ENABLED=...`：告知 Lessons Mode 已開啟。簡短說明：
    - 這是給「開發歷程中的困難/決策」用的，不是架構知識庫（那個留在 `docs/design/*.md`）
    - 只有兩種訊號會讓你考慮記一筆：這輪的 Status 從 `BLOCKED` 解開，或你自己判斷這輪明顯繞了一圈才對
-   - 完全不強制——寫不寫都不影響這一輪能不能收尾，跟 `#### 決策` 同一種「沒有就整節省略」的精神
+   - 完全不強制——寫不寫都不影響這一輪能不能收尾，跟 Handoff 的 `<decisions>`（舊格式 `#### 決策`）同一種「沒有就整個標籤省略」的精神
    - 用 `/devlog-tracker:lessons` 查現有教訓，或 `/devlog-tracker:lessons-off` 關掉
 
 不要因為 `.lessons-enabled` 已經存在就跳過步驟 3——重新確認一次現在的狀態即可。
