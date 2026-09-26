@@ -113,6 +113,7 @@ The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --cla
 |---|---|
 | `/devlog-tracker:start` | Runs a script that creates `.devlog/.enabled` (missing state files are backfilled; existing thresholds aren't reset). Reads the file to check progress; doesn't auto-start work. `.devlog/` contains a prompt suggesting adding it to `.gitignore`, and only edits it with your consent. |
 | `/devlog-tracker:continue` | Reads `.devlog/devlog.md`, checks the last round's Handoff "Workspace" section, then continues per its next step. Use this after `/clear` to resume. See [`docs/design/continue.md`](docs/design/continue.md). |
+| `/devlog-tracker:migrate` | Converts legacy `####` Handoff/Session Handoff in `devlog.md`, branch files, the open round and `handoff.md` to XML (backups as `*.pre-migrate`). The Stop hook tells the agent to run it when it blocks a legacy Handoff. |
 | `/devlog-tracker:pause` | Pauses enforced recording; history files are untouched, and you can `start` again later. |
 | `/devlog-tracker:compact` | A script moves older `DONE` rounds into `devlog.archive.md` (Checkpoints and unfinished rounds stay in the main file). |
 | `/devlog-tracker:keep` | Scans the current branch's main file (to reorganize every devlog at once, use `keep-all`), groups it by topic, lists suggestions at once, then — after confirmation — moves each section out into its own `devlog.<name>.md` (leaving a `## Kept index` pointer line with a one-sentence topic description in the main file); can also extract a single section or merge everything into one history file. Not the same as compact. See [`docs/design/keep.md`](docs/design/keep.md). |
@@ -170,20 +171,24 @@ Every round has these fixed sections:
 - **`User Input`** — the raw submitted text takes priority (written by the hook; Claude shouldn't rewrite it), common tokens are masked
 - **`Summary`** — a conclusion a human can scan
 - **`Reply`** — what was said/promised to the user this round
-- **`Handoff`** — for the next round to pick up (decisions / files / workspace / current state / completion criteria / next steps)
+- **`Handoff`** — for the next round to pick up (decisions / files / workspace / current state / completion criteria / next steps). `Handoff` and `Session Handoff` are written as line-based XML tags (`<handoff>` … `<next>` …) because only the next agent and the Stop hook read them; `Summary`/`Reply` stay Markdown for humans. See [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md).
 - **`Status`** — one of `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED`
 
 "Workspace" is a git snapshot taken at wrap-up time; required whenever in progress or blocked. `DONE` also requires it if "Files" has content (claiming files were touched/committed). "Completion criteria" is required whenever in progress or blocked.
 
 The Stop hook does the following:
 
-1. Confirms `Summary`/`Reply`/`Handoff` headings have content underneath, and Status is one of the four values above; Handoff subsections must be in the order Decisions → Files → Workspace → Current state → Completion criteria → Next steps
+1. Confirms `Summary`/`Reply`/`Handoff` headings have content underneath, and Status is one of the four values above; Handoff must use the XML tag form, with tags in the order `decisions` → `files` → `workspace` → `state` → `done-when` → `next`
 2. In-progress/blocked rounds must have "Completion criteria" and "Next steps"; "Next steps" can't be pure blacklisted filler (e.g. a section that just says "continue finishing up" — string matching, not semantic scoring; see [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)); in-progress rounds get an additional lightweight actionability check; blocked rounds require "Current state" or "Next steps" to contain a missing-piece phrasing
 3. Machine-verifies that "Workspace" matches the actual git state at wrap-up time, verbatim (always checked when in progress/blocked; only checked for `DONE` when "Files" is non-empty) — this catches claims like "already committed" that don't actually match reality
 
-When `#### Files` is non-empty, it's likewise machine-verified: the commit section must match that commit's actual content verbatim; for uncommitted sections, it only requires that the claimed paths actually have changes (not full coverage, so leftovers from a previous round aren't counted as missing from this one).
+When `<files>` is non-empty, it's likewise machine-verified: the commit section must match that commit's actual content verbatim; for uncommitted sections, it only requires that the claimed paths actually have changes (not full coverage, so leftovers from a previous round aren't counted as missing from this one).
 
-See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md), [`docs/design/files-verify.md`](docs/design/files-verify.md), and SKILL.md for details.
+See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md), [`docs/design/files-verify.md`](docs/design/files-verify.md), [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md), and SKILL.md for details.
+
+### Upgrading to XML Handoff
+
+Rounds written before this change stay in the legacy `####`-headed form and are still read fine — nothing rewrites history automatically. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run `/devlog-tracker:migrate` (or the underlying `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. If the agent keeps writing the legacy form instead of picking up the fix, that means the vendored skill/commands in your project are stale: rerun `npx devlog-tracker init` (plugin users: update the plugin), then `/devlog-tracker:start` again.
 
 ## What the hooks do automatically
 

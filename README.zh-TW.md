@@ -113,6 +113,7 @@ $devlog-start           # npx init --codex
 |---|---|
 | `/devlog-tracker:start` | 跑腳本建立 `.devlog/.enabled`（缺的 state 檔會補上，已有門檻不重置）。讀檔對進度，不自動開工。`.devlog/` 含 prompt，會建議加進 `.gitignore`，要你同意才改。 |
 | `/devlog-tracker:continue` | 讀 `.devlog/devlog.md`，核對最後一輪 Handoff「工作區」後再依下一步接著做。`/clear` 之後要接續用這個。細節見 [`docs/design/continue.md`](docs/design/continue.md)。 |
+| `/devlog-tracker:migrate` | 把 `devlog.md`、分支檔、開著的那一輪與 `handoff.md` 裡舊格式 `####` 的 Handoff／Session Handoff 轉成 XML（備份成 `*.pre-migrate`）。Stop hook 擋下舊格式的 Handoff 時，會叫 agent 自己跑這個指令。 |
 | `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
 | `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
 | `/devlog-tracker:keep` | 掃目前分支的主檔分主題（要一次整理所有 devlog 用 `keep-all`），一次列出建議，確認後把各段各自搬走成 `devlog.<name>.md`（並在主檔留一個 `## Kept 索引` 指標行，含一句主題描述）；也可抽出一段或合併成全部歷史一檔。不是 compact。細節見 [`docs/design/keep.md`](docs/design/keep.md)。 |
@@ -170,20 +171,24 @@ sequenceDiagram
 - **`User Input`** — 送出原文優先（hook 寫入；Claude 不要改寫），常見 token 會遮罩
 - **`Summary`** — 給人掃的結論
 - **`Reply`** — 這輪對使用者說過／答應過的話
-- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）
+- **`Handoff`** — 給下一輪接手（決策／檔案／工作區／現況／完成條件／下一步）。`Handoff` 與 `Session Handoff` 用以行為單位的 XML 標籤寫（`<handoff>` … `<next>` …），因為讀者只有下一輪的 agent 與 Stop hook；`Summary`／`Reply` 仍是給人看的 Markdown。細節見 [`docs/design/handoff-xml.md`](docs/design/handoff-xml.md)。
 - **`Status`** — `DONE` / `IN_PROGRESS` / `BLOCKED` / `INTERRUPTED` 四選一
 
 其中「工作區」是收尾時的 git 快照，進行中／卡住必寫；`DONE` 若「檔案」有內容（宣稱動過／commit 過檔案）也必寫。「完成條件」在進行中／卡住必寫。
 
 Stop hook 會做這些事：
 
-1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 小節順序為 決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步
+1. 確認 `Summary`／`Reply`／`Handoff` 標題底下有內容、Status 是上述四值之一；Handoff 必須是 XML 標籤格式，標籤順序為 `decisions` → `files` → `workspace` → `state` → `done-when` → `next`
 2. 進行中／卡住時有「完成條件」與「下一步」；「下一步」不是純黑名單空話（例如整節只寫「繼續完成」；字串比對，非語意評分，細節見 [`docs/design/next-step-blacklist.md`](docs/design/next-step-blacklist.md)）；進行中另做輕量可執行檢查；卡住時「現況」或「下一步」須含缺件句式
 3. 機器核對「工作區」是否跟收尾當下的 git 狀態逐字相符（進行中／卡住一律核對，`DONE` 只在「檔案」非空時核對），避免「已 commit 完成」卻其實沒 commit 這類宣稱跟實際不符
 
-`#### 檔案` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
+`<files>` 非空時同樣機器核對：commit 區塊要跟該次 commit 的實際內容逐字相符，未 commit 的區塊只要求宣稱的路徑真的存在變更（不要求涵蓋全部，避免把跨輪殘留算成這輪漏列）。
 
-細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)、[`docs/design/files-verify.md`](docs/design/files-verify.md) 和 SKILL.md。
+細節見 [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md)、[`docs/design/devlog-as-ssot-assessment.md`](docs/design/devlog-as-ssot-assessment.md)、[`docs/design/files-verify.md`](docs/design/files-verify.md)、[`docs/design/handoff-xml.md`](docs/design/handoff-xml.md) 和 SKILL.md。
+
+### 升級到 XML Handoff
+
+舊輪次仍是 `####` 小節格式，讀取端照樣相容，不會被自動改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑 `/devlog-tracker:migrate`（底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。如果 agent 一直寫舊格式、沒有照著修，代表專案裡 vendor 的 skill／指令版本太舊：重跑 `npx devlog-tracker init`（plugin 使用者更新 plugin），再下一次 `/devlog-tracker:start`。
 
 ## Hook 會自動做的事
 
