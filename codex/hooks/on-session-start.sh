@@ -5,9 +5,8 @@
 # JSON-in shape as Claude Code, so we assume the same is true for stdout-out
 # here and skip any envelope too.
 #
-# One documented field-name gap: Codex's SessionStart payload may call the
-# "how did this session start" field `how` instead of Claude Code's `source`.
-# We try both and default to "startup" on purpose: session-start-devlog.sh
+# Codex's documented SessionStart field is `source`. Accept older `how`
+# payloads too, and default to "startup" on purpose: session-start-devlog.sh
 # SKIPS the dangling-round heal when source is missing/unrecognized (same as
 # `compact`); the wrapper forces SRC="startup" so healing runs.
 set -uo pipefail
@@ -20,10 +19,10 @@ export DEVLOG_PROJECT_DIR="$ROOT"
 
 SRC=""
 if command -v jq >/dev/null 2>&1; then
-  SRC="$(printf '%s' "$INPUT" | jq -r '.how // .source // empty' 2>/dev/null || true)"
+  SRC="$(printf '%s' "$INPUT" | jq -r '.source // .how // empty' 2>/dev/null || true)"
 else
-  SRC="$(printf '%s' "$INPUT" | grep -o '"how"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"how"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
-  [ -n "$SRC" ] || SRC="$(printf '%s' "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+  SRC="$(printf '%s' "$INPUT" | grep -o '"source"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"source"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+  [ -n "$SRC" ] || SRC="$(printf '%s' "$INPUT" | grep -o '"how"[[:space:]]*:[[:space:]]*"[^"]*"' 2>/dev/null | head -1 | sed 's/.*"how"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
 fi
 [ -n "$SRC" ] || SRC="startup"
 

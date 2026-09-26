@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SubagentStart hook（Claude Code）：Lessons Mode 開著時，把「可以自己呼叫
+# SubagentStart hook（Claude Code／Codex）：Lessons Mode 開著時，把「可以自己呼叫
 # lessons-append.sh」的說明注入 sub agent／Workflow agent 的 context
 # （docs/design/lessons-mode.md「sub agent／workflow 情境」）。
 # sub agent 的 Bash 裡沒有 CLAUDE_PROJECT_DIR，isolation: "worktree" 時 cwd

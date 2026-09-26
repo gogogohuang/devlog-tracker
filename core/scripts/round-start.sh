@@ -94,8 +94,19 @@ case "$PROMPT" in
     CMD_NAME="${CMD_NAME#/}"
     ;;
 esac
+# Codex exposes project commands as skills. An explicit $devlog-name mention
+# is the first token of the submitted prompt, rather than a command-name tag.
+if [ -z "$CMD_NAME" ]; then
+  case "$PROMPT" in
+    \$devlog-*)
+      CMD_NAME="${PROMPT%%[[:space:]]*}"
+      CMD_NAME="${CMD_NAME#\$devlog-}"
+      CMD_NAME="devlog-tracker:$CMD_NAME"
+      ;;
+  esac
+fi
 case "$CMD_NAME" in
-  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
+  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:migrate|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
     exit 0
     ;;
 esac

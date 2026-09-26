@@ -666,6 +666,16 @@ else
 fi
 rm -f "$DEVLOG_DIR/.checkpoint-state"
 
+# Codex invokes project skills through $devlog-<name> in the prompt.
+for ADMIN_PROMPT in '$devlog-status' '$devlog-report --json'; do
+  printf '{"prompt":"%s"}' "$ADMIN_PROMPT" | bash "$SCRIPT_DIR/round-start.sh"
+  assert_file_absent "Codex admin $ADMIN_PROMPT: no .round-current.md" "$DEVLOG_DIR/.round-current.md"
+done
+printf '{"prompt":"%s"}' '$devlog-continue' | bash "$SCRIPT_DIR/round-start.sh"
+CUR_BODY="$(cat "$DEVLOG_DIR/.round-current.md" 2>/dev/null || echo '')"
+assert_contains "Codex continue still opens a Round" "## Round 1 —" "$CUR_BODY"
+rm -f "$DEVLOG_DIR/devlog.md" "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.turn-start" "$DEVLOG_DIR/.round-current.md"
+
 # --- 19b: report / timeline / keep-all are admin commands too -------------
 for ADMIN_CMD in report timeline keep-all; do
   rm -f "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.round-open"

@@ -20,6 +20,16 @@
         ]
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-subagent-start.sh\""
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [
@@ -46,6 +56,17 @@
           {
             "type": "command",
             "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-session-end.sh\""
+          }
+        ]
+      }
+    ],
+    "Interrupt": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${DEVLOG_TRACKER_ROOT}/codex/hooks/on-interrupt.sh\"",
+            "timeout": 3
           }
         ]
       }

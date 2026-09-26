@@ -51,13 +51,17 @@ npx devlog-tracker init --codex
 
 Merges the `hooks` from `codex/hooks.json` into the project's `.codex/hooks.json`, and generates `.agents/skills/devlog-<name>/SKILL.md` from `commands/*.md`, invoked with `$devlog-<name>` (or picked from `/skills`); it also adds the same kind of fallback block to `AGENTS.md`. Files the older 0.25.0 version wrote to `.codex/prompts/` are cleared out on the next `init` run — Codex doesn't read project-level custom prompts.
 
-**Hooks require approval before they run.** Codex requires approval for new or changed hooks; an unapproved hook is silently skipped — **with no warning at all**, so it looks like devlog just isn't recording. This is independent of whether the project is set to `trust_level = "trusted"`; project trust doesn't make hooks active.
+**Hooks require trust review before they run.** Codex skips new or changed hooks until you trust their current definitions. Project trust and hook trust are separate: the project `.codex/` layer must be trusted to load project hooks, then `/hooks` shows which hook definitions still need review.
 
-- Interactive mode: the first time you open it, Codex prompts that hooks need approval; they only run once approved. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require approval again.
+- Interactive mode: Codex warns at startup when hooks need review. Use `/hooks` to inspect and trust them. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require another review.
 - Non-interactive `codex exec` (CI, scripts): unapproved hooks are silently skipped. `--dangerously-bypass-hook-trust` lets them run, but that flag skips trust checks for *all* hooks, so it's only appropriate for automation environments where you've already vetted the hook sources yourself.
 - To confirm it's working: after `start`, send a message and check whether `.devlog/.round-current.md` shows this round's User Input skeleton; if not, the hook didn't run.
 
-Codex currently has no equivalent to "user interrupted" (Claude Code's `PostToolUseFailure`/`is_interrupt`) or "this round ended abnormally" (`StopFailure`); these two detailed states won't be marked `INTERRUPTED` on Codex, but the core enforcement mechanism (the `Stop` event blocking unfinished rounds) is unaffected.
+When the silence or workspace guard blocks a tool, Codex can read the current round with a single `cat <project>/.devlog/.round-current.md` command and update it with `apply_patch`. The block message includes the project path.
+
+Codex's `Interrupt` hook records an interrupted main-thread turn as `INTERRUPTED`. Codex has no `StopFailure` event for other abnormal endings; an open round is recovered on the next prompt or session start, or when `SessionEnd` runs. Codex's `SessionEnd` reason is currently only `other`, and it may run after an idle session rather than immediately when you switch conversations. The `Stop` hook still enforces completion of normal turns. Codex can also start from a subdirectory of an installed project; the hooks find the installation root.
+
+With Lessons Mode enabled, Codex's `SubagentStart` hook gives subagents the recording guidance and the main project's absolute path, including when they run in a separate worktree.
 
 ### Cursor
 

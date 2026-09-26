@@ -361,7 +361,7 @@ Read `.devlog/.round-current.md` 再用 Edit／StrReplace 追加一段（**禁�
 覆寫整份檔）。
 
 完整格式範例、寫入細則、跟 dynamic workflow／subagent 的例外情況，見
-`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/round-segments.md`。
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/devlog-tracker/references/round-segments.md`。
 
 ## Reply Fold：把「Claude 提問、user 回答」記成同一個 Round
 
@@ -382,7 +382,7 @@ Reply Fold 讓它折進同一個 Round。
 Status，只有整場問答真正結束才收尾一次。
 
 完整步驟、折疊格式、猜錯的處理、跟 task-notification／Span Mode／checkpoint
-計數的關係，見 `${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/reply-fold.md`。
+計數的關係，見 `${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/devlog-tracker/references/reply-fold.md`。
 
 ## Span Mode：橫跨多次自動續接的長任務
 
@@ -394,7 +394,7 @@ Status，只有整場問答真正結束才收尾一次。
 （`max_silent_ticks`）才強制寫一次；崩潰最多漏記固定數量的 tick，不是整段 span。
 
 JSON 格式、開關步驟、已知限制（分辨不出自動續接 vs 真人插話），見
-`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/span-mode.md`（設計動機
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/devlog-tracker/references/span-mode.md`（設計動機
 見 `docs/design/span-mode.md`）。
 
 ## Checkpoint Mode：定期摘要
@@ -406,7 +406,7 @@ JSON 格式、開關步驟、已知限制（分辨不出自動續接 vs 真人�
 hook 會要求補一段。
 
 運作機制、`/devlog-tracker:pause` 之後的行為，見
-`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/checkpoint-mode.md`
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/devlog-tracker/references/checkpoint-mode.md`
 （設計動機見 `docs/design/checkpoint-mode.md`）。補寫時用固定三段：
 `### 決策`／`### 待解問題`／`### 失敗嘗試`（格式與填寫規則見該 reference）。
 
@@ -481,13 +481,14 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 若這輪任務是透過 Agent 工具派 sub agent，或用 Workflow 工具跑多階段 pipeline，一樣可能
 踩到值得記的坑，只是沒有 Round／Status 可比對訊號；讀完 sub agent／workflow 的最終回報後
 自我判斷（例如 verify 推翻了它先前的 fix、它自陳繞了一圈、多個 agent 重複卡在同一種問題、
-或成果被打回票要求重做），值得的話一樣呼叫 `lessons-append.sh`。Claude Code 上 hook 會自動
-觸發：sub agent／Workflow agent 開始時被注入 `lessons-append.sh` 的絕對路徑用法、可以自己記；
-它回來或背景任務通知到達時，你會看到一句 `[Lessons Mode 提示]`（`failed`／`killed` 另算進
-共用計數器）。sub agent 已記過的不用重複記。
+或成果被打回票要求重做），值得的話一樣呼叫 `lessons-append.sh`。Claude Code 與 Codex 的
+`SubagentStart` hook 會在 sub agent 開始時注入 `lessons-append.sh` 的絕對路徑用法，讓它自行判斷
+是否記錄。Claude Code 的前景 agent 回來或背景任務通知到達時，還會顯示 `[Lessons Mode 提示]`
+（`failed`／`killed` 另算進共用計數器）；Codex 讀完回報後自行檢查上述訊號。sub agent 已記過
+的不用重複記。
 
 寫法、per-topic 存檔規則、索引重建、機制性訊號細節，見
-`${CLAUDE_PLUGIN_ROOT}/skills/devlog-tracker/references/lessons-mode.md`（完整
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/devlog-tracker/references/lessons-mode.md`（完整
 設計見 `docs/design/lessons-mode.md`）。
 
 ## 無條件清空：`/devlog-tracker:clean`

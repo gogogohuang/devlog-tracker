@@ -51,13 +51,17 @@ npx devlog-tracker init --codex
 
 會把 `codex/hooks.json` 的 `hooks` 合併進專案 `.codex/hooks.json`，並從 `commands/*.md` 產生 `.agents/skills/devlog-<名稱>/SKILL.md`，用 `$devlog-<名稱>`（或 `/skills` 選）執行；同時在 `AGENTS.md` 加上同一種 fallback 說明區塊。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——Codex 不讀專案層級的 custom prompts。
 
-**hook 需要審核才會執行。** Codex 對新增或有變動的 hook 要求先審核；沒核准的 hook 會被直接略過，而且**沒有任何警告**，看起來就像 devlog 沒在記錄。這跟專案有沒有設成 `trust_level = "trusted"` 是兩回事，專案信任不會讓 hook 生效。
+**hook 需要信任審核才會執行。** Codex 會略過尚未信任的新 hook 或變更過的 hook。專案信任與 hook 信任是兩件事：專案的 `.codex/` 設定層須先被信任，專案 hook 才會載入；之後可用 `/hooks` 查看哪些 hook 定義仍待審核。
 
-- 互動模式：第一次開啟時 Codex 會提示有 hook 需要審核，核准後才會執行。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再核准一次。
+- 互動模式：有 hook 待審核時，Codex 啟動時會顯示警告。用 `/hooks` 檢查並信任它們。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再審核一次。
 - 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。
 - 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
 
-Codex 目前沒有對應「使用者中斷」（Claude Code 的 `PostToolUseFailure`／`is_interrupt`）與「這輪異常結束」（`StopFailure`）的事件，這兩種細節狀態在 Codex 上不會被標記成 `INTERRUPTED`；核心強制記錄機制（`Stop` 事件擋住未寫完的輪次）不受影響。
+沉默或工作區檢查擋住工具時，Codex 可用單一 `cat <專案>/.devlog/.round-current.md` 指令讀取當輪，再用 `apply_patch` 修改；封鎖訊息會附上專案路徑。
+
+Codex 的 `Interrupt` hook 會把主執行緒被中斷的輪次標成 `INTERRUPTED`。Codex 沒有處理其他異常結束的 `StopFailure` 事件；未收尾輪次會在下次訊息、下次 session start，或 `SessionEnd` 執行時補記。Codex 的 `SessionEnd` 原因目前只有 `other`，切換對話後也可能等閒置一段時間才觸發。正常輪次仍由 `Stop` hook 強制收尾。從已安裝專案的子目錄啟動 Codex 時，hook 也會找到安裝根目錄。
+
+Lessons Mode 開啟時，Codex 的 `SubagentStart` hook 會把記錄指引與主專案的絕對路徑交給子代理；子代理在獨立 worktree 執行時也適用。
 
 ### Cursor
 
