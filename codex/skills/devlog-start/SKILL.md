@@ -3,6 +3,13 @@ name: devlog-start
 description: "啟動這個專案的 devlog 強制記錄機制。之後每一輪結束前都會被 Stop hook 檢查，沒寫 devlog 就不能結束。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行以下步驟：
 
 1. 先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：

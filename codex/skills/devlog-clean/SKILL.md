@@ -3,6 +3,13 @@ name: devlog-clean
 description: "無條件清空 .devlog/devlog.md（含專案摘要與所有 Round 歷史），只留這一輪重編成 Round 1；不可復原，執行前一定要先問使用者確認"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行 devlog clean（無條件清空）。這是使用者主動執行 `/devlog-tracker:clean` 時才做的事，不要自動觸發。
 
 確認之前不要跑清空腳本、不要動 `devlog.md` 的既有歷史內容。這一輪本身仍照 devlog-tracker 的一般規則：結束前要補 `### Summary` / `### Handoff` / `### Status`（Status 通常是 `BLOCKED`，因為在等使用者回覆）——這跟「先問再等」不衝突，Stop hook 檢查的是這一輪有沒有收尾，不是有沒有清空。

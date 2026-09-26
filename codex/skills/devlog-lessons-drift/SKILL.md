@@ -3,6 +3,13 @@ name: devlog-lessons-drift
 description: "調整 Lessons Mode 機制性提醒的共用門檻——工作區漂移或 BLOCKED 輪次累積達幾次才印一次建議。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 取得使用者要設定的次數（正整數）；沒帶就先問，不要用預設值硬猜。跑：
 
 ```bash

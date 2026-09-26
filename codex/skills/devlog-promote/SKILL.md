@@ -3,6 +3,13 @@ name: devlog-promote
 description: "從已 keep 的檔、lessons 檔與 Checkpoint 決策挑出該長期遵守的規範，你選定後寫進 CLAUDE.md 或 AGENTS.md 的 devlog-tracker 規範區塊。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 這是使用者主動執行 `/devlog-tracker:promote` 時才做的事。**沒有使用者明確選擇就不寫入任何檔案。**
 
 ## 1. 取得來源與目標

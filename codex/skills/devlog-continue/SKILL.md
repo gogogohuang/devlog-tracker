@@ -3,6 +3,13 @@ name: devlog-continue
 description: "讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區後再依下一步接著做。/clear 之後不會自動接續，要下這個指令才會讀檔。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行 devlog continue（接續上一題）。這是使用者主動執行 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時才做的事。`/clear` 之後的一般新請求不要先讀檔接舊工作。
 
 1. 讀取 `.devlog/devlog.md`。若檔案不存在，告知「目前沒有 devlog 可接續」，不要建立 `.devlog/` 或任何新檔，結束。記下 `.devlog/` 的上層目錄（也就是專案根目錄）的絕對路徑，作為本輪接下來都要用的專案根目錄——後面步驟（尤其是步驟 5.1）一律沿用這個值，不要再用 shell 的 `pwd` 重新推。Bash 工具的工作目錄會在同一段對話裡的呼叫之間持續累積，中途若因為別的原因 `cd` 過，`pwd` 就不再代表這個專案根目錄。

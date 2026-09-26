@@ -3,6 +3,13 @@ name: devlog-pr
 description: "從這個 branch 的 devlog 與 git log 產生 PR 描述，寫到 .devlog/pr-body.md；使用者確認後才用 gh 建立或更新 PR。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 這是使用者主動執行 `/devlog-tracker:pr` 時才做的事。產生草稿是純讀取；**建立或更新 PR 是對外動作，一定要等使用者明確確認才做。**
 
 ## 1. 取得 context

@@ -3,6 +3,13 @@ name: devlog-keep-all
 description: "整理所有 devlog：跨主檔、所有分支檔、archive 與既有 keep 檔，依主題重新分成 devlog.<name>.md"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行 devlog keep-all（整理全部 devlog）。這是使用者主動執行 `/devlog-tracker:keep-all` 時才做的事，不要自動觸發。
 
 跟 `/devlog-tracker:keep` 的差別：keep 只整理目前分支的主檔；keep-all 一次看 `.devlog/` 裡**所有** devlog 檔——目前分支的主檔、其他分支的 `devlog.<branch>.md`、`devlog.archive.md`，以及先前 keep／keep-all 產生的具名檔——跨檔依主題重新分段。既有的具名檔會被拆開重組，所以一個主題散在 main、feature 分支與 archive 的片段可以合回同一個檔。設計見 `docs/design/keep-all.md`。

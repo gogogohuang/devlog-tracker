@@ -3,6 +3,13 @@ name: devlog-search
 description: "在 devlog.md／archive／keep 檔／lessons 檔裡搜尋關鍵字，讀完命中後用自己的話回答（純讀取，不核對工作區、不等確認）。"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 取得使用者提供的 `<關鍵字>`（或自然語言查詢裡的關鍵片語）；沒有給的話先問。這是純讀取，不做 `commands/continue.md`／`commands/resume.md` 那套「核對工作區、等確認才動手」流程——搜尋結果是導航用的參考，不是暫停中的工作主題。讀完之後不要自動據此修改任何檔案，除非使用者接著明確要求。
 
 記下你目前已經確認的專案根目錄絕對路徑（後面步驟都要用這個值，不要用 `$(pwd)` 重新推——理由同 `commands/continue.md` 步驟 1）。先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄），再跑：

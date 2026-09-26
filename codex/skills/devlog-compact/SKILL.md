@@ -3,6 +3,13 @@ name: devlog-compact
 description: "把 .devlog/devlog.md 裡已完成且較舊的紀錄搬到 devlog.archive.md，避免主檔案無限膨脹"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行 devlog 壓縮：
 
 1. 讀取 `.devlog/devlog.md` 全文。若檔案不存在，告知使用者目前沒有東西可壓縮，不要建立空檔案，結束。

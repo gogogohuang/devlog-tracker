@@ -3,6 +3,13 @@ name: devlog-keep
 description: "掃描整份 devlog.md，把值得留名的主題段落一次分別搬成 devlog.<name>.md；也可只抽出一段或合併成全部歷史一個檔"
 ---
 
+Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
+`<plugin 根目錄>/codex/skills/<skill 名稱>/SKILL.md`。每次用 shell 執行下方步驟時，
+先從這份檔案的所在目錄往上三層取得 plugin 根目錄，並在同一次 shell 呼叫中
+`export DEVLOG_TRACKER_ROOT="<該根目錄的絕對路徑>"`。
+一般 shell 呼叫不一定有 hook 專用的 `PLUGIN_ROOT`／`CLAUDE_PLUGIN_ROOT` 環境變數。
+若是 npx 安裝，沿用專案內既有的 `DEVLOG_TRACKER_ROOT`。
+
 請執行 devlog keep（具名搬走）。這是使用者主動執行 `/devlog-tracker:keep` 時才做的事，不要自動觸發。
 
 這個指令只整理**目前分支的主檔**（`devlog.md` 或 `devlog.<branch>.md`）。要一次整理所有 devlog——其他分支的檔、`devlog.archive.md`、既有的 keep 檔——用 `/devlog-tracker:keep-all`（`commands/keep-all.md`）。
