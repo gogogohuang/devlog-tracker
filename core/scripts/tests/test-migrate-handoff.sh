@@ -176,5 +176,43 @@ eq "snapshot already xml rc" 2 "$RC"
 
 # ---- migrate-handoff.sh (Task 3 appends below this line) ----
 
+P="$TMP/proj"; D="$P/.devlog"; mkdir -p "$D"
+cp "$TMP/in.md" "$D/devlog.md"
+{ printf '<!-- devlog-origin: branch=feat/x -->\n\n'; cat "$TMP/in.md"; } > "$D/devlog.feat-x.md"
+cp "$TMP/in.md" "$D/devlog.archive.md"
+cp "$TMP/in.md" "$D/devlog.mytopic.md"
+cp "$TMP/h.md" "$D/handoff.md"
+OUT="$(DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/migrate-handoff.sh")"; RC=$?
+eq "migrate rc" 0 "$RC"
+case "$OUT" in *"MIGRATED=2"*) echo "PASS: migrated count (main + branch)" ;; *) echo "FAIL: migrated count: $OUT"; FAIL=1 ;; esac
+case "$OUT" in *"SKIP devlog.md Round 2: "*) echo "PASS: skip line" ;; *) echo "FAIL: skip line: $OUT"; FAIL=1 ;; esac
+eq "main converted" "$(cat "$TMP/want.md")" "$(cat "$D/devlog.md")"
+eq "backup kept original" "$(cat "$TMP/in.md")" "$(cat "$D/devlog.md.pre-migrate")"
+grep -q '^<handoff>$' "$D/devlog.feat-x.md" && echo "PASS: branch file converted" || { echo "FAIL: branch file"; FAIL=1; }
+eq "archive untouched" "$(cat "$TMP/in.md")" "$(cat "$D/devlog.archive.md")"
+eq "keep file untouched" "$(cat "$TMP/in.md")" "$(cat "$D/devlog.mytopic.md")"
+grep -q '^<session-handoff>$' "$D/handoff.md" && echo "PASS: handoff.md converted" || { echo "FAIL: handoff.md"; FAIL=1; }
+OUT2="$(DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/migrate-handoff.sh")"
+case "$OUT2" in *"MIGRATED=0"*) echo "PASS: second run migrates nothing" ;; *) echo "FAIL: second run: $OUT2"; FAIL=1 ;; esac
+[ ! -d "$D/.lock" ] && echo "PASS: lock released" || { echo "FAIL: lock left behind"; FAIL=1; }
+OUT3="$(DEVLOG_PROJECT_DIR="$TMP/nope" bash "$SCRIPT_DIR/migrate-handoff.sh")"; RC=$?
+eq "no devlog rc" 1 "$RC"
+eq "no devlog out" "NO_DEVLOG" "$OUT3"
+
+# Coverage gap 1: a duplicated `#### 現況` inside one Handoff leaves that
+# round byte-for-byte untouched and is reported as SKIP mentioning 重複.
+printf '## Round 10 — dup\n\n### Handoff\n#### 現況\na\n#### 現況\nb\n\n### Status\nIN_PROGRESS\n' > "$TMP/dup.md"
+handoff_convert_file "$TMP/dup.md" "$TMP/dup.out" "$TMP/dup.rep"
+eq "duplicate section untouched" "$(cat "$TMP/dup.md")" "$(cat "$TMP/dup.out")"
+case "$(cat "$TMP/dup.rep")" in SKIP\ 10\ *重複*) echo "PASS: duplicate section reported" ;; *) echo "FAIL: duplicate section report: $(cat "$TMP/dup.rep")"; FAIL=1 ;; esac
+
+# Coverage gap 2: Handoff is valid legacy but Session Handoff has an unknown
+# `#### 其他` subsection — the WHOLE round (including the convertible
+# Handoff) is left byte-for-byte untouched and reported SKIP.
+printf '## Round 11 — mixed\n\n### Handoff\n#### 決策\npick\n\n### Session Handoff\n#### 其他\nx\n\n### Status\nDONE\n' > "$TMP/mixed.md"
+handoff_convert_file "$TMP/mixed.md" "$TMP/mixed.out" "$TMP/mixed.rep"
+eq "unknown session-handoff subsection leaves whole round untouched" "$(cat "$TMP/mixed.md")" "$(cat "$TMP/mixed.out")"
+case "$(cat "$TMP/mixed.rep")" in SKIP\ 11\ *) echo "PASS: mixed round skipped" ;; *) echo "FAIL: mixed round report: $(cat "$TMP/mixed.rep")"; FAIL=1 ;; esac
+
 [ "$FAIL" -eq 0 ] || exit 1
 echo "All migrate-handoff checks passed."
