@@ -1,6 +1,6 @@
 {
   "name": "devlog-tracker",
-  "version": "0.34.0",
+  "version": "1.0.0",
   "description": "Record development rounds and resume work across Codex sessions.",
   "author": {
     "name": "gogogohuang"
