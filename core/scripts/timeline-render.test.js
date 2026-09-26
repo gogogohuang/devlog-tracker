@@ -100,7 +100,7 @@ test('handoffToMarkdown leaves legacy Handoff untouched', () => {
 });
 
 test('XML Handoff renders as headings, never as raw tags', () => {
-  const html = render({ rounds: [round({ handoff: '<handoff>\n<state>\nok\n</state>\n</handoff>' })], checkpoints: [] });
+  const html = render({ rounds: [round({ handoff: '<handoff>\n<state>\nok\n</state>\n</handoff>' })], checkpoint_blocks: [] });
   assert.ok(!html.includes('&lt;state&gt;'));
   assert.ok(html.includes('現況'));
 });

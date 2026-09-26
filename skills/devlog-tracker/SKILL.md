@@ -13,7 +13,7 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 | 維度 | 契約（短） |
 |---|---|
 | **Requirements** | 強制記錄需 `.devlog/.enabled`（`/devlog-tracker:start`）。`/clear` 後不自動接續；要開工用 `/devlog-tracker:continue`（或明確說接續）。Cursor／Codex 對照 `.devlog-tracker/commands/*.md`。 |
-| **Output** | 編輯開著的 Round（`.round-current.md`）：必有 `### Summary`／`### Reply`／`### Handoff`／`### Status`；Handoff 小節順序固定。格式見「每一輪的紀錄格式」。 |
+| **Output** | 編輯開著的 Round（`.round-current.md`）：必有 `### Summary`／`### Reply`／`### Handoff`／`### Status`；Handoff／Session Handoff 用 XML 標籤，標籤順序固定。格式見「每一輪的紀錄格式」。 |
 | **Invariants** | L1 寫回義務；聊天不旁白記錄動作；不改 User Input（除非 hook `（無 prompt）`）；不為同一則訊息再 append `## Round`；設計真相在 `docs/design/*.md`，不是 lessons。 |
 | **Validation** | Soft：收尾前自檢欄位與工作區。Hard：Stop／PreToolUse／workspace／files snapshot（見「每一輪的紀錄格式」末段與 hook 腳本）。fail-open／loop guard 見下方開關一節。 |
 | **Transformation** | 單次動作走對應 `commands/*.md`（start／continue／compact／keep／…）；本檔管協定與跨指令不變式，不重抄步驟。 |
@@ -24,7 +24,7 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 
 devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下一步、完成條件）的 single source of truth，
 也是 L1「人觸發 continue／開 session 後 agent 可接手」的主入口；接手輪必須把狀態**寫回**本檔。
-不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git（`#### 工作區` 是收尾當下的已核對快取：
+不是整個專案的單一真相來源：程式碼／檔案狀態的真相仍是 git（工作區（`<workspace>`）是收尾當下的已核對快取：
 `IN_PROGRESS`／`BLOCKED` 時 Stop hook 一律對過 live git，`DONE` 若「檔案」有內容也對過；接手時樹可能已變，`continue`／`resume`
 仍以實際工作樹為準，見 `docs/design/continue.md`）；完整逐字過程的真相是對話 transcript（`/clear` 後不存在）；設計
 決策的真相是 `docs/design/*.md`。使用者在裡面許願、Claude 也在裡面回報進度與結果——取代「終端機
@@ -156,12 +156,12 @@ matcher 設為 `startup|resume|clear|compact|fork`。**開新 session、resume�
 ## 接續：`/devlog-tracker:continue`
 
 `/clear` 之後要接著做上一題，下 `/devlog-tracker:continue`（或明確說「continue」
-「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的 `#### 工作區`
+「接續」「繼續上一題」）。讀 `devlog.md`，**先核對**最後一輪 Handoff 的工作區（`<workspace>`；舊格式 `#### 工作區`）
 （跑步驟 5.1，編成同一格式再對），再依「下一步」開工，並對照「完成條件」。有快照但不符才先寫 `### 段落`；
 沒有快照（舊 Round、`INTERRUPTED` stub）直接以實際狀態為準，不用寫。步驟見 `commands/continue.md`。
 `DONE` 就說明上一題已結束、等新需求，不核對。`BLOCKED`：缺的外部輸入仍缺就停，已經出現就做；
 不要用 git 相不相符當作缺件已到。SessionStart 注入的摘錄若讓你要動手做「下一步」，同樣先核對。
-同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪 `#### 工作區` 跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。擋著的時候，唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse`（不含任何 shell 串接符號）仍可執行，方便自行核對「宣稱 vs 實際」再動手寫段落。
+同一條對話的下一則訊息也一樣：UserPromptSubmit 若發現上一輪工作區（`<workspace>`）跟 live git 不符，會注入說明並在 PreToolUse 擋住其他工具，直到這一輪寫了含實際快照的 `### 段落`。Span 安靜 tick 與 task-notification 不擋。`DONE` 一律不擋（跟 Stop hook 不同：Stop 在 `DONE` 有「檔案」時會機器核對，但這裡管的是「上一輪的宣稱還能不能拿來接續下一步」——`DONE` 沒有下一步可接，即使當初有檔案也不用重查）。沒呼叫任何工具的純文字回覆不會碰到 PreToolUse，仍應先核對再依實際工作樹行動。擋著的時候，唯讀的 `git status`／`diff`／`log`／`show`／`rev-parse`（不含任何 shell 串接符號）仍可執行，方便自行核對「宣稱 vs 實際」再動手寫段落。
 不要自動觸發。`/devlog-tracker:start` 只對進度，不開工、不核對。
 
 ### L1 寫回義務
@@ -186,43 +186,64 @@ hook 已在送出時寫好 User Input；Claude **編輯最後一個 Round**，�
 <這輪實際對使用者說的話／答應的邊界／未決提問，短述即可。給下一輪知道承諾，不是 Handoff>
 
 ### Handoff
-#### 決策
-<影響後續方向的選擇與理由；若依賴設計文件，寫上 `docs/design/...` 路徑。沒做選擇就整節省略>
-
-#### 檔案
-<機器可核對格式，見下方「檔案 machine-verify」：零個以上 `commit <hash>：` 區塊（依時間序），
-加上最多一個 `尚未 commit：` 區塊，各自帶 `新增：`/`修改：`/`刪除：` 分類行（無則省略該行）。
-沒動檔就整節省略>
-
-#### 工作區
-<IN_PROGRESS／BLOCKED 必寫；DONE 若上面「檔案」有內容（宣稱動過／commit 過檔案）也必寫，
-Stop hook 會機器核對；DONE 且「檔案」整節省略時，工作區才能跟著省略。收尾前跑 git 再寫，見下方格式>
-
-#### 現況
-<任務做到哪、卡在哪。git 快照寫在「工作區」，不要寫這裡。幾乎每輪都該有。
-BLOCKED 時寫清楚缺什麼、出現長怎樣（可觀察條件）>
-
-#### 完成條件
-<IN_PROGRESS／BLOCKED 必寫：可觀察的做完判準（測試指令、檔案行為、使用者已確認的範圍）。
-下一輪對照此節決定能否 DONE。DONE 且沒有後續就整節省略>
-
-#### 下一步
-<下一輪第一件具體要做的事（路徑、指令、要載入的 skill）。
-IN_PROGRESS／BLOCKED 必寫；DONE 且沒有後續就整節省略>
+<handoff>
+<decisions>
+影響後續方向的選擇與理由（沒做選擇就整個標籤省略）
+</decisions>
+<files>
+尚未 commit：
+修改：path/to/file
+</files>
+<workspace>
+main @ a1b2c3d，工作樹乾淨
+</workspace>
+<state>
+任務做到哪、卡在哪
+</state>
+<done-when>
+可觀察的做完判準（IN_PROGRESS／BLOCKED 必寫）
+</done-when>
+<next>
+下一輪第一件具體要做的事（IN_PROGRESS／BLOCKED 必寫）
+</next>
+</handoff>
 
 ### Session Handoff
-#### 決策
-- <仍影響後續方向的選擇；沒有就 `- （無）`>
-
-#### 待解問題
-- <下一 session 最該先看的卡點；沒有就 `- （無）`>
-
-#### 失敗嘗試
-- <試過但放棄／不可行的做法；沒有就 `- （無）`>
+<session-handoff>
+<decisions>
+- 仍影響後續方向的選擇；沒有就寫 - （無）
+</decisions>
+<open-questions>
+- 下一 session 最該先看的卡點；沒有就寫 - （無）
+</open-questions>
+<failed-attempts>
+- 試過但放棄的做法；沒有就寫 - （無）
+</failed-attempts>
+</session-handoff>
 
 ### Status
 DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 ```
+
+**Handoff／Session Handoff 用 XML 標籤（只有這兩節）：** 讀者是下一輪的 agent 與 Stop hook，不是人。規則：
+
+- 標籤自己一行（`<next>`、`</next>` 各佔一行），內容寫在中間，照常用 Markdown；不要寫成 `<next>做 X</next>`。
+- 標籤名固定、順序固定；沒發生的欄位整個標籤省略，不要留空標籤。
+- 這不是真的 XML：不用跳脫 `<`、`&`，不要加屬性。
+- 舊的 `#### 小節` 格式只會出現在歷史輪次，讀取時仍相容；這一輪寫舊格式會被 Stop 擋下，照訊息跑 `migrate-handoff.sh` 即可。
+
+| 標籤 | 舊格式小節 | 所在區塊 |
+|---|---|---|
+| `<decisions>` | `#### 決策` | Handoff、Session Handoff |
+| `<files>` | `#### 檔案` | Handoff |
+| `<workspace>` | `#### 工作區` | Handoff |
+| `<state>` | `#### 現況` | Handoff |
+| `<done-when>` | `#### 完成條件` | Handoff |
+| `<next>` | `#### 下一步` | Handoff |
+| `<open-questions>` | `#### 待解問題` | Session Handoff |
+| `<failed-attempts>` | `#### 失敗嘗試` | Session Handoff |
+
+下文提到「決策」「檔案」「工作區」「現況」「完成條件」「下一步」時，指的就是對應標籤。
 
 Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。
 
@@ -233,12 +254,13 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   （用詞、並列條件、例外）必須留在檔裡。超長內容由 hook 截斷並標明；不要在收尾時再手動縮成更短的改寫版。
 - **三個讀者拆開：** `Summary` 只給人掃；`Reply` 只記對使用者說過／答應過的話；`Handoff` 只給下一輪
   Claude 接手。同一件事不要三邊複述。
-- **`### Session Handoff`（跨 session 精簡快照）：** 與 Checkpoint 同款三欄（決策／待解問題／失敗嘗試），
-  不是 `### Handoff` 六小節的複本。`IN_PROGRESS`／`BLOCKED` 必寫（可 `- （無）`）；`DONE` 不要求；
-  `INTERRUPTED` stub 不寫。Stop 通過後會把內容覆寫到 `.devlog/handoff.md`（分支檔同規則）；
-  `DONE` 會刪掉該檔——不要把長期軌跡只寫在 handoff 檔裡。細節見 `docs/design/session-handoff-file.md`。
-- Handoff 小節順序固定（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），Stop hook 會檢查已出現的小節
-  順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整節省略，不要寫「無」。
+- **`### Session Handoff`（跨 session 精簡快照）：** 與 Checkpoint 同款三個標籤（`decisions`／
+  `open-questions`／`failed-attempts`），不是 `### Handoff` 六個標籤的複本。`IN_PROGRESS`／`BLOCKED`
+  必寫（可 `- （無）`）；`DONE` 不要求；`INTERRUPTED` stub 不寫。Stop 通過後會把整個 `<session-handoff>`
+  區塊原樣寫進 `.devlog/handoff.md`（分支檔同規則）；`DONE` 會刪掉該檔——不要把長期軌跡只寫在
+  handoff 檔裡。細節見 `docs/design/session-handoff-file.md`。
+- Handoff 標籤順序固定（`decisions` → `files` → `workspace` → `state` → `done-when` → `next`），Stop hook
+  會檢查已出現的標籤順序有沒有錯、有沒有重複（不檢查內容對不對）。沒發生的整個標籤省略，不要寫「無」。
   `現況` 幾乎每輪都該有。`工作區`、`完成條件` 與 `下一步` 在 `IN_PROGRESS`／`BLOCKED` 必寫；`DONE` 且沒有後續就整節省略——
   但 `DONE` 若 `檔案` 有內容（宣稱動過／commit 過檔案），`工作區` 一樣必寫且會被 Stop hook 機器核對，
   避免「已 commit 完成」卻其實沒 commit 這種宣稱跟實際不符沒人發現。
@@ -259,7 +281,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   docs/design/devlog-as-ssot-assessment.md Phase 1）；`DONE` 若「檔案」有內容一樣核對——只有
   沒動檔的 `DONE` 與 `INTERRUPTED` 不受影響。
   接手跑 `workspace-snapshot.sh`（`PLUGIN_ROOT` 同其他指令），stdout 就是要對的快照，不要手編（continue／fallback 見 `commands/continue.md` 步驟 5；resume 只做 5.1–5.2，等確認才做下一步）。腳本找不到才退回上面七種格式手編。
-- **`檔案` 是機器可核對的區塊格式（devlog ssot Phase 4）。** 零個以上 `commit <hash>：` 區塊
+- **`<files>` 是機器可核對的區塊格式（devlog ssot Phase 4）。** 零個以上 `commit <hash>：` 區塊
   （commit 短 hash，依時間序），每個後面接最多三行分類（`新增：`/`修改：`/`刪除：`，逗號分隔路徑，
   沒有就省略那行）；最多一個 `尚未 commit：` 區塊，格式相同。一輪可以先 commit 一部分、後面
   繼續改，兩種區塊可以並存。Stop hook 對 `commit` 區塊做逐字精確核對（含分類），對
@@ -289,7 +311,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   當接續動作**必須**重新載入某個特定 skill 才能正確接手時，才把 skill 名稱寫進 Handoff
   「下一步」裡。
 
-Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 小節順序與不重複（決策 → 檔案 → 工作區 → 現況 → 完成條件 → 下一步），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」與「下一步」且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」或「下一步」須含缺件句式（缺／等待／等使用者等）；`#### 工作區` 跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`#### 檔案` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）；`IN_PROGRESS`／`BLOCKED` 還必須有完整的 `### Session Handoff`（決策／待解問題／失敗嘗試），通過後覆寫分支對應的 `handoff.md`，`DONE` 則刪除該檔。
+最後一輪的 Handoff／Session Handoff 必須是 XML 標籤格式（舊 `####` 格式會被擋，訊息附 migrate 指令與模板）。
+Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply` 與 `### Handoff`、三者底下有內容、`### Status` 是四個合法值之一，已出現的 Handoff 標籤順序與不重複（`decisions` → `files` → `workspace` → `state` → `done-when` → `next`），以及 `IN_PROGRESS`／`BLOCKED` 時 Handoff 有「完成條件」（`<done-when>`）與「下一步」（`<next>`）且「下一步」不是純黑名單空話（例如整節只寫「繼續完成」，見 `docs/design/next-step-blacklist.md`；這是字串比對，不是語意評分）；`IN_PROGRESS` 的「下一步」另做輕量可執行檢查（須含路徑、反引號指令、或檔名／skill 跡象）；`BLOCKED` 時「現況」（`<state>`）或「下一步」須含缺件句式（缺／等待／等使用者等）；工作區（`<workspace>`）跟 hook 算出的 git 快照相符——`IN_PROGRESS`／`BLOCKED` 一律核對，`DONE` 則只在「檔案」（`<files>`）有內容時才核對（瑣碎、沒動檔的 DONE 輪不受影響）；`<files>` 非空時，hook 也會核對它是否符合實際 git 變更（commit 區塊精確核對，未 commit 區塊單向核對，見上方「檔案 machine-verify」）；`IN_PROGRESS`／`BLOCKED` 還必須有完整的 `### Session Handoff`（`decisions`／`open-questions`／`failed-attempts`），通過後把 `<session-handoff>` 區塊原樣覆寫到分支對應的 `handoff.md`，`DONE` 則刪除該檔。
 新開的 Round 三個標題（Summary／Reply／Handoff）都要有，瑣碎輪也不例外。
 
 ### devlog-tracker 自己的管理指令不記錄
@@ -312,7 +335,7 @@ Stop hook 要求補寫 Summary／Reply／Handoff。這些指令本身就是在�
 判斷測試：**如果把這一輪從 devlog 刪掉，之後光讀檔案接續工作，會不會漏掉重要資訊？**
 會漏掉就不瑣碎，要完整寫；不會漏掉（純確認、閒聊、使用者只回「好」「謝謝」、沒有產生任何
 實質變化或懸而未決的事）就是瑣碎，但**還是要有這個 Round 區塊**，只是 Summary 一句話、
-Reply 一句（對使用者說過的話）、Handoff 只留「現況」一句（沒有「工作區」），Status 多半 `DONE`。三個標題仍然都要有。
+Reply 一句（對使用者說過的話）、Handoff 只留 `<state>` 一句（沒有 `<workspace>`），Status 多半 `DONE`。三個標題仍然都要有。
 
 具體訊號：
 

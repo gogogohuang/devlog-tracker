@@ -5,8 +5,9 @@ reader is the next Claude (and the Stop hook), never a human. Today both
 are `####`-headed Markdown, so every consumer — `enforce-devlog.sh`,
 `handoff-file.sh`, `devlog-md.sh`, `round-start.sh`, `segment-watch.sh` —
 walks lines with awk, tracks ``` fences, and needs the odd-fence
-fail-open (`_devlog_fence_nofence`, `_handoff_nofence_flag`) so a pasted
-unclosed fence doesn't silently hide `#### 工作區`. Misspelled headings
+fail-open (`_devlog_fence_nofence`, and the since-removed
+`_handoff_nofence_flag`) so a pasted unclosed fence doesn't silently
+hide `#### 工作區`. Misspelled headings
 (`#### 下一步驟`) are ignored rather than rejected.
 
 This design moves those two sections — and only those two — to

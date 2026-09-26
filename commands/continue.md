@@ -14,15 +14,15 @@ description: 讀取 .devlog/devlog.md，核對最後一輪 Handoff 的工作區�
       PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
       DEVLOG_PROJECT_DIR="<步驟 1 記下的專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/workspace-snapshot.sh"
       ```
-      把 `DEVLOG_PROJECT_DIR` 換成實際的絕對路徑字串再執行，不要真的呼叫 `pwd`。stdout 就是實際快照（1 行或 2 行）。腳本檔找不到時才退回 `skills/devlog-tracker/SKILL.md` `#### 工作區` 的七種格式手編。不要重跑測試套件，除非「下一步」本身就是跑測試。
-   2. 把編成的實際快照對照該歷史 Round 的 `#### 工作區` 正文。
+      把 `DEVLOG_PROJECT_DIR` 換成實際的絕對路徑字串再執行，不要真的呼叫 `pwd`。stdout 就是實際快照（1 行或 2 行）。腳本檔找不到時才退回 `skills/devlog-tracker/SKILL.md` 工作區（`<workspace>`；舊格式 `#### 工作區`）的七種格式手編。不要重跑測試套件，除非「下一步」本身就是跑測試。
+   2. 把編成的實際快照對照該歷史 Round 的工作區（`<workspace>`；舊格式 `#### 工作區`）正文。
       - 沒有這一節（舊 Round、`INTERRUPTED` stub）：沒有宣稱可對，不算「不符」——不用寫 `### 段落`，直接以剛才編成的實際快照為準。
       - 有這一節但跟編成的實際快照不符：在**這一輪**先追加一段 `### 段落`，寫宣稱 vs 實際（用剛才腳本的 stdout 當實際快照）。
       - 有這一節且相符：不用寫 `### 段落`。
    3. 然後依**實際工作樹**行動（不要照 Handoff「工作區」或「現況」的字面當事實）：
       - `IN_PROGRESS`／`INTERRUPTED`：做 Handoff「下一步」（沒有就依「現況」與實際工作樹推出並做）。對照「完成條件」判斷能否收成 `DONE`。
       - `BLOCKED`：看缺的外部輸入本身在不在——已經出現就做下一步；仍缺就說明缺什麼並停。git 相不相符不能證明缺件已到，不要發明輸入。
-6. **寫回義務（L1 硬契約）：** 接手＝核對 → 行動 → **同一輪收尾寫回** `.devlog/devlog.md`。讀而不寫算失敗——下一任無法再接。編輯**這一個** Round（continue 的 skeleton／開著的 Round），不要再新增一個 `## Round`，也不要改歷史 Round。必寫 `### Summary`、`### Reply`、`### Handoff`、`### Status`（契約見 SKILL.md）。收尾時若 Status 是 `IN_PROGRESS`／`BLOCKED`，照契約寫本輪的 `#### 工作區`、`#### 完成條件`、`#### 下一步`。聊天不要旁白「已寫入 devlog」。
+6. **寫回義務（L1 硬契約）：** 接手＝核對 → 行動 → **同一輪收尾寫回** `.devlog/devlog.md`。讀而不寫算失敗——下一任無法再接。編輯**這一個** Round（continue 的 skeleton／開著的 Round），不要再新增一個 `## Round`，也不要改歷史 Round。必寫 `### Summary`、`### Reply`、`### Handoff`、`### Status`（契約見 SKILL.md）。收尾時若 Status 是 `IN_PROGRESS`／`BLOCKED`，照契約寫本輪的 `<workspace>`、`<done-when>`、`<next>`（XML 格式見 SKILL.md）。聊天不要旁白「已寫入 devlog」。
    - **有** `/devlog-tracker:start`（`.enabled`）時：Stop hook 會擋沒寫完的收尾。
    - **沒有** Stop／未 `start`／Cursor 未裝 hook：仍必須自行用 Edit／Write 寫回；沒有擋關不代表可以省略。
    - **子 agent** 若只改程式不收尾：主對話負責寫回，或在派出 brief 裡要求子任務寫回同一 Round。
