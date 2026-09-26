@@ -65,13 +65,26 @@ _handoff_convert_awk() {
       out[++on] = sess ? "</session-handoff>" : "</handoff>"
       return ""
     }
-    function flush(   i, t, k, sb, r, conv_any, cur) {
+    # First non-blank line of rl[a..b]: "EMPTY", "XML" or "" (legacy).
+    function kind(a, b,   i, t) {
+      for (i = a; i <= b; i++) if (rl[i] ~ /[^ \t]/) break
+      if (i > b) return "EMPTY"
+      t = rl[i]; sub(/^[ \t]+/, "", t); sub(/[ \t]+$/, "", t)
+      return (t == "<handoff>" || t == "<session-handoff>") ? "XML" : ""
+    }
+    function flush(   i, t, k, sb, r, conv_any, cur, nof) {
       if (rn == 0) return
       if (!inround) { emit_round(); rn = 0; return }
+      # NOFENCE fail-open (same rule as _hf_nofence／enforce-devlog.sh): an
+      # odd number of ``` markers in this round means a fence was never
+      # closed, so stop tracking fences while locating sections — that is
+      # what the Stop gate sees too.
+      nof = 0
+      for (i = 1; i <= rn; i++) if (rl[i] ~ /^[ \t]*```/) nof = !nof
       # locate ### Handoff / ### Session Handoff sections (fence-aware)
       ns = 0; fence = 0
       for (i = 1; i <= rn; i++) {
-        if (rl[i] ~ /^[ \t]*```/) { fence = !fence; continue }
+        if (rl[i] ~ /^[ \t]*```/) { if (!nof) fence = !fence; continue }
         if (fence) continue
         if (rl[i] ~ /^### /) {
           if (ns && !se[ns]) se[ns] = i - 1
@@ -80,6 +93,14 @@ _handoff_convert_awk() {
         }
       }
       if (ns && !se[ns]) se[ns] = rn
+      if (nof) {
+        # Cannot map a round with a broken fence exactly: leave it as-is,
+        # but say so when it still carries a legacy Handoff.
+        for (k = 1; k <= ns; k++) if (kind(sh[k] + 1, se[k]) == "") {
+          print "SKIP " roundno " fence 沒有成對" > report; break
+        }
+        emit_round(); rn = 0; return
+      }
       conv_any = 0
       for (k = 1; k <= ns; k++) {
         # keep trailing blank lines of the section outside the tag block
@@ -109,16 +130,25 @@ _handoff_convert_awk() {
       if (conv_any) print "MIGRATED " roundno > report
       rn = 0; delete cstart
     }
-    {
-      if ($0 ~ /^[ \t]*```/) gfence = !gfence
-      if (!gfence && $0 ~ /^## /) {
-        flush()
-        inround = ($0 ~ /^## Round [0-9]+/)
-        if (inround) { roundno = $0; sub(/^## Round /, "", roundno); sub(/[^0-9].*$/, "", roundno) }
+    { L[++nl] = $0; if ($0 ~ /^[ \t]*```/) tf++ }
+    END {
+      # Round boundaries: fence-aware, except when the whole file has an
+      # odd ``` count — then one unclosed fence would swallow every later
+      # `## ` heading, so fall back to plain scanning (NOFENCE rule). A
+      # round that ends up with an odd count is SKIPped by flush().
+      gnf = tf % 2
+      for (li = 1; li <= nl; li++) {
+        line = L[li]
+        if (!gnf && line ~ /^[ \t]*```/) gfence = !gfence
+        if (!gfence && line ~ /^## /) {
+          flush()
+          inround = (line ~ /^## Round [0-9]+/)
+          if (inround) { roundno = line; sub(/^## Round /, "", roundno); sub(/[^0-9].*$/, "", roundno) }
+        }
+        rl[++rn] = line
       }
-      rl[++rn] = $0
+      flush()
     }
-    END { flush() }
   '
 }
 

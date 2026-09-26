@@ -21,6 +21,7 @@ function claudeBlock() {
 | 接續上一題 / continue（換過工具或 \`/clear\` 之後） | \`commands/continue.md\` |
 | 歸檔 / compact | \`commands/compact.md\` |
 | 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
+| 舊格式 Handoff 轉 XML / migrate（Stop hook 擋下舊格式時直接跑） | \`commands/migrate.md\` |
 | 保存主題 / keep、接續具名檔 / resume、跨主題總覽 / overview | \`commands/keep.md\`、\`commands/resume.md\`、\`commands/overview.md\` |
 | 整理所有 devlog（跨分支檔、archive、既有 keep 檔重新分主題） / keep-all | \`commands/keep-all.md\` |
 | 沉澱規範寫進 CLAUDE.md／AGENTS.md / promote | \`commands/promote.md\` |

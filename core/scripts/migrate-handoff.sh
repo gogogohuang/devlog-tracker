@@ -14,6 +14,16 @@ PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 DEVLOG_DIR="$PROJECT_DIR/.devlog"
 [ -d "$DEVLOG_DIR" ] || { echo NO_DEVLOG; exit 1; }
 
+# The current branch's files, even when they predate the devlog-origin
+# marker. Resolved before taking the lock: devlog_resolve_paths may take it
+# itself. Outside git this just yields devlog.md／handoff.md.
+# shellcheck source=devlog-path.sh
+. "$SCRIPT_DIR/devlog-path.sh"
+devlog_resolve_paths "$PROJECT_DIR" 2>/dev/null || true
+CUR_DEVLOG="${DEVLOG_FILE:-}"
+CUR_HANDOFF="${HANDOFF_FILE:-}"
+DEVLOG_DIR="$PROJECT_DIR/.devlog"
+
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 if [ -n "${LOCK_CONTENDED_BY:-}" ]; then echo "LOCKED ${LOCK_CONTENDED_BY}"; exit 1; fi
@@ -56,16 +66,23 @@ migrate_snapshot_file() {
   fi
 }
 
-for f in "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/devlog.md"; do
-  [ -s "$f" ] && migrate_round_file "$f"
+# Each file at most once (the current branch file may also carry a marker).
+DONE_FILES=$'\n'
+first_visit() {
+  case "$DONE_FILES" in *$'\n'"$1"$'\n'*) return 1 ;; esac
+  DONE_FILES="${DONE_FILES}${1}"$'\n'
+}
+
+for f in "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/devlog.md" "$CUR_DEVLOG"; do
+  [ -n "$f" ] && [ -s "$f" ] && first_visit "$f" && migrate_round_file "$f"
 done
 for f in "$DEVLOG_DIR"/devlog.*.md; do
   [ -s "$f" ] || continue
   head -n 1 "$f" | grep -q '^<!-- devlog-origin: ' || continue
-  migrate_round_file "$f"
+  first_visit "$f" && migrate_round_file "$f"
 done
-for f in "$DEVLOG_DIR"/handoff.md "$DEVLOG_DIR"/handoff.*.md; do
-  [ -s "$f" ] && migrate_snapshot_file "$f"
+for f in "$DEVLOG_DIR"/handoff.md "$CUR_HANDOFF" "$DEVLOG_DIR"/handoff.*.md; do
+  [ -n "$f" ] && [ -s "$f" ] && first_visit "$f" && migrate_snapshot_file "$f"
 done
 
 echo "MIGRATED=$MIGRATED"

@@ -214,5 +214,65 @@ handoff_convert_file "$TMP/mixed.md" "$TMP/mixed.out" "$TMP/mixed.rep"
 eq "unknown session-handoff subsection leaves whole round untouched" "$(cat "$TMP/mixed.md")" "$(cat "$TMP/mixed.out")"
 case "$(cat "$TMP/mixed.rep")" in SKIP\ 11\ *) echo "PASS: mixed round skipped" ;; *) echo "FAIL: mixed round report: $(cat "$TMP/mixed.rep")"; FAIL=1 ;; esac
 
+# Odd fence (a): the open round's User Input pasted an unbalanced fence (3
+# ``` lines). Stop's NOFENCE gate still sees the legacy Handoff, so migrate
+# must report it SKIP instead of silently finding nothing.
+P2="$TMP/proj-odd"; D2="$P2/.devlog"; mkdir -p "$D2"
+printf '## Round 7 — t\n\n### User Input\npaste:\n```\ncode\n```\n```\nunclosed\n\n### Summary\ns\n\n### Reply\nr\n\n### Handoff\n#### 現況\na\n\n#### 下一步\nb\n' > "$D2/.round-current.md"
+cp "$D2/.round-current.md" "$TMP/odd-a.orig"
+OUT4="$(DEVLOG_PROJECT_DIR="$P2" bash "$SCRIPT_DIR/migrate-handoff.sh")"
+case "$OUT4" in *"SKIP .round-current.md Round 7: fence 沒有成對"*) echo "PASS: odd fence in open round reported SKIP" ;; *) echo "FAIL: odd fence open round: $OUT4"; FAIL=1 ;; esac
+case "$OUT4" in *"SKIPPED=1"*) echo "PASS: odd fence open round counted" ;; *) echo "FAIL: odd fence open round count: $OUT4"; FAIL=1 ;; esac
+eq "odd fence open round untouched" "$(cat "$TMP/odd-a.orig")" "$(cat "$D2/.round-current.md")"
+
+# Odd fence (b): an unbalanced fence in an old round's Summary must not
+# swallow every later `## Round` heading.
+printf '## Round 1 — old\n\n### Summary\n```\nunclosed\n\n### Handoff\n#### 現況\na\n\n### Status\nDONE\n\n## Round 2 — new\n\n### Handoff\n#### 現況\nb\n\n### Status\nDONE\n' > "$TMP/odd-b.md"
+handoff_convert_file "$TMP/odd-b.md" "$TMP/odd-b.out" "$TMP/odd-b.rep"
+eq "odd fence (b) report" "SKIP 1 fence 沒有成對
+MIGRATED 2" "$(cat "$TMP/odd-b.rep")"
+eq "odd fence (b) output" "## Round 1 — old
+
+### Summary
+\`\`\`
+unclosed
+
+### Handoff
+#### 現況
+a
+
+### Status
+DONE
+
+## Round 2 — new
+
+### Handoff
+<handoff>
+<state>
+b
+</state>
+</handoff>
+
+### Status
+DONE" "$(cat "$TMP/odd-b.out")"
+
+# migrate_snapshot_file rc=1: an unrecognised handoff.md is reported, untouched.
+P3="$TMP/proj-snap"; D3="$P3/.devlog"; mkdir -p "$D3"
+printf 'random notes\n' > "$D3/handoff.md"
+OUT5="$(DEVLOG_PROJECT_DIR="$P3" bash "$SCRIPT_DIR/migrate-handoff.sh")"
+case "$OUT5" in *"SKIP handoff.md: "*) echo "PASS: unknown snapshot reported" ;; *) echo "FAIL: unknown snapshot: $OUT5"; FAIL=1 ;; esac
+eq "unknown snapshot untouched" "random notes" "$(cat "$D3/handoff.md")"
+
+# Branch file from before the devlog-origin marker existed: still migrated
+# when that branch is checked out (resolved via devlog_resolve_paths).
+P4="$TMP/proj-git"; D4="$P4/.devlog"; mkdir -p "$D4"
+git -C "$P4" init -q
+git -C "$P4" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+git -C "$P4" checkout -q -b feat/y
+cp "$TMP/in.md" "$D4/devlog.feat-y.md"
+OUT6="$(DEVLOG_PROJECT_DIR="$P4" bash "$SCRIPT_DIR/migrate-handoff.sh")"
+eq "markerless current branch file converted" "$(cat "$TMP/want.md")" "$(cat "$D4/devlog.feat-y.md")"
+case "$OUT6" in *"MIGRATED=1"*) echo "PASS: markerless branch file converted once" ;; *) echo "FAIL: markerless branch count: $OUT6"; FAIL=1 ;; esac
+
 [ "$FAIL" -eq 0 ] || exit 1
 echo "All migrate-handoff checks passed."
