@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Self-check for enforce-devlog.sh's Handoff subsection order/duplicate
-# check (Phase 2, docs/design/devlog-as-ssot-assessment.md). No framework —
+# Self-check for enforce-devlog.sh's Handoff format gate: XML tag order／
+# duplicate／unknown-tag checks and legacy-format blocking
+# (docs/design/handoff-xml.md). No framework —
 # plain assert-and-exit, matching this repo's existing style.
 set -uo pipefail
 
@@ -14,11 +15,10 @@ mkdir -p "$DEVLOG_DIR"
 touch "$DEVLOG_DIR/.enabled"
 
 # A real (if minimal) git repo, only so the "full canonical order" fixture's
-# #### 檔案 + #### 工作區 pair below can carry a #### 工作區 that actually
-# matches live git — DONE rounds with a non-empty #### 檔案 are now
-# machine-verified too (enforce-devlog.sh's workspace check, extended past
-# Phase 1's IN_PROGRESS/BLOCKED). Every other fixture in this file keeps
-# Status DONE with no #### 檔案, so it stays decoupled from this check.
+# <files> + <workspace> pair below can carry a <workspace> that actually
+# matches live git — DONE rounds with a non-empty <files> are
+# machine-verified too. Every other fixture in this file keeps Status DONE
+# with no <files>, so it stays decoupled from this check.
 git -C "$TMP_ROOT" init -q -b main
 git -C "$TMP_ROOT" config user.email test@example.com
 git -C "$TMP_ROOT" config user.name test
@@ -55,7 +55,7 @@ assert_round_merged() {
 }
 
 write_round() {
-  # $1 = Handoff body (already includes #### subsection lines). Status DONE
+  # $1 = Handoff body (already includes the <handoff> block). Status DONE
   # throughout so this suite is decoupled from Phase 1's 工作區/下一步 checks.
   # Writes into .round-current.md — the file enforce-devlog.sh now validates
   # (round-start.sh already opened a skeleton there; this overwrites it).
@@ -78,40 +78,56 @@ write_round() {
 
 # --- full canonical order -> allowed -----------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
+write_round "<handoff>
+<decisions>
 d
-#### 檔案
+</decisions>
+<files>
 尚未 commit：
-#### 工作區
+</files>
+<workspace>
 main @ ${HASH}，工作樹乾淨
-#### 現況
+</workspace>
+<state>
 c
-#### 完成條件
+</state>
+<done-when>
 observable done.
-#### 下一步
-n"
+</done-when>
+<next>
+n
+</next>
+</handoff>"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "full canonical order -> allowed" 0 $?
 assert_round_merged "full canonical order"
 
 # --- subset in order -> allowed -----------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
+write_round "<handoff>
+<decisions>
 d
-#### 現況
-c"
+</decisions>
+<state>
+c
+</state>
+</handoff>"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
 assert_exit "subset in canonical order -> allowed" 0 $?
 assert_round_merged "subset in canonical order"
 
 # --- reordered -> blocked -------------------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 現況
+write_round "<handoff>
+<state>
 c
-#### 決策
-d"
+</state>
+<decisions>
+d
+</decisions>
+</handoff>"
 MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
-assert_exit "現況 before 決策 -> blocked" 2 $?
+assert_exit "state before decisions -> blocked" 2 $?
 case "$MSG" in
   *"順序錯了"*) echo "PASS: order-violation message" ;;
   *) echo "FAIL: expected 順序錯了 message, got: $MSG"; FAIL=1 ;;
@@ -119,32 +135,44 @@ esac
 
 # --- duplicate -> blocked -------------------------------------------------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 現況
+write_round "<handoff>
+<state>
 c1
-#### 現況
-c2"
+</state>
+<state>
+c2
+</state>
+</handoff>"
 MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
-assert_exit "duplicate 現況 -> blocked" 2 $?
+assert_exit "duplicate state -> blocked" 2 $?
 case "$MSG" in
-  *"出現超過一次"*) echo "PASS: duplicate-subsection message" ;;
+  *"出現超過一次"*) echo "PASS: duplicate-tag message" ;;
   *) echo "FAIL: expected 出現超過一次 message, got: $MSG"; FAIL=1 ;;
 esac
 
-# --- unrecognized heading interleaved -> ignored, allowed ------------------------
+# --- unknown tag -> blocked (spec rule 6: no silently ignored subsections) ---
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
+write_round "<handoff>
+<decisions>
 d
-#### 其他備註
+</decisions>
+<notes>
 x
-#### 現況
-c"
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "unrecognized #### heading interleaved -> ignored, allowed" 0 $?
-assert_round_merged "unrecognized #### heading interleaved"
+</notes>
+</handoff>"
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "unknown tag -> blocked" 2 $?
+case "$MSG" in
+  *"不認得的標籤"*) echo "PASS: unknown-tag message" ;;
+  *) echo "FAIL: expected 不認得的標籤 message, got: $MSG"; FAIL=1 ;;
+esac
 
-# --- fenced example reordering subsection headings -> ignored, allowed -----
+# --- fenced legacy example inside a field -> plain content, allowed --------
+# XML fields don't track fences; a ``` block quoting old #### headings is
+# just text in <decisions>.
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
+write_round "<handoff>
+<decisions>
 說明格式時可以貼一段範例：
 \`\`\`markdown
 #### 現況
@@ -153,66 +181,106 @@ c
 d
 \`\`\`
 真正決定
-#### 現況
-c"
+</decisions>
+<state>
+c
+</state>
+</handoff>"
 echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "fenced example reordering subsection headings -> ignored, allowed" 0 $?
-assert_round_merged "fenced example reordering subsection headings"
+assert_exit "fenced #### example inside <decisions> -> allowed" 0 $?
+assert_round_merged "fenced #### example inside <decisions>"
 
-# --- fenced example duplicating a heading already used -> ignored, allowed -
+# --- unterminated fence inside a field -> fail-open, allowed ----------------
 bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
-真正決策
-說明格式時再貼一次範例：
-\`\`\`markdown
-#### 決策
-d2
-\`\`\`
-#### 現況
-c"
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "fenced example duplicating a used heading -> ignored, allowed" 0 $?
-assert_round_merged "fenced example duplicating a used heading"
-
-# --- unterminated fence inside #### 決策 -> fail-open, not a false block
-# (final-review Fix 1). A ``` fence that never closes (odd fence-marker
-# count) must never make a present #### 現況 register as missing/malformed.
-# Status DONE so 下一步/工作區 (Phase 1) stay out of the picture — this only
-# exercises section_body()/ORDER_ERR's own fence handling.
-bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
-一段沒收尾的範例：
-\`\`\`markdown
-沒收尾內容，一路吃到 Handoff 結尾
-#### 現況
-c"
-echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
-assert_exit "unterminated fence in 決策, real 現況 after it -> fail-open, allowed" 0 $?
-assert_round_merged "unterminated fence in 決策, real 現況 after it"
-
-# --- same unterminated fence, but hiding a real duplicate below it --------
-# ORDER_ERR re-scans the extracted Handoff body with its own fence tracking;
-# pre-fix the same stuck-fence bug hid every #### heading after the broken
-# fence from ORDER_ERR too — including a genuine duplicate "#### 決策" that
-# should be rejected. NOFENCE degrades ORDER_ERR back to a plain scan for
-# this round, so the duplicate check reaches it again. (This is the mirror
-# image of the false-block case above: here the pre-fix bug wrongly *allowed*
-# something; the point is the same root cause, fixed the same way.)
-bash "$SCRIPT_DIR/round-start.sh" < /dev/null
-write_round "#### 決策
+write_round "<handoff>
+<decisions>
 一段沒收尾的範例：
 \`\`\`markdown
 沒收尾內容
-#### 現況
+</decisions>
+<state>
 c
-#### 決策
-d2（應該被判定為重複）"
+</state>
+</handoff>"
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "unterminated fence in <decisions> -> allowed" 0 $?
+assert_round_merged "unterminated fence in <decisions>"
+
+# --- unterminated fence does not hide a real duplicate tag -------------------
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_round "<handoff>
+<decisions>
+一段沒收尾的範例：
+\`\`\`markdown
+沒收尾內容
+</decisions>
+<state>
+c
+</state>
+<decisions>
+d2（應該被判定為重複）
+</decisions>
+</handoff>"
 MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
 assert_exit "unterminated fence no longer hides a real duplicate -> blocked" 2 $?
 case "$MSG" in
-  *"出現超過一次"*) echo "PASS: duplicate-subsection message despite unterminated fence" ;;
+  *"出現超過一次"*) echo "PASS: duplicate-tag message despite unterminated fence" ;;
   *) echo "FAIL: expected 出現超過一次 message, got: $MSG"; FAIL=1 ;;
 esac
+
+# --- XML gate (docs/design/handoff-xml.md) ---
+write_handoff_round() {  # $1 = Handoff body lines (already formatted)
+  {
+    echo "## Round 1 — 2026-09-26T00:00:00+08:00"
+    echo ""
+    echo "### Summary"; echo "s"; echo ""
+    echo "### Reply"; echo "r"; echo ""
+    echo "### Handoff"
+    printf '%s\n' "$1"
+    echo ""
+    echo "### Status"; echo "DONE"
+  } > "$DEVLOG_DIR/.round-current.md"
+}
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_handoff_round '#### 現況
+legacy'
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "legacy Handoff blocked" 2 $?
+case "$MSG" in
+  *"migrate-handoff.sh"*"<handoff>"*"npx devlog-tracker init"*) echo "PASS: legacy message has migrate, template, init hint" ;;
+  *) echo "FAIL: legacy message: $MSG"; FAIL=1 ;;
+esac
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_handoff_round '<handoff>
+<state>
+ok
+</state>
+</handoff>'
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "XML Handoff DONE passes" 0 $?
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_handoff_round '<handoff>
+<next>
+x
+</next>
+<state>
+y
+</state>
+</handoff>'
+MSG="$(echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" 2>&1)"
+assert_exit "XML order violation blocked" 2 $?
+case "$MSG" in *"順序"*"### Handoff"*"<handoff>"*) echo "PASS: order message + template" ;; *) echo "FAIL: order msg: $MSG"; FAIL=1 ;; esac
+
+bash "$SCRIPT_DIR/round-start.sh" < /dev/null
+write_handoff_round '<handoff>
+<state>
+y
+</state>'
+echo '{}' | bash "$SCRIPT_DIR/enforce-devlog.sh" >/dev/null 2>&1
+assert_exit "unclosed handoff blocked" 2 $?
 
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
