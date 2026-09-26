@@ -83,6 +83,38 @@ CLI_UNBORN="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$UNBORN")"
 FUNC_UNBORN="$(workspace_snapshot "$UNBORN")"
 assert_eq "cli matches function (unborn dirty)" "$FUNC_UNBORN" "$CLI_UNBORN"
 
+# --- .devlog/ changes are ignored (same rule as files-snapshot.sh) ----------
+# The devlog is rewritten every round, so counting it would make every
+# snapshot dirty and every Handoff 工作區 drift on its own write.
+DL="$TMP_ROOT/devlog-ignored"
+mkdir -p "$DL"
+git -C "$DL" init -q -b main
+git -C "$DL" config user.email test@example.com
+git -C "$DL" config user.name test
+echo hello > "$DL/a.txt"
+mkdir -p "$DL/.devlog"
+echo tracked > "$DL/.devlog/devlog.md"
+git -C "$DL" add a.txt .devlog/devlog.md
+git -C "$DL" commit -q -m init
+DL_HASH="$(git -C "$DL" rev-parse --short HEAD)"
+echo more >> "$DL/.devlog/devlog.md"
+echo round > "$DL/.devlog/.round-current.md"
+OUT="$(workspace_snapshot "$DL")"
+assert_eq ".devlog-only changes count as clean" "main @ ${DL_HASH}，工作樹乾淨" "$OUT"
+
+echo change >> "$DL/a.txt"
+OUT="$(workspace_snapshot "$DL")"
+EXPECTED="main @ ${DL_HASH}
+未提交：a.txt"
+assert_eq ".devlog changes omitted from 未提交" "$EXPECTED" "$OUT"
+
+DL_UNBORN="$TMP_ROOT/devlog-unborn"
+mkdir -p "$DL_UNBORN/.devlog"
+git -C "$DL_UNBORN" init -q -b main
+echo x > "$DL_UNBORN/.devlog/devlog.md"
+OUT="$(workspace_snapshot "$DL_UNBORN")"
+assert_eq "unborn with untracked .devlog/ only is clean" "main @ (尚無 commit)，工作樹乾淨" "$OUT"
+
 # --- executable entry matches the sourced function --------------------------
 CLI_NONGIT="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$NONGIT")"
 assert_eq "cli non-git directory" "非 git 工作區" "$CLI_NONGIT"

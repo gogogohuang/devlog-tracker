@@ -245,7 +245,7 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   `完成條件` 要寫到下一輪能對照判斷「可否 DONE」（例如「`bash core/scripts/tests/test-foo.sh` 全過」），
   不要只寫「功能完成」。`下一步` 要具體到下一輪打開就能做（路徑／反引號指令／skill 名），寫「繼續完成」不算完成；
   `IN_PROGRESS` 時 Stop 會做輕量可執行檢查（見下）。`BLOCKED` 的 `現況` 或 `下一步` 必須寫「缺什麼、出現長怎樣」。
-- **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式；`rev-parse --short HEAD` 失敗但 `git symbolic-ref --short HEAD` 抓得到分支名（尚無 commit，例如剛 `git init`）用 unborn 格式；兩者都失敗才是非 git。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同。格式：
+- **`工作區` 是收尾當下的 git 快照，給下一輪核對用。** 寫之前跑 `git status --short`、`git rev-parse --abbrev-ref HEAD`、`git rev-parse --short HEAD`，照輸出寫。`abbrev-ref` 為 `HEAD` 時用 detached 格式；`rev-parse --short HEAD` 失敗但 `git symbolic-ref --short HEAD` 抓得到分支名（尚無 commit，例如剛 `git init`）用 unborn 格式；兩者都失敗才是非 git。髒檔是整棵樹的未提交，不必跟「檔案」那輪 delta 相同；`.devlog/` 底下的路徑不列（devlog 每輪都會改，只有它髒時照「工作樹乾淨」寫）。格式：
   - 乾淨：`main @ a1b2c3d，工作樹乾淨`（一行）
   - 有未提交：第一行 `feat/foo @ a1b2c3d`，第二行 `未提交：src/a.ts, hooks/foo.sh`
   - 非 git：一行 `非 git 工作區`
