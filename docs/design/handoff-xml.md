@@ -178,7 +178,7 @@ Files: `core/scripts/migrate-handoff.sh`, `commands/migrate.md`.
   its tag; copy content byte-for-byte.
 - **Idempotent:** rounds already in XML are skipped.
 - **Never guesses:** a round with an unknown `#### ` subsection, bad order,
-  a duplicate, or an odd fence count inside the section is left untouched
+  a duplicate, or an odd fence count inside the section or the round is left untouched
   and reported. History is converted as-is — no validation, no filling
   missing fields, no removals.
 - **Safety:** takes `devlog-lock.sh`; writes each file to a temp file and

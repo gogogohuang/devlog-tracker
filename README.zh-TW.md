@@ -188,7 +188,7 @@ Stop hook 會做這些事：
 
 ### 升級到 XML Handoff
 
-舊輪次仍是 `####` 小節格式，讀取端照樣相容，不會被自動改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑 `/devlog-tracker:migrate`（底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。如果 agent 一直寫舊格式、沒有照著修，代表專案裡 vendor 的 skill／指令版本太舊：重跑 `npx devlog-tracker init`（plugin 使用者更新 plugin），再下一次 `/devlog-tracker:start`。
+舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑 `/devlog-tracker:migrate`（底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、開著的 Round（`.round-current.md`）與 `handoff.md`／`handoff.<branch>.md`，每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，代表專案裡 vendor 的 skill／指令版本太舊：重跑 `npx devlog-tracker init`（plugin 使用者更新 plugin），再下一次 `/devlog-tracker:start`。
 
 ## Hook 會自動做的事
 

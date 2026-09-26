@@ -256,7 +256,8 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   Claude 接手。同一件事不要三邊複述。
 - **`### Session Handoff`（跨 session 精簡快照）：** 與 Checkpoint 同款三個標籤（`decisions`／
   `open-questions`／`failed-attempts`），不是 `### Handoff` 六個標籤的複本。`IN_PROGRESS`／`BLOCKED`
-  必寫（可 `- （無）`）；`DONE` 不要求；`INTERRUPTED` stub 不寫。Stop 通過後會把整個 `<session-handoff>`
+  必寫（可 `- （無）`）；`DONE` 不要求，但 DONE 輪若寫了仍會被當 XML 驗證（是否存在採 fence-aware 判斷，標題須剛好是
+  `### Session Handoff`）；`INTERRUPTED` stub 不寫。Stop 通過後會把整個 `<session-handoff>`
   區塊原樣寫進 `.devlog/handoff.md`（分支檔同規則）；`DONE` 會刪掉該檔——不要把長期軌跡只寫在
   handoff 檔裡。細節見 `docs/design/session-handoff-file.md`。
 - Handoff 標籤順序固定（`decisions` → `files` → `workspace` → `state` → `done-when` → `next`），Stop hook

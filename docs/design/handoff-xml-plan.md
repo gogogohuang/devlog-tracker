@@ -1,5 +1,7 @@
 # Handoff XML Implementation Plan
 
+> **HISTORICAL.** Executed on branch `feat/handoff-xml`. Do not re-execute.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `### Handoff`／`### Session Handoff` 改用以行為單位的 XML 標籤；讀取端相容舊 `####` 格式；Stop 只收 XML；新增 `/devlog-tracker:migrate`。

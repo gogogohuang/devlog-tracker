@@ -188,7 +188,7 @@ See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/d
 
 ### Upgrading to XML Handoff
 
-Rounds written before this change stay in the legacy `####`-headed form and are still read fine — nothing rewrites history automatically. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run `/devlog-tracker:migrate` (or the underlying `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. If the agent keeps writing the legacy form instead of picking up the fix, that means the vendored skill/commands in your project are stale: rerun `npx devlog-tracker init` (plugin users: update the plugin), then `/devlog-tracker:start` again.
+Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run `/devlog-tracker:migrate` (or the underlying `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, the open round (`.round-current.md`) and `handoff.md`／`handoff.<branch>.md` in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, that means the vendored skill/commands in your project are stale: rerun `npx devlog-tracker init` (plugin users: update the plugin), then `/devlog-tracker:start` again.
 
 ## What the hooks do automatically
 
