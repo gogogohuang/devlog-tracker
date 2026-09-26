@@ -47,12 +47,21 @@ Merges the hooks into `.claude/settings.local.json` (not `settings.json` — the
 
 **Option 1: plugin marketplace**
 
+To try an unpublished checkout, run these commands **from this repository's root**:
+
+```bash
+codex plugin marketplace add .
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+After the branch is merged and pushed, install from GitHub instead:
+
 ```bash
 codex plugin marketplace add gogogohuang/devlog-tracker
 codex plugin add devlog-tracker@devlog-tracker
 ```
 
-Start a new Codex session, review the bundled hooks with `/hooks`, then use `$devlog-start` (or pick it from `/skills`). The plugin keeps its scripts in Codex's plugin cache; it does not create a `.devlog-tracker/` directory in each project. Tracking data is created under `.devlog/` only after `$devlog-start`.
+Start a new Codex session in the project you want to track, review and trust the bundled hooks with `/hooks`, then use `$devlog-start` (or pick it from `/skills`). The plugin keeps its scripts in Codex's plugin cache; it does not create a `.devlog-tracker/` directory in each project. Tracking data is created under `.devlog/` only after `$devlog-start`. If this project already uses `npx devlog-tracker init --codex`, remove the devlog-tracker entries from its project-level `.codex/hooks.json` before enabling the plugin to avoid running each hook twice.
 
 **Option 2: npx (vendored into the project, version pinnable)**
 
@@ -72,7 +81,7 @@ When the silence or workspace guard blocks a tool, Codex can read the current ro
 
 Codex's `Interrupt` hook records an interrupted main-thread turn as `INTERRUPTED`. Codex has no `StopFailure` event for other abnormal endings; an open round is recovered on the next prompt or session start, or when `SessionEnd` runs. Codex's `SessionEnd` reason is currently only `other`, and it may run after an idle session rather than immediately when you switch conversations. The `Stop` hook still enforces completion of normal turns. Codex can also start from a subdirectory of an installed project; the hooks find the installation root.
 
-With Lessons Mode enabled, Codex's `SubagentStart` hook gives subagents the recording guidance and the main project's absolute path, including when they run in a separate worktree.
+With Lessons Mode enabled, Codex's `SubagentStart` hook gives subagents the recording guidance and project path. For npx installs, it preserves the main project's path when a subagent runs in a separate worktree; plugin installs use that worktree's path.
 
 ### Cursor
 
@@ -91,6 +100,8 @@ npx devlog-tracker init
 Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
 Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
+
+`.devlog-tracker/` contains the installed program. `.devlog/` contains your project's tracking data and is created only when you run the start command. Therefore, seeing `.devlog-tracker/` immediately after `npx init` is expected; `init` alone does not start recording.
 
 `init` writes this machine's absolute paths into each platform's hooks config and into `.devlog-tracker/env.sh`. If you commit these files to git, each teammate needs to run `npx devlog-tracker init` on their own machine (paths differ per machine); alternatively, add `.devlog-tracker/` and the generated hooks config files to `.gitignore`.
 
@@ -115,14 +126,14 @@ Run once in your project (pick whichever matches your install method):
 ```
 /devlog-tracker:start   # Claude Code plugin
 /devlog-start           # npx init --claude
-$devlog-start           # npx init --codex
+$devlog-start           # Codex plugin or npx init --codex
 ```
 
 After that, just converse normally — every round is enforced-checked and `.devlog/devlog.md` gets updated before it can end. After `/clear`, context is empty; to pick up prior work, run the matching `continue` command. See the command table below for pause, archive, named export, status, and span.
 
 ## Commands
 
-The table below uses the plugin's `/devlog-tracker:*` namespace; `npx init --claude` installs `/devlog-<name>`, and `npx init --codex` installs `$devlog-<name>` — the command content is the same.
+The table below uses the Claude plugin's `/devlog-tracker:*` namespace; `npx init --claude` installs `/devlog-<name>`, while either Codex installation method uses `$devlog-<name>` — the command content is the same.
 
 | Command | What it does |
 |---|---|
@@ -203,7 +214,7 @@ See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/d
 
 ### Upgrading to XML Handoff
 
-Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run `/devlog-tracker:migrate` (or the underlying `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, the open round (`.round-current.md`) and `handoff.md`／`handoff.<branch>.md` in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, that means the vendored skill/commands in your project are stale: rerun `npx devlog-tracker init` (plugin users: update the plugin), then `/devlog-tracker:start` again.
+Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run the migrate command (`/devlog-tracker:migrate` on the Claude plugin or `$devlog-migrate` on Codex; underlying script: `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, the open round (`.round-current.md`) and `handoff.md`／`handoff.<branch>.md` in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, update the plugin or rerun `npx devlog-tracker init`, then use the start command for your installation (`/devlog-tracker:start` on the Claude plugin or `$devlog-start` on Codex).
 
 ## What the hooks do automatically
 

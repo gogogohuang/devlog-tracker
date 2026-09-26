@@ -47,12 +47,21 @@ npx devlog-tracker init --claude
 
 **方式一：plugin marketplace**
 
+要測試尚未發布的 checkout，先在**這個 repo 的根目錄**用本機版本安裝：
+
+```bash
+codex plugin marketplace add .
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+合併並推送後，才改用 GitHub 來源安裝：
+
 ```bash
 codex plugin marketplace add gogogohuang/devlog-tracker
 codex plugin add devlog-tracker@devlog-tracker
 ```
 
-開新的 Codex session，用 `/hooks` 審核 plugin 附帶的 hooks，再執行 `$devlog-start`（或從 `/skills` 選）。plugin 腳本放在 Codex 的快取中，不會在每個專案建立 `.devlog-tracker/`；執行 `$devlog-start` 後才會在專案建立 `.devlog/` 紀錄資料。
+在要追蹤的專案開新 Codex session，用 `/hooks` 審核並信任 plugin 附帶的 hooks，再執行 `$devlog-start`（或從 `/skills` 選）。plugin 腳本放在 Codex 的快取中，不會在每個專案建立 `.devlog-tracker/`；執行 `$devlog-start` 後才會在專案建立 `.devlog/` 紀錄資料。若專案之前跑過 `npx devlog-tracker init --codex`，啟用 plugin 前先從專案的 `.codex/hooks.json` 移除 devlog-tracker 的 hook 項目，避免同一個 hook 執行兩次。
 
 **方式二：npx（vendor 進專案，版本可鎖定）**
 
@@ -72,7 +81,7 @@ npx devlog-tracker init --codex
 
 Codex 的 `Interrupt` hook 會把主執行緒被中斷的輪次標成 `INTERRUPTED`。Codex 沒有處理其他異常結束的 `StopFailure` 事件；未收尾輪次會在下次訊息、下次 session start，或 `SessionEnd` 執行時補記。Codex 的 `SessionEnd` 原因目前只有 `other`，切換對話後也可能等閒置一段時間才觸發。正常輪次仍由 `Stop` hook 強制收尾。從已安裝專案的子目錄啟動 Codex 時，hook 也會找到安裝根目錄。
 
-Lessons Mode 開啟時，Codex 的 `SubagentStart` hook 會把記錄指引與主專案的絕對路徑交給子代理；子代理在獨立 worktree 執行時也適用。
+Lessons Mode 開啟時，Codex 的 `SubagentStart` hook 會把記錄指引與專案路徑交給子代理。npx 安裝在子代理使用獨立 worktree 時仍會傳主專案路徑；plugin 安裝則使用該 worktree 的路徑。
 
 ### Cursor
 
@@ -91,6 +100,8 @@ npx devlog-tracker init
 沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
 會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
+
+`.devlog-tracker/` 放的是安裝進專案的程式；`.devlog/` 放的是這個專案的紀錄資料，執行 start 指令後才會建立。因此 `npx init` 後先看到 `.devlog-tracker/` 是預期行為，單跑 `init` 不會開始記錄。
 
 `init` 會把這台機器專屬的絕對路徑寫進各平台的 hooks 設定檔與 `.devlog-tracker/env.sh`。如果你把這些檔案 commit 進 git，每位隊友都要在自己的機器上跑一次 `npx devlog-tracker init`（路徑每台機器不同）；或者改成把 `.devlog-tracker/` 與產生出來的 hooks 設定檔加進 `.gitignore`。
 
@@ -115,14 +126,14 @@ bash "$DEVLOG_TRACKER_ROOT/core/scripts/timeline-devlog.sh"
 ```
 /devlog-tracker:start   # Claude Code plugin
 /devlog-start           # npx init --claude
-$devlog-start           # npx init --codex
+$devlog-start           # Codex plugin 或 npx init --codex
 ```
 
 之後正常對話即可，每一輪結束前都會被強制檢查、補上 `.devlog/devlog.md` 的紀錄。`/clear` 之後 context 是空的；要接著做上一題，下對應的 `continue` 指令。暫停、歸檔、具名搬走、狀態與 span 見下方指令表。
 
 ## 指令
 
-下表以 plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，`npx init --codex` 裝的是 `$devlog-<名稱>`，指令內容相同。
+下表以 Claude plugin 的 `/devlog-tracker:*` namespace 表示；`npx init --claude` 裝的是 `/devlog-<名稱>`，Codex 兩種安裝方式都用 `$devlog-<名稱>`，指令內容相同。
 
 | 指令 | 做什麼 |
 |---|---|
@@ -203,7 +214,7 @@ Stop hook 會做這些事：
 
 ### 升級到 XML Handoff
 
-舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑 `/devlog-tracker:migrate`（底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、開著的 Round（`.round-current.md`）與 `handoff.md`／`handoff.<branch>.md`，每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，代表專案裡 vendor 的 skill／指令版本太舊：重跑 `npx devlog-tracker init`（plugin 使用者更新 plugin），再下一次 `/devlog-tracker:start`。
+舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑對應的 migrate 指令（Claude plugin 用 `/devlog-tracker:migrate`，Codex 用 `$devlog-migrate`；底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、開著的 Round（`.round-current.md`）與 `handoff.md`／`handoff.<branch>.md`，每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，請更新 plugin 或重跑 `npx devlog-tracker init`，再使用對應的 start 指令（Claude plugin 用 `/devlog-tracker:start`，Codex 用 `$devlog-start`）。
 
 ## Hook 會自動做的事
 
