@@ -136,6 +136,30 @@ function renderMarkdown(md) {
   return out.join('\n');
 }
 
+const HANDOFF_FIELDS = {
+  decisions: '決策', files: '檔案', workspace: '工作區', state: '現況',
+  'done-when': '完成條件', next: '下一步', 'open-questions': '待解問題', 'failed-attempts': '失敗嘗試',
+};
+const HANDOFF_BLOCK_TAG = /^\s*<\/?(handoff|session-handoff)>\s*$/;
+const HANDOFF_TAG = /^\s*<(\/?)([a-z-]+)>\s*$/;
+
+// Line-based XML Handoff (docs/design/handoff-xml.md) → `#### 中文名`
+// headings so renderMarkdown shows it like the legacy form. Legacy text
+// passes through unchanged.
+function handoffToMarkdown(text) {
+  const out = [];
+  for (const line of String(text).split('\n')) {
+    if (HANDOFF_BLOCK_TAG.test(line)) continue;
+    const m = HANDOFF_TAG.exec(line);
+    if (m && HANDOFF_FIELDS[m[2]]) {
+      if (!m[1]) out.push(`#### ${HANDOFF_FIELDS[m[2]]}`);
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join('\n').trim();
+}
+
 function statusOf(s) {
   return STATUSES.includes(s) ? s : 'NONE';
 }
@@ -145,7 +169,7 @@ function roundCard(r) {
   const parts = [];
   if (r.input) parts.push(`<h4>User Input</h4><pre><code>${escapeHtml(r.input)}</code></pre>`);
   if (r.reply) parts.push(`<h4>Reply</h4>${renderMarkdown(r.reply)}`);
-  if (r.handoff) parts.push(`<h4>Handoff</h4>${renderMarkdown(r.handoff)}`);
+  if (r.handoff) parts.push(`<h4>Handoff</h4>${renderMarkdown(handoffToMarkdown(r.handoff))}`);
   for (const seg of r.segments || []) parts.push(`<div class="seg">${renderMarkdown('#### ' + seg)}</div>`);
   const details = parts.length ? `<details><summary>詳細</summary>${parts.join('\n')}</details>` : '';
   return `<article class="card round" data-status="${st}" data-branch="${escapeHtml(r.branch)}">
@@ -244,4 +268,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { render, renderMarkdown, inline, escapeHtml, safeHref, timelineItems };
+module.exports = { render, renderMarkdown, inline, escapeHtml, safeHref, timelineItems, handoffToMarkdown, HANDOFF_FIELDS };

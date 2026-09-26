@@ -165,7 +165,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
     LIVE_WS="$(workspace_snapshot "$PROJECT_DIR")"
     if [ -n "$LIVE_WS" ]; then
       printf '%s\n' "$LIVE_WS" > "$MISMATCH_FILE" 2>/dev/null || true
-      printf '%s\n' "上一輪 Handoff「#### 工作區」跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
+      printf '%s\n' "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
       printf '\n宣稱：\n%s\n\n實際：\n%s\n' "$CLAIMED_WS" "$LIVE_WS"
 
       if [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then

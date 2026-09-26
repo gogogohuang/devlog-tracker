@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 _DEVLOG_MD_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+# shellcheck source=handoff-fields.sh
+. "$_DEVLOG_MD_DIR/handoff-fields.sh"
 
 # NOFENCE 防呆（跟 enforce-devlog.sh 同一套邏輯）：如果 [start,end] 這個範圍
 # 內 ``` 記號數量是奇數，代表某處圍欄沒有正常收尾（例如 User Input 貼了一段
@@ -139,17 +141,10 @@ devlog_strip_lessons_index() {
 }
 
 devlog_round_workspace_body() {
-  local nofence
-  nofence="$(_devlog_fence_nofence "$1" "$2" "$3")"
-  awk -v start="$2" -v end="$3" -v nofence="$nofence" '
-    NR < start || NR > end { next }
-    /^[ \t]*```/ { if (!nofence) fence = !fence; next }
-    !fence && /^#### 工作區[[:space:]]*$/ { grab = 1; next }
-    grab && !fence && /^#### / { grab = 0 }
-    grab && !fence && /^### / { grab = 0 }
-    grab && !fence && /^## / { grab = 0 }
-    grab { print }
-  ' "$1" | sed -e '/^[[:space:]]*$/d'
+  local blob body
+  blob="$(awk -v start="$2" -v end="$3" 'NR >= start && NR <= end' "$1")"
+  body="$(handoff_section_of "$blob" Handoff)"
+  handoff_field "$body" workspace | sed -e '/^[[:space:]]*$/d'
 }
 
 devlog_round_segments_body() {
