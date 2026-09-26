@@ -9,16 +9,22 @@ const { syncVersion, checkVersion } = require('./sync-version');
 function makeRoot({
   pkg = '0.22.0',
   plugin = '0.21.0',
+  codexPlugin = plugin,
   market = '0.21.0',
   readme = '0.21.0',
   readmeZh = '0.21.0',
 } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'devlog-tracker-sync-'));
   fs.mkdirSync(path.join(root, '.claude-plugin'));
+  fs.mkdirSync(path.join(root, '.codex-plugin'));
   fs.writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ name: 'x', version: pkg }, null, 2)}\n`);
   fs.writeFileSync(
     path.join(root, '.claude-plugin', 'plugin.json'),
     `${JSON.stringify({ name: 'x', version: plugin, description: 'd' }, null, 2)}\n`
+  );
+  fs.writeFileSync(
+    path.join(root, '.codex-plugin', 'plugin.json'),
+    `${JSON.stringify({ name: 'x', version: codexPlugin, description: 'd' }, null, 2)}\n`
   );
   fs.writeFileSync(
     path.join(root, '.claude-plugin', 'marketplace.json'),
@@ -29,13 +35,14 @@ function makeRoot({
   return root;
 }
 
-test('syncVersion copies package.json version into the four other files', () => {
+test('syncVersion copies package.json version into plugin manifests, marketplace, and READMEs', () => {
   const root = makeRoot();
   const version = syncVersion(root);
   assert.equal(version, '0.22.0');
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
   const market = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'marketplace.json'), 'utf8'));
   assert.equal(plugin.version, '0.22.0');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.codex-plugin', 'plugin.json'), 'utf8')).version, '0.22.0');
   assert.equal(plugin.description, 'd');
   assert.equal(market.plugins[0].version, '0.22.0');
   const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
@@ -68,7 +75,7 @@ test('syncVersion throws when README.zh-TW.md has no version line', () => {
   assert.throws(() => syncVersion(root), /README\.zh-TW\.md/);
 });
 
-test('checkVersion passes when all five files agree', () => {
+test('checkVersion passes when all versioned files agree', () => {
   const root = makeRoot({ pkg: '0.22.0', plugin: '0.22.0', market: '0.22.0', readme: '0.22.0', readmeZh: '0.22.0' });
   assert.deepEqual(checkVersion(root), { ok: true, version: '0.22.0', problems: [] });
 });
@@ -83,8 +90,9 @@ test('checkVersion names every file that disagrees', () => {
   });
   const result = checkVersion(root);
   assert.equal(result.ok, false);
-  assert.equal(result.problems.length, 2);
+  assert.equal(result.problems.length, 3);
   assert.match(result.problems.join('\n'), /plugin\.json/);
+  assert.match(result.problems.join('\n'), /\.codex-plugin\/plugin\.json/);
   assert.match(result.problems.join('\n'), /README\.md/);
 });
 

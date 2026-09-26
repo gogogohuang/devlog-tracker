@@ -13,6 +13,10 @@ mkdir -p "$TMP/nested/.devlog-tracker" "$TMP/nested/src/lib"
 ROOT="$(printf '{"cwd":"%s"}' "$TMP/nested/src/lib" | bash "$SCRIPT_DIR/project-dir.sh")"
 if [ "$ROOT" = "$TMP/nested" ]; then echo "PASS: nested cwd resolves installed project"; else echo "FAIL: nested cwd [$ROOT]"; FAIL=1; fi
 
+mkdir -p "$TMP/plugin-project/.git" "$TMP/plugin-project/src/lib"
+ROOT="$(printf '{"cwd":"%s"}' "$TMP/plugin-project/src/lib" | bash "$SCRIPT_DIR/project-dir.sh")"
+if [ "$ROOT" = "$TMP/plugin-project" ]; then echo "PASS: plugin nested cwd resolves git root"; else echo "FAIL: plugin nested cwd [$ROOT]"; FAIL=1; fi
+
 # Codex Stop requires JSON stdout on a successful exit.
 OUT="$(printf '{"cwd":"%s","hook_event_name":"Stop"}' "$TMP/nested" | bash "$SCRIPT_DIR/on-stop.sh")"
 if [ "$OUT" = '{}' ]; then echo "PASS: inactive Stop returns JSON"; else echo "FAIL: inactive Stop output [$OUT]"; FAIL=1; fi

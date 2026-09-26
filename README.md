@@ -45,13 +45,24 @@ Merges the hooks into `.claude/settings.local.json` (not `settings.json` — the
 
 ### Codex
 
+**Option 1: plugin marketplace**
+
+```bash
+codex plugin marketplace add gogogohuang/devlog-tracker
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+Start a new Codex session, review the bundled hooks with `/hooks`, then use `$devlog-start` (or pick it from `/skills`). The plugin keeps its scripts in Codex's plugin cache; it does not create a `.devlog-tracker/` directory in each project. Tracking data is created under `.devlog/` only after `$devlog-start`.
+
+**Option 2: npx (vendored into the project, version pinnable)**
+
 ```bash
 npx devlog-tracker init --codex
 ```
 
 Merges the `hooks` from `codex/hooks.json` into the project's `.codex/hooks.json`, and generates `.agents/skills/devlog-<name>/SKILL.md` from `commands/*.md`, invoked with `$devlog-<name>` (or picked from `/skills`); it also adds the same kind of fallback block to `AGENTS.md`. Files the older 0.25.0 version wrote to `.codex/prompts/` are cleared out on the next `init` run — Codex doesn't read project-level custom prompts.
 
-**Hooks require trust review before they run.** Codex skips new or changed hooks until you trust their current definitions. Project trust and hook trust are separate: the project `.codex/` layer must be trusted to load project hooks, then `/hooks` shows which hook definitions still need review.
+**Hooks require trust review before they run.** Codex skips new or changed hooks until you trust their current definitions. For npx installs, the project `.codex/` layer must also be trusted to load project hooks. Use `/hooks` to review the active definitions.
 
 - Interactive mode: Codex warns at startup when hooks need review. Use `/hooks` to inspect and trust them. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require another review.
 - Non-interactive `codex exec` (CI, scripts): unapproved hooks are silently skipped. `--dangerously-bypass-hook-trust` lets them run, but that flag skips trust checks for *all* hooks, so it's only appropriate for automation environments where you've already vetted the hook sources yourself.

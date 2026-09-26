@@ -1,0 +1,24 @@
+---
+name: devlog-segment-watch
+description: "調整 Segment Watch 的沉默門檻——同一輪連續多久沒改 devlog.md 就要求先補一段 ### 段落。"
+---
+
+取得使用者要設定的時間長度（例如「10 分鐘」「5min」「300 秒」）；沒帶就先問，不要用預設值硬猜。
+換算成整數秒數 `<seconds>`，跑：
+
+```bash
+先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄）：
+
+```bash
+PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/segment-watch-set.sh" <seconds>
+```
+```
+
+不要自己手改 `.devlog/.segment-state`。
+
+- stdout 是 `NOT_STARTED`：告知這個專案還沒 `/devlog-tracker:start`，門檻設定只在啟動後才有意義；問要不要現在 `/devlog-tracker:start`，不要自己跑 start。
+- stdout 有 `SEGMENT_MAX_SILENT_SECONDS=<n>`：告知使用者新門檻已生效（換算回分鐘講會更好懂）。
+- exit 1（例如帶了非正整數）：原樣顯示 stderr，請使用者換一個時間長度再試，不要自己編秒數硬跑。
+
+使用者提供的額外參數：請看觸發這個 skill 的使用者訊息。

@@ -45,13 +45,24 @@ npx devlog-tracker init --claude
 
 ### Codex
 
+**方式一：plugin marketplace**
+
+```bash
+codex plugin marketplace add gogogohuang/devlog-tracker
+codex plugin add devlog-tracker@devlog-tracker
+```
+
+開新的 Codex session，用 `/hooks` 審核 plugin 附帶的 hooks，再執行 `$devlog-start`（或從 `/skills` 選）。plugin 腳本放在 Codex 的快取中，不會在每個專案建立 `.devlog-tracker/`；執行 `$devlog-start` 後才會在專案建立 `.devlog/` 紀錄資料。
+
+**方式二：npx（vendor 進專案，版本可鎖定）**
+
 ```bash
 npx devlog-tracker init --codex
 ```
 
 會把 `codex/hooks.json` 的 `hooks` 合併進專案 `.codex/hooks.json`，並從 `commands/*.md` 產生 `.agents/skills/devlog-<名稱>/SKILL.md`，用 `$devlog-<名稱>`（或 `/skills` 選）執行；同時在 `AGENTS.md` 加上同一種 fallback 說明區塊。舊版（0.25.0）寫到 `.codex/prompts/` 的檔案會在重跑 `init` 時清掉——Codex 不讀專案層級的 custom prompts。
 
-**hook 需要信任審核才會執行。** Codex 會略過尚未信任的新 hook 或變更過的 hook。專案信任與 hook 信任是兩件事：專案的 `.codex/` 設定層須先被信任，專案 hook 才會載入；之後可用 `/hooks` 查看哪些 hook 定義仍待審核。
+**hook 需要信任審核才會執行。** Codex 會略過尚未信任的新 hook 或變更過的 hook。若使用 npx 安裝，專案的 `.codex/` 設定層也須先被信任，專案 hook 才會載入；之後可用 `/hooks` 查看哪些 hook 定義仍待審核。
 
 - 互動模式：有 hook 待審核時，Codex 啟動時會顯示警告。用 `/hooks` 檢查並信任它們。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再審核一次。
 - 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。

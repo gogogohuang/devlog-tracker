@@ -1,0 +1,12 @@
+{
+  "name": "devlog-tracker",
+  "version": "0.33.5",
+  "description": "Record development rounds and resume work across Codex sessions.",
+  "author": {
+    "name": "gogogohuang"
+  },
+  "repository": "https://github.com/gogogohuang/devlog-tracker",
+  "license": "Apache-2.0",
+  "skills": "./codex/skills/",
+  "hooks": "./codex/plugin-hooks.json"
+}

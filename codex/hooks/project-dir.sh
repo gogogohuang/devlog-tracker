@@ -12,10 +12,11 @@ else
 fi
 [ -n "$ROOT" ] || ROOT=.
 # Codex can start from a subdirectory while loading the repo's hooks.json.
-# The vendored scripts and .devlog live at the installation root.
+# npx uses the vendored marker; a Codex plugin has no project-local vendor
+# directory, so use the nearest tracked project or existing .devlog root.
 SEARCH="$ROOT"
 while [ -d "$SEARCH" ]; do
-  if [ -d "$SEARCH/.devlog-tracker" ]; then
+  if [ -d "$SEARCH/.devlog-tracker" ] || [ -d "$SEARCH/.devlog" ] || [ -e "$SEARCH/.git" ]; then
     printf '%s\n' "$SEARCH"
     exit 0
   fi

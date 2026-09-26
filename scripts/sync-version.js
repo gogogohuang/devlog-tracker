@@ -24,6 +24,11 @@ function syncVersion(root) {
   plugin.version = version;
   writeJson(pluginFile, plugin);
 
+  const codexPluginFile = path.join(root, '.codex-plugin', 'plugin.json');
+  const codexPlugin = readJson(codexPluginFile);
+  codexPlugin.version = version;
+  writeJson(codexPluginFile, codexPlugin);
+
   const marketFile = path.join(root, '.claude-plugin', 'marketplace.json');
   const market = readJson(marketFile);
   market.plugins[0].version = version;
@@ -48,6 +53,10 @@ function checkVersion(root, { tag } = {}) {
   const plugin = readJson(path.join(root, '.claude-plugin', 'plugin.json'));
   if (plugin.version !== version) {
     problems.push(`.claude-plugin/plugin.json is ${plugin.version}, package.json is ${version}`);
+  }
+  const codexPlugin = readJson(path.join(root, '.codex-plugin', 'plugin.json'));
+  if (codexPlugin.version !== version) {
+    problems.push(`.codex-plugin/plugin.json is ${codexPlugin.version}, package.json is ${version}`);
   }
   const market = readJson(path.join(root, '.claude-plugin', 'marketplace.json'));
   if (market.plugins[0].version !== version) {
