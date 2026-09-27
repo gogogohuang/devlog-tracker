@@ -22,10 +22,18 @@ _devlog_fence_nofence() {
   if [ $((count % 2)) -eq 0 ]; then printf '0\n'; else printf '1\n'; fi
 }
 
+# Prints "<line> <round>" per round heading outside fences. With platform $2,
+# only rounds it owns: a heading ending in " · <platform>" (lowercase word)
+# belongs to it; any other heading (every pre-upgrade round) belongs to claude.
 devlog_list_round_starts() {
-  awk '
+  LC_ALL=C awk -v p="${2:-}" '
     /^[ \t]*```/ { fence = !fence; next }
     !fence && /^## Round [0-9]+/ {
+      if (p != "") {
+        owner = $0
+        if (!(sub(/.* · /, "", owner) && owner ~ /^[a-z]+$/)) owner = "claude"
+        if (owner != p) next
+      }
       round = $0
       sub(/^## Round /, "", round)
       sub(/[^0-9].*$/, "", round)
@@ -34,22 +42,8 @@ devlog_list_round_starts() {
   ' "$1"
 }
 
-# Same output as devlog_list_round_starts, only rounds owned by platform $2:
-# a heading ending in " · <platform>" (lowercase word) belongs to it; any
-# other heading (every pre-upgrade round) belongs to claude.
 devlog_list_round_starts_of() {
-  awk -v p="$2" '
-    /^[ \t]*```/ { fence = !fence; next }
-    !fence && /^## Round [0-9]+/ {
-      owner = $0
-      if (!(sub(/.* · /, "", owner) && owner ~ /^[a-z]+$/)) owner = "claude"
-      if (owner != p) next
-      round = $0
-      sub(/^## Round /, "", round)
-      sub(/[^0-9].*$/, "", round)
-      print NR, round
-    }
-  ' "$1"
+  devlog_list_round_starts "$1" "$2"
 }
 
 devlog_round_start_by_number() {
