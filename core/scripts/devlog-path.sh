@@ -8,6 +8,98 @@ _DEVLOG_PATH_DIR="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
 . "$_DEVLOG_PATH_DIR/devlog-lock.sh"
 # shellcheck source=devlog-md.sh
 . "$_DEVLOG_PATH_DIR/devlog-md.sh"
+# shellcheck source=json-field.sh
+. "$_DEVLOG_PATH_DIR/json-field.sh"
+
+# Every platform that can own per-round state. Claude keeps the pre-0.x
+# un-suffixed names; the others add "@<platform>" (docs/design/
+# multi-platform-concurrency.md). "@" never survives _devlog_sanitize_name,
+# so a branch named "codex" cannot collide with platform Codex.
+DEVLOG_PLATFORMS="claude codex cursor"
+
+devlog_platform() {
+  case "${DEVLOG_PLATFORM:-}" in
+    codex|cursor) printf '%s\n' "$DEVLOG_PLATFORM" ;;
+    *) printf 'claude\n' ;;
+  esac
+}
+
+# $1 stem (".round-current", "handoff.feat-x"), $2 extension (".md" or ""),
+# $3 platform. Prints a basename.
+devlog_platform_file() {
+  if [ "$3" = claude ]; then printf '%s%s\n' "$1" "$2"
+  else printf '%s@%s%s\n' "$1" "$3" "$2"; fi
+}
+
+_devlog_set_state_paths() {
+  local p="$1" d="$DEVLOG_DIR"
+  # shellcheck disable=SC2034 # consumed by callers
+  ROUND_CURRENT="$d/$(devlog_platform_file .round-current .md "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  ROUND_OPEN="$d/$(devlog_platform_file .round-open '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  TURN_MARKER="$d/$(devlog_platform_file .turn-start '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  SEGMENT_FILE="$d/$(devlog_platform_file .segment-state '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  AWAITING_FILE="$d/$(devlog_platform_file .awaiting-reply '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  INTERRUPTED_FLAG="$d/$(devlog_platform_file .interrupted '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  SPAN_FILE="$d/$(devlog_platform_file .span-open '' "$p")"
+  # shellcheck disable=SC2034 # consumed by callers
+  MISMATCH_FILE="$d/$(devlog_platform_file .workspace-mismatch '' "$p")"
+}
+
+# First resolve after upgrade: before this change every platform wrote the
+# un-suffixed names. The platform that resolves first most likely wrote
+# them, so a non-Claude first resolver renames them to its own names.
+# .segment-state is configuration (start-devlog.sh creates it), not round
+# state, so it stays. Runs once; .platform-claimed stops it.
+_devlog_claim_legacy_state() {
+  local p="$1" d="$DEVLOG_DIR" name f stem
+  [ -f "$d/.enabled" ] && [ ! -e "$d/.platform-claimed" ] || return 0
+  devlog_lock_acquire
+  if [ ! -e "$d/.platform-claimed" ]; then
+    if [ "$p" != claude ]; then
+      for name in .round-open .turn-start .awaiting-reply .interrupted .span-open .workspace-mismatch; do
+        [ -e "$d/$name" ] && [ ! -e "$d/$name@$p" ] && mv "$d/$name" "$d/$name@$p" 2>/dev/null
+      done
+      [ -e "$d/.round-current.md" ] && [ ! -e "$d/.round-current@$p.md" ] \
+        && mv "$d/.round-current.md" "$d/.round-current@$p.md" 2>/dev/null
+      for f in "$d"/handoff.md "$d"/handoff.*.md; do
+        [ -f "$f" ] || continue
+        case "${f##*/}" in *@*) continue ;; esac
+        stem="${f%.md}"
+        [ -e "$stem@$p.md" ] || mv "$f" "$stem@$p.md" 2>/dev/null
+      done
+    fi
+    : > "$d/.platform-claimed" 2>/dev/null || true
+  fi
+  devlog_lock_release
+}
+
+# One line per existing .round-open marker: platform, round, file field.
+devlog_open_rounds() {
+  local q f
+  for q in $DEVLOG_PLATFORMS; do
+    f="$DEVLOG_DIR/$(devlog_platform_file .round-open '' "$q")"
+    [ -f "$f" ] || continue
+    printf '%s\t%s\t%s\n' "$q" "$(json_int_get "$f" round)" "$(json_str_get "$f" file)"
+  done
+}
+
+# One line per other platform's non-empty handoff for this branch.
+devlog_other_handoffs() {
+  local q f
+  for q in $DEVLOG_PLATFORMS; do
+    [ "$q" = "$DEVLOG_PLATFORM" ] && continue
+    f="$HANDOFF_STEM.md"
+    [ "$q" = claude ] || f="$HANDOFF_STEM@$q.md"
+    [ -s "$f" ] && printf '%s\t%s\n' "$q" "$f"
+  done
+  return 0
+}
 
 # Turns an arbitrary branch/worktree name into a safe devlog.<name>.md
 # filename segment: anything outside [A-Za-z0-9._-] becomes '-', repeats
@@ -24,8 +116,9 @@ _devlog_sanitize_name() {
 # work in progress). When $6 (an origin like "branch=feat/x") is given,
 # the branch file starts with its origin marker. The project header,
 # Checkpoints, and Kept/Lessons
-# indexes always stay in $2. When rounds move, $4 (handoff.md) moves to
-# $5 too, since it snapshots that same unfinished work. Caller holds the
+# indexes always stay in $2. When rounds move, every platform's handoff
+# under stem $4 moves to stem $5 too, since it snapshots that same
+# unfinished work. Caller holds the
 # devlog lock.
 _devlog_migrate_unfinished_tail() {
   local dir="$1" src="$2" dst="$3" src_handoff="$4" dst_handoff="$5" origin="${6:-}"
@@ -82,9 +175,13 @@ _devlog_migrate_unfinished_tail() {
 
   # Branch file first: if the second mv fails the tail is duplicated, never lost.
   if mv "$dst.tmp" "$dst" 2>/dev/null && mv "$src.tmp" "$src" 2>/dev/null; then
-    if [ -f "$src_handoff" ] && [ ! -f "$dst_handoff" ]; then
-      mv "$src_handoff" "$dst_handoff" 2>/dev/null || true
-    fi
+    local q suffix
+    for q in $DEVLOG_PLATFORMS; do
+      suffix="$(devlog_platform_file '' .md "$q")"
+      if [ -f "$src_handoff$suffix" ] && [ ! -f "$dst_handoff$suffix" ]; then
+        mv "$src_handoff$suffix" "$dst_handoff$suffix" 2>/dev/null || true
+      fi
+    done
   fi
   rm -f "$dst.tmp" "$src.tmp" 2>/dev/null || true
 }
@@ -106,9 +203,13 @@ devlog_resolve_paths() {
   local dir="${1:-.}"
   DEVLOG_DIR="$dir/.devlog"
   DEVLOG_FILE="$DEVLOG_DIR/devlog.md"
-  # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
-  HANDOFF_FILE="$DEVLOG_DIR/handoff.md"
+  DEVLOG_PLATFORM="$(devlog_platform)"
+  HANDOFF_STEM="$DEVLOG_DIR/handoff"
   DEVLOG_ORIGIN=""
+  _devlog_set_state_paths "$DEVLOG_PLATFORM"
+  _devlog_claim_legacy_state "$DEVLOG_PLATFORM"
+  # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
+  HANDOFF_FILE="$DEVLOG_DIR/$(devlog_platform_file handoff .md "$DEVLOG_PLATFORM")"
 
   local branch raw name origin
   branch="$(git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
@@ -146,15 +247,16 @@ devlog_resolve_paths() {
   esac
 
   local resolved="$DEVLOG_DIR/devlog.$name.md"
-  local resolved_handoff="$DEVLOG_DIR/handoff.$name.md"
+  local resolved_stem="$DEVLOG_DIR/handoff.$name"
   if [ -f "$DEVLOG_DIR/.enabled" ] && [ ! -f "$resolved" ] && [ -s "$DEVLOG_FILE" ]; then
     devlog_lock_acquire
     [ -f "$resolved" ] || _devlog_migrate_unfinished_tail \
-      "$dir" "$DEVLOG_FILE" "$resolved" "$HANDOFF_FILE" "$resolved_handoff" "$origin"
+      "$dir" "$DEVLOG_FILE" "$resolved" "$HANDOFF_STEM" "$resolved_stem" "$origin"
     devlog_lock_release
   fi
   DEVLOG_FILE="$resolved"
+  HANDOFF_STEM="$resolved_stem"
   # shellcheck disable=SC2034 # consumed by callers (e.g. enforce-devlog.sh), not used in this file
-  HANDOFF_FILE="$resolved_handoff"
+  HANDOFF_FILE="$DEVLOG_DIR/$(devlog_platform_file "handoff.$name" .md "$DEVLOG_PLATFORM")"
   DEVLOG_ORIGIN="$origin"
 }
