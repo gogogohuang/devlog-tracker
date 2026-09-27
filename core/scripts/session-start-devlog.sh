@@ -21,6 +21,9 @@
 # 非空就整份印出來、清楚標示「尚未收尾」，跟上面的歷史摘要分開。startup /
 # resume / fork 這幾個 source 因為上面已經先 heal 過，這裡通常是空的、印出
 # 來是 no-op，不特別排除，寫法比較單純。讀不到就跳過，fail-open。
+#
+# 其他平台的 Session Handoff：只注入本平台的 handoff 檔；其他平台非空的
+# handoff 只印一行路徑提醒，不注入內容。
 
 set -uo pipefail
 
@@ -73,6 +76,11 @@ if [ -s "${HANDOFF_FILE:-}" ]; then
   cat "$HANDOFF_FILE" 2>/dev/null || true
   echo ""
 fi
+
+devlog_other_handoffs | while IFS="$(printf '\t')" read -r OTHER_PLATFORM OTHER_FILE; do
+  echo "另一個平台（${OTHER_PLATFORM}）有未完成的交接：.devlog/${OTHER_FILE##*/}"
+  echo ""
+done
 
 if [ -f "$DEVLOG_FILE" ]; then
   echo "以下是本專案 .devlog/${DEVLOG_FILE##*/} 的接手摘要（不是全文；完整紀錄請自行讀取原檔）："

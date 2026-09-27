@@ -103,6 +103,15 @@ grep -q 'sentinel' "$DEVLOG_DIR/.awaiting-reply" \
   && echo "PASS: existing marker left untouched" || { echo "FAIL: existing marker was overwritten"; FAIL=1; }
 rm -f "$DEVLOG_DIR/.awaiting-reply" "$DEVLOG_DIR/devlog.md"
 
+# --- platform: codex falls back to its own last round ----------------------
+rm -f "$DEVLOG_DIR/.round-open" "$DEVLOG_DIR/.awaiting-reply" "$DEVLOG_DIR/.awaiting-reply@codex"
+printf '## Round 7 — t · codex\n\n### Status\nDONE\n\n## Round 8 — t\n\n### Status\nDONE\n' > "$DEVLOG_DIR/devlog.md"
+touch "$DEVLOG_DIR/.platform-claimed"
+OUT="$(DEVLOG_PLATFORM=codex bash "$SCRIPT_DIR/await-open.sh")"
+assert_contains "codex await-open uses its own last round" "OPENED=7" "$OUT"
+[ -f "$DEVLOG_DIR/.awaiting-reply@codex" ] && [ ! -f "$DEVLOG_DIR/.awaiting-reply" ] \
+  && echo "PASS: codex awaiting file" || { echo "FAIL: codex awaiting file"; FAIL=1; }
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

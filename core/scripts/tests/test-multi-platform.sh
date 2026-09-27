@@ -3,6 +3,8 @@
 # Run: bash core/scripts/tests/test-multi-platform.sh
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=../workspace-snapshot.sh
+. "$SCRIPT_DIR/workspace-snapshot.sh"
 TMP_ROOT="$(mktemp -d)"
 trap 'rm -rf "$TMP_ROOT"' EXIT
 FAIL=0
@@ -99,6 +101,83 @@ printf '{"round": 1, "opened_at": "t"}\n' > "$D/.awaiting-reply@codex"
 submit codex "the answer" >/dev/null
 check "fold reopened codex round 1" 'grep -q "^## Round 1 — .* · codex$" "$D/.round-current@codex.md" && grep -q "the answer" "$D/.round-current@codex.md"'
 check "claude round 2 stays in devlog" 'grep -q "^## Round 2 " "$D/devlog.md" && ! grep -q "^## Round 1 " "$D/devlog.md"'
+
+# --- Task 5: both Stop in either order, handoffs coexist -------------------
+close_round() { # platform status file
+  local f="$3"
+  cat >> "$f" <<EOF
+
+### Summary
+closed by $1
+
+### Reply
+ok
+
+### Handoff
+<handoff>
+<workspace>
+$(workspace_snapshot "$P")
+</workspace>
+<state>
+$1 state
+</state>
+<done-when>
+tests pass
+</done-when>
+<next>
+run \`bash core/scripts/run-tests.sh\`
+</next>
+</handoff>
+
+### Session Handoff
+<session-handoff>
+<decisions>
+- $1 decision
+</decisions>
+<open-questions>
+- （無）
+</open-questions>
+<failed-attempts>
+- （無）
+</failed-attempts>
+</session-handoff>
+EOF
+  # Replace the skeleton's Status with the requested one.
+  awk -v st="$2" '/^### Status$/ { print; getline; print st; next } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+  printf '{}' | DEVLOG_PLATFORM="$1" DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/enforce-devlog.sh"
+}
+new_project stops
+submit claude "claude task" >/dev/null
+submit codex "codex task" >/dev/null
+close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>"$TMP_ROOT/err1"
+check "codex Stop passes" '[ $? -eq 0 ] || { cat "$TMP_ROOT/err1"; false; }'
+check "codex merged, claude still open" 'grep -q "closed by codex" "$D/devlog.md" && [ -f "$D/.round-open" ] && [ ! -e "$D/.round-open@codex" ]'
+check "codex handoff written" 'grep -q "codex decision" "$D/handoff@codex.md"'
+close_round claude IN_PROGRESS "$D/.round-current.md" 2>"$TMP_ROOT/err2"
+check "claude Stop passes" '[ $? -eq 0 ] || { cat "$TMP_ROOT/err2"; false; }'
+check "file order is close order, numbers unique" '[ "$(grep -o "^## Round [0-9]*" "$D/devlog.md" | tr "\n" ",")" = "## Round 2,## Round 1," ]'
+check "handoffs coexist" 'grep -q "claude decision" "$D/handoff.md" && grep -q "codex decision" "$D/handoff@codex.md"'
+check "neither INTERRUPTED" '! grep -q INTERRUPTED "$D/devlog.md"'
+
+OUT="$(printf '{"source":"startup"}' | DEVLOG_PLATFORM=codex DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/session-start-devlog.sh")"
+check "codex SessionStart injects own handoff" 'case "$OUT" in *"codex decision"*) true ;; *) false ;; esac'
+check "codex SessionStart does not inject claude handoff" 'case "$OUT" in *"claude decision"*) false ;; *) true ;; esac'
+check "codex SessionStart notes claude handoff" 'case "$OUT" in *"另一個平台（claude）有未完成的交接：.devlog/handoff.md"*) true ;; *) false ;; esac'
+
+# Interrupt of one platform does not touch the other.
+new_project interrupt
+submit claude "claude task" >/dev/null
+submit codex "codex task" >/dev/null
+DEVLOG_PLATFORM=codex DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/close-open-round.sh" "Interrupt:cancelled"
+check "codex interrupted round merged" 'grep -q "^## Round 2 — .* · codex$" "$D/devlog.md" && grep -q "Interrupt:cancelled" "$D/devlog.md"'
+check "claude untouched by codex interrupt" '[ -f "$D/.round-open" ] && grep -q "claude task" "$D/.round-current.md"'
+
+# span-open falls back to the platform's own last round.
+new_project span
+printf '## Round 7 — t · codex\n\n### Status\nDONE\n\n## Round 8 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+# shellcheck disable=SC2034 # read inside check's eval strings
+OUT="$(DEVLOG_PLATFORM=codex DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/span-open.sh")"
+check "codex span-open uses its own last round" '[ "$OUT" = "OPENED=7" ] && grep -q "\"round\": 7" "$D/.span-open@codex" && [ ! -e "$D/.span-open" ]'
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
