@@ -69,7 +69,7 @@ Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 `.awaiting-reply`、且輪次跟 `devlog.md` 目前最後一個 `## Round` 吻合（提問
 時那一輪已經正常收尾過，這時只會存在於 `devlog.md`，不在
 `.devlog/.round-current.md` 裡），就不開新 Round，而是先把 `devlog.md` 裡
-那個 Round 整段搬回 `.devlog/.round-current.md`（`devlog_reopen_last_round`，
+那個 Round 整段搬回 `.devlog/.round-current.md`（`devlog_reopen_round`，
 `devlog.md` 那邊同步移除），再改成在那個 Round 的 `### Summary` 之前插入一個
 新段落：
 

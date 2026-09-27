@@ -214,7 +214,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ] &&
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
-  devlog_reopen_last_round "$DEVLOG_FILE" "$ROUND_CURRENT" || : > "$ROUND_CURRENT"
+  devlog_reopen_round "$DEVLOG_FILE" "$ROUND_CURRENT" "$FOLD_ROUND" || : > "$ROUND_CURRENT"
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
   fi

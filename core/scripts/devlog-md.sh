@@ -34,6 +34,28 @@ devlog_list_round_starts() {
   ' "$1"
 }
 
+# Same output as devlog_list_round_starts, only rounds owned by platform $2:
+# a heading ending in " · <platform>" (lowercase word) belongs to it; any
+# other heading (every pre-upgrade round) belongs to claude.
+devlog_list_round_starts_of() {
+  awk -v p="$2" '
+    /^[ \t]*```/ { fence = !fence; next }
+    !fence && /^## Round [0-9]+/ {
+      owner = $0
+      if (!(sub(/.* · /, "", owner) && owner ~ /^[a-z]+$/)) owner = "claude"
+      if (owner != p) next
+      round = $0
+      sub(/^## Round /, "", round)
+      sub(/[^0-9].*$/, "", round)
+      print NR, round
+    }
+  ' "$1"
+}
+
+devlog_round_start_by_number() {
+  devlog_list_round_starts "$1" | awk -v n="$2" '$2 == n { s = $1 } END { if (s) print s }'
+}
+
 devlog_block_end() {
   awk -v start="$2" '
     NR < start { next }
@@ -195,12 +217,11 @@ devlog_merge_round_current() {
   return 0
 }
 
-devlog_reopen_last_round() {
-  # Moves the last "## Round N ..." block out of $1 into $2 (creating $2),
-  # removing those lines from $1. Returns 1 and touches neither file if $1
-  # has no round to move.
+devlog_reopen_round() {
+  # Moves the "## Round $3" block (wherever it sits in $1) into $2, removing
+  # it from $1. Returns 1 and touches neither file if $1 has no such round.
   local devlog="$1" current="$2" start end
-  start="$(devlog_list_round_starts "$devlog" | awk 'END { print $1 }')"
+  start="$(devlog_round_start_by_number "$devlog" "$3")"
   [ -n "$start" ] || return 1
   end="$(devlog_block_end "$devlog" "$start")"
   awk -v start="$start" -v end="$end" 'NR >= start && NR <= end' "$devlog" > "$current" 2>/dev/null || return 1
@@ -210,12 +231,12 @@ devlog_reopen_last_round() {
 }
 
 workspace_claim_state() {
-  local dir="$1" file="$2" start end status claimed live
+  local dir="$1" file="$2" platform="${3:-claude}" start end status claimed live
   if ! type workspace_snapshot >/dev/null 2>&1; then
     # shellcheck source=workspace-snapshot.sh
     . "$_DEVLOG_MD_DIR/workspace-snapshot.sh"
   fi
-  start="$(devlog_list_round_starts "$file" | awk 'END { print $1 }')"
+  start="$(devlog_list_round_starts_of "$file" "$platform" | awk 'END { print $1 }')"
   [ -n "$start" ] || { printf 'NO_CLAIM\n'; return 0; }
   end="$(devlog_block_end "$file" "$start")"
   status="$(devlog_round_status "$file" "$start" "$end")"
