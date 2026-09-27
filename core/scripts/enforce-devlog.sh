@@ -48,21 +48,18 @@ PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 # DEVLOG_DIR 永遠是 $PROJECT_DIR/.devlog，與分支無關，所以兩者等價。
 ENABLED_FLAG="$PROJECT_DIR/.devlog/.enabled"
 if [ ! -f "$ENABLED_FLAG" ]; then
-  # 沒啟用就不做任何強制，但仍要清掉殘留的 .interrupted，否則之後重新
-  # /devlog-tracker:start 會繼承一個陳舊的中斷旗標。.interrupted 跟
+  # 沒啟用就不做任何強制，但仍要清掉每個平台殘留的 .interrupted，否則之後
+  # 重新 /devlog-tracker:start 會繼承一個陳舊的中斷旗標。.interrupted 跟
   # DEVLOG_DIR 一樣與分支無關，所以這裡不必解析分支。
-  if [ -f "$PROJECT_DIR/.devlog/.interrupted" ]; then
-    rm -f "$PROJECT_DIR/.devlog/.interrupted" 2>/dev/null || true
-  fi
+  rm -f "$PROJECT_DIR"/.devlog/.interrupted "$PROJECT_DIR"/.devlog/.interrupted@* 2>/dev/null || true
   exit 0
 fi
 # shellcheck source=devlog-path.sh
 . "$SCRIPT_DIR/devlog-path.sh"
 devlog_resolve_paths "$PROJECT_DIR"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
-if [ -f "$DEVLOG_DIR/.interrupted" ]; then
+if [ -f "$INTERRUPTED_FLAG" ]; then
   bash "$SCRIPT_DIR/close-open-round.sh" "user_interrupt" || true
-  rm -f "$DEVLOG_DIR/.interrupted" 2>/dev/null || true
+  rm -f "$INTERRUPTED_FLAG" 2>/dev/null || true
   # close-open-round.sh merges and removes .round-current.md whenever it
   # decided the round was finished (stamped INTERRUPTED, or recovered —
   # Claude had already written Summary/Handoff before the interrupt signal
@@ -89,8 +86,6 @@ if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
 fi
 
 # --- 開關檢查 -----------------------------------------------------------
-TURN_MARKER="$DEVLOG_DIR/.turn-start"
-
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 if [ -n "${LOCK_CONTENDED_BY:-}" ]; then
@@ -104,7 +99,6 @@ fi
 # 每個 tick 遞增）沒有累積超過 max_silent_ticks。超過門檻就退回下面正常的
 # 雜湊比對，逼這輪真的寫點東西；寫成功後把計數器歸零。span 檔案壞掉、缺欄位
 # 或不是數字，一律當作沒有 span，直接往下走正常流程——fail-open。
-SPAN_FILE="$DEVLOG_DIR/.span-open"
 SPAN_VALID=0
 if [ -f "$SPAN_FILE" ]; then
   SPAN_TICKS="$(json_int_get "$SPAN_FILE" ticks_since_checkin)"
@@ -138,7 +132,7 @@ fi
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
   if [ "$SPAN_VALID" -eq 1 ]; then
-    echo "這一輪尚未寫入。請依 skills/devlog-tracker/SKILL.md 在 .devlog/.round-current.md 建立一個新的 ## Round（編號接在 devlog.md 目前最後一輪之後），包含 User Input / Summary / Reply / Handoff / Status；收尾成功後 hook 會自動併回 devlog.md，不要自己直接寫進 devlog.md。" >&2
+    echo "這一輪尚未寫入。請依 skills/devlog-tracker/SKILL.md 在 .devlog/${ROUND_CURRENT##*/} 建立一個新的 ## Round（編號接在 devlog.md 目前最後一輪之後），包含 User Input / Summary / Reply / Handoff / Status；收尾成功後 hook 會自動併回 devlog.md，不要自己直接寫進 devlog.md。" >&2
   else
     echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Reply / Handoff / Status。不要再新增一個 ## Round。" >&2
   fi
@@ -553,7 +547,7 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
       {
         echo "Session Handoff 格式不對：${SESSION_ERR}"
         echo ""
-        echo "正確格式（三個標籤都要有，沒有內容就寫 - （無））。寫完後 hook 會覆寫 .devlog/handoff.md 給下一 session："
+        echo "正確格式（三個標籤都要有，沒有內容就寫 - （無））。寫完後 hook 會覆寫 .devlog/${HANDOFF_FILE##*/} 給下一 session："
         handoff_xml_template session-handoff
       } >&2
       exit 2
@@ -561,7 +555,7 @@ ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
   fi
 fi
 
-rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
+rm -f "$MISMATCH_FILE" 2>/dev/null || true
 
 # 這一輪通過所有驗證，正式收尾：把 .round-current.md 併回 devlog.md（併完
 # 就地刪除 .round-current.md）。放在 checkpoint 計數檢查之前，這樣如果這輪
@@ -581,7 +575,7 @@ rm -f "$DEVLOG_DIR/.workspace-mismatch" 2>/dev/null || true
 # 知道要去救它。
 if [ -n "$LAST_ROUND" ]; then
   if devlog_merge_round_current "$DEVLOG_FILE" "$ROUND_CURRENT"; then
-    rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+    rm -f "$ROUND_OPEN" 2>/dev/null || true
     case "${STATUS_VAL:-}" in
       IN_PROGRESS|BLOCKED)
         handoff_write "$HANDOFF_FILE" "$LAST_ROUND" 2>/dev/null || \
@@ -594,7 +588,7 @@ if [ -n "$LAST_ROUND" ]; then
     esac
   fi
 else
-  rm -f "$DEVLOG_DIR/.round-open" 2>/dev/null || true
+  rm -f "$ROUND_OPEN" 2>/dev/null || true
 fi
 
 # 這輪真的有寫東西：如果剛剛因為 span 過期才走到這裡，把計數器歸零，

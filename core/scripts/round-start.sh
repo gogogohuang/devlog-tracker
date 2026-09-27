@@ -29,12 +29,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
-SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
-SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
-ROUND_OPEN="$DEVLOG_DIR/.round-open"
-AWAITING_FILE="$DEVLOG_DIR/.awaiting-reply"
 ADVISORY_FILE="$DEVLOG_DIR/.lessons-advisory-state"
 
 devlog_lock_acquire
@@ -165,7 +160,6 @@ if [ "$TASK_NOTIF" -eq 1 ] && [ -z "$FOLD_ROUND" ] && [ "$SPAN_SKIP" -eq 0 ] && 
   esac
 fi
 
-MISMATCH_FILE="$DEVLOG_DIR/.workspace-mismatch"
 rm -f "$MISMATCH_FILE" 2>/dev/null || true
 if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; then
   CLAIM_ST="$(workspace_claim_state "$PROJECT_DIR" "$DEVLOG_FILE" 2>/dev/null || echo NO_CLAIM)"
@@ -306,9 +300,9 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
 fi
 
 if [ -f "$ROUND_CURRENT" ]; then
-  cksum < "$ROUND_CURRENT" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+  cksum < "$ROUND_CURRENT" > "$TURN_MARKER" 2>/dev/null || true
 else
-  echo "MISSING" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+  echo "MISSING" > "$TURN_MARKER" 2>/dev/null || true
 fi
 
 SPAN_WILL_PASS_THROUGH=0

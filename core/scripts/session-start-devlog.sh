@@ -35,15 +35,13 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
-SPAN_FILE="$DEVLOG_DIR/.span-open"
 
 INPUT="$(cat 2>/dev/null || true)"
 SOURCE="$(json_str_field "$INPUT" source)"
 
 case "$SOURCE" in
   startup|resume|clear|fork)
-    if [ -f "$DEVLOG_DIR/.round-open" ]; then
+    if [ -f "$ROUND_OPEN" ]; then
       DANGLING_DETAIL=""
       if [ -n "$(detect_pending_question "$(json_str_field "$INPUT" transcript_path)")" ]; then
         DANGLING_DETAIL="awaiting_question"
@@ -64,7 +62,7 @@ if [ -f "$SPAN_FILE" ]; then
   if [ -n "$SPAN_ROUND" ] && [ -n "$SPAN_OPENED_AT" ]; then
     echo "⚠️ 有一個開啟中的 span：Round ${SPAN_ROUND}，從 ${SPAN_OPENED_AT} 開始，"
     echo "還沒有正式結束。請先確認要繼續這個自動化任務，還是要明確關閉它"
-    echo "（刪除 .devlog/.span-open 並補寫收尾的 Round）。"
+    echo "（刪除 .devlog/${SPAN_FILE##*/} 並補寫收尾的 Round）。"
     echo ""
   fi
 fi
@@ -155,7 +153,7 @@ fi
 # heal) with its real content sitting only in .round-current.md. Surface it
 # separately from the devlog.md excerpt above so it isn't silently dropped.
 if [ -s "$ROUND_CURRENT" ]; then
-  echo "以下是目前還沒收尾、仍在 .devlog/.round-current.md 裡的這一輪內容（跟上面的歷史摘要分開，尚未併入 devlog.md）："
+  echo "以下是目前還沒收尾、仍在 .devlog/${ROUND_CURRENT##*/} 裡的這一輪內容（跟上面的歷史摘要分開，尚未併入 devlog.md）："
   echo ""
   cat "$ROUND_CURRENT" 2>/dev/null || true
   echo ""

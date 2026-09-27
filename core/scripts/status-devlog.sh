@@ -16,11 +16,11 @@ if [ -f "$DEVLOG_DIR/.lessons-advisory-state" ]; then
   advisory_max="$(json_int_get "$DEVLOG_DIR/.lessons-advisory-state" threshold)"
   printf 'LESSONS_ADVISORY=%s/%s\n' "${advisory_count:-0}" "${advisory_max:-3}"
 fi
-if [ -f "$DEVLOG_DIR/.span-open" ]; then
-  r="$(json_int_get "$DEVLOG_DIR/.span-open" round)"
-  opened="$(json_str_get "$DEVLOG_DIR/.span-open" opened_at)"
-  ticks="$(json_int_get "$DEVLOG_DIR/.span-open" ticks_since_checkin)"
-  max="$(json_int_get "$DEVLOG_DIR/.span-open" max_silent_ticks)"
+if [ -f "$SPAN_FILE" ]; then
+  r="$(json_int_get "$SPAN_FILE" round)"
+  opened="$(json_str_get "$SPAN_FILE" opened_at)"
+  ticks="$(json_int_get "$SPAN_FILE" ticks_since_checkin)"
+  max="$(json_int_get "$SPAN_FILE" max_silent_ticks)"
   printf 'SPAN=%s,%s,%s,%s\n' "${r:-?}" "${opened:-?}" "${ticks:-?}" "${max:-5}"
 else
   echo "SPAN=closed"
@@ -28,7 +28,7 @@ fi
 rounds="$(json_int_get "$DEVLOG_DIR/.checkpoint-state" rounds_since_checkpoint)"
 checkpoint_max="$(json_int_get "$DEVLOG_DIR/.checkpoint-state" max_silent_rounds)"
 printf 'CHECKPOINT=%s/%s\n' "${rounds:-0}" "${checkpoint_max:-20}"
-seconds="$(json_int_get "$DEVLOG_DIR/.segment-state" max_silent_seconds)"
+seconds="$(json_int_get "$SEGMENT_FILE" max_silent_seconds)"
 printf 'SEGMENT=max_silent_seconds=%s\n' "${seconds:-600}"
 
 status="none"

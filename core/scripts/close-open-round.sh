@@ -35,10 +35,6 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 ENABLED_FLAG="$DEVLOG_DIR/.enabled"
-ROUND_OPEN="$DEVLOG_DIR/.round-open"
-INTERRUPTED_FLAG="$DEVLOG_DIR/.interrupted"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
-TURN_MARKER="$DEVLOG_DIR/.turn-start"
 
 drop_markers() {
   rm -f "$ROUND_OPEN" "$INTERRUPTED_FLAG" 2>/dev/null || true

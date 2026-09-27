@@ -71,5 +71,15 @@ assert_exit "zero -> exit 1" 1 $?
 bash "$SCRIPT_DIR/segment-watch-set.sh" >/dev/null 2>&1
 assert_exit "missing arg -> exit 1" 1 $?
 
+# --- 5: threshold applies to every platform's .segment-state ----------------
+printf '%s\n' '{"last_change_epoch": 7, "last_seen_cksum": "", "max_silent_seconds": 600, "session_id": "c1"}' \
+  > "$TMP_ROOT/.devlog/.segment-state@codex"
+bash "$SCRIPT_DIR/segment-watch-set.sh" 300 >/dev/null
+assert_exit "multi-platform set -> exit 0" 0 $?
+grep -q '"max_silent_seconds": 300' "$TMP_ROOT/.devlog/.segment-state" \
+  && echo "PASS: claude segment-state gets 300" || { echo "FAIL: claude segment-state"; FAIL=1; }
+grep -q '"max_silent_seconds": 300' "$TMP_ROOT/.devlog/.segment-state@codex" \
+  && echo "PASS: codex segment-state gets 300" || { echo "FAIL: codex segment-state"; FAIL=1; }
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi
