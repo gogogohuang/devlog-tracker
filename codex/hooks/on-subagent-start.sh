@@ -15,5 +15,6 @@ case "$SCRIPT_DIR" in
     ;;
 esac
 export DEVLOG_PROJECT_DIR="$ROOT"
+export DEVLOG_PLATFORM=codex
 printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/lessons-subagent-start.sh" || true
 exit 0

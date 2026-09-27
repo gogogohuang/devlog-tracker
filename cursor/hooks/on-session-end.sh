@@ -6,6 +6,7 @@ PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../core/scripts" && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
 export DEVLOG_PROJECT_DIR="$ROOT"
+export DEVLOG_PLATFORM=cursor
 printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/on-session-end.sh" >/dev/null 2>&1 || true
 echo '{}'
 exit 0

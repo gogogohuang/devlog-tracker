@@ -39,14 +39,15 @@ EOF
 OUT="$(printf '{"cwd":"%s","source":"startup"}' "$TMP/project" | bash "$SCRIPT_DIR/on-session-start.sh")"
 case "$OUT" in *"Round 1"*) echo "PASS: sessionStart injects context" ;; *) echo "FAIL: sessionStart [$OUT]"; FAIL=1 ;; esac
 
-# userPromptSubmit: opens a Round in .round-current.md
+# userPromptSubmit: opens a Round in .round-current@codex.md
 SUBMIT="$TMP/submit"
 mkdir -p "$SUBMIT/.devlog" "$SUBMIT/.devlog-tracker" "$SUBMIT/src"
 touch "$SUBMIT/.devlog/.enabled"
+touch "$SUBMIT/.devlog/.platform-claimed"
 bash "$SCRIPT_DIR/on-user-prompt-submit.sh" <<EOF2 >/dev/null
 {"cwd":"$SUBMIT","prompt":"hello","session_id":"codex-1"}
 EOF2
-if grep -q 'hello' "$SUBMIT/.devlog/.round-current.md" 2>/dev/null; then
+if grep -q 'hello' "$SUBMIT/.devlog/.round-current@codex.md" 2>/dev/null; then
   echo "PASS: userPromptSubmit writes round"
 else
   echo "FAIL: userPromptSubmit round"; FAIL=1
@@ -55,8 +56,8 @@ fi
 # preTool: blocks (exit 2) once the silence window has expired, allows fresh writes
 NOW="$(date +%s)"
 OLD=$((NOW - 1000))
-SUM="$(cksum < "$SUBMIT/.devlog/.round-current.md" | tr -d '\n')"
-printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "codex-1"}\n' "$OLD" "$SUM" > "$SUBMIT/.devlog/.segment-state"
+SUM="$(cksum < "$SUBMIT/.devlog/.round-current@codex.md" | tr -d '\n')"
+printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "codex-1"}\n' "$OLD" "$SUM" > "$SUBMIT/.devlog/.segment-state@codex"
 set +e
 ERR="$(printf '{"cwd":"%s","tool_name":"Bash","tool_input":{},"session_id":"codex-1"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh" 2>&1 >/dev/null)"
 RC=$?
@@ -68,20 +69,20 @@ case "$ERR" in
 esac
 
 set +e
-printf '{"cwd":"%s","tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current.md"},"session_id":"codex-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh" >/dev/null 2>/dev/null
+printf '{"cwd":"%s","tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current@codex.md"},"session_id":"codex-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh" >/dev/null 2>/dev/null
 RC=$?
 set -e
 if [ "$RC" -eq 0 ]; then echo "PASS: devlog write allowed (exit 0)"; else echo "FAIL: allowed-tool exit [$RC]"; FAIL=1; fi
 
 set +e
-printf '{"cwd":"%s","tool_name":"Bash","tool_input":{"command":"cat %s/.devlog/.round-current.md"},"session_id":"codex-1"}' \
+printf '{"cwd":"%s","tool_name":"Bash","tool_input":{"command":"cat %s/.devlog/.round-current@codex.md"},"session_id":"codex-1"}' \
   "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh" >/dev/null 2>/dev/null
 RC=$?
 set -e
 if [ "$RC" -eq 0 ]; then echo "PASS: devlog cat allowed"; else echo "FAIL: devlog cat exit [$RC]"; FAIL=1; fi
 
 set +e
-printf '{"cwd":"%s","tool_name":"Bash","tool_input":{"command":"cat %s/.devlog/.round-current.md; echo unsafe"},"session_id":"codex-1"}' \
+printf '{"cwd":"%s","tool_name":"Bash","tool_input":{"command":"cat %s/.devlog/.round-current@codex.md; echo unsafe"},"session_id":"codex-1"}' \
   "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh" >/dev/null 2>/dev/null
 RC=$?
 set -e
@@ -89,7 +90,7 @@ if [ "$RC" -eq 2 ]; then echo "PASS: chained cat blocked"; else echo "FAIL: chai
 
 # Codex reports file edits as apply_patch with the patch in tool_input.command.
 PATCH='*** Begin Patch
-*** Update File: .devlog/.round-current.md
+*** Update File: .devlog/.round-current@codex.md
 @@
 -before
 +after
@@ -102,7 +103,7 @@ set -e
 if [ "$RC" -eq 0 ]; then echo "PASS: devlog apply_patch allowed"; else echo "FAIL: devlog apply_patch exit [$RC]"; FAIL=1; fi
 
 PATCH='*** Begin Patch
-*** Update File: ../.devlog/.round-current.md
+*** Update File: ../.devlog/.round-current@codex.md
 @@
 -before
 +after
@@ -115,7 +116,7 @@ set -e
 if [ "$RC" -eq 0 ]; then echo "PASS: nested cwd devlog apply_patch allowed"; else echo "FAIL: nested cwd apply_patch exit [$RC]"; FAIL=1; fi
 
 PATCH='*** Begin Patch
-*** Update File: .devlog/.round-current.md
+*** Update File: .devlog/.round-current@codex.md
 @@
 -before
 +after
@@ -128,7 +129,7 @@ set -e
 if [ "$RC" -eq 2 ]; then echo "PASS: nested cwd unrelated apply_patch blocked"; else echo "FAIL: nested cwd unrelated patch exit [$RC]"; FAIL=1; fi
 
 PATCH='*** Begin Patch
-*** Update File: .devlog/.round-current.md
+*** Update File: .devlog/.round-current@codex.md
 @@
 -before
 +after
@@ -144,9 +145,18 @@ RC=$?
 set -e
 if [ "$RC" -eq 2 ]; then echo "PASS: mixed apply_patch blocked"; else echo "FAIL: mixed apply_patch exit [$RC]"; FAIL=1; fi
 
+# A patch to Claude's round file is not Codex's own file: still blocked.
+PATCH="$(printf '*** Begin Patch\n*** Update File: .devlog/.round-current.md\n@@\n-a\n+b\n*** End Patch')"
+set +e
+printf '{"cwd":"%s","tool_name":"apply_patch","tool_input":{"command":%s},"session_id":"codex-1"}' \
+  "$SUBMIT" "$(node -p 'JSON.stringify(process.argv[1])' "$PATCH")" | bash "$SCRIPT_DIR/on-pre-tool.sh" >/dev/null 2>/dev/null
+RC=$?
+set -e
+if [ "$RC" -eq 2 ]; then echo "PASS: Claude round-file apply_patch blocked"; else echo "FAIL: Claude round-file apply_patch exit [$RC]"; FAIL=1; fi
+
 # stop: blocks (exit 2) while the round is unfinished
-printf '{"round": 1, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open"
-cksum < "$SUBMIT/.devlog/.round-current.md" > "$SUBMIT/.devlog/.turn-start"
+printf '{"round": 1, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open@codex"
+cksum < "$SUBMIT/.devlog/.round-current@codex.md" > "$SUBMIT/.devlog/.turn-start@codex"
 set +e
 printf '{"cwd":"%s"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-stop.sh" >/dev/null 2>/dev/null
 RC=$?
@@ -154,9 +164,9 @@ set -e
 if [ "$RC" -eq 2 ]; then echo "PASS: stop blocks unfinished round (exit 2)"; else echo "FAIL: stop exit [$RC]"; FAIL=1; fi
 
 # sessionEnd: closes the open round using the documented "reason"
-printf '\n## Round 2 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current.md"
-printf '{"round": 2, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open"
-cksum < "$SUBMIT/.devlog/.round-current.md" > "$SUBMIT/.devlog/.turn-start"
+printf '\n## Round 2 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current@codex.md"
+printf '{"round": 2, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open@codex"
+cksum < "$SUBMIT/.devlog/.round-current@codex.md" > "$SUBMIT/.devlog/.turn-start@codex"
 printf '{"cwd":"%s","reason":"other"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-session-end.sh" >/dev/null
 if grep -q 'SessionEnd:other' "$SUBMIT/.devlog/devlog.md" 2>/dev/null; then
   echo "PASS: sessionEnd closes round via reason"
@@ -165,9 +175,9 @@ else
 fi
 
 # Interrupt closes the active round immediately, using Codex's event.
-printf '\n## Round 3 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current.md"
-printf '{"round": 3, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open"
-cksum < "$SUBMIT/.devlog/.round-current.md" > "$SUBMIT/.devlog/.turn-start"
+printf '\n## Round 3 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current@codex.md"
+printf '{"round": 3, "opened_at": "now"}\n' > "$SUBMIT/.devlog/.round-open@codex"
+cksum < "$SUBMIT/.devlog/.round-current@codex.md" > "$SUBMIT/.devlog/.turn-start@codex"
 printf '{"cwd":"%s","hook_event_name":"Interrupt","turn_id":"turn-3"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-interrupt.sh" >/dev/null
 if grep -q 'Interrupt:cancelled' "$SUBMIT/.devlog/devlog.md" 2>/dev/null; then
   echo "PASS: interrupt closes round"
