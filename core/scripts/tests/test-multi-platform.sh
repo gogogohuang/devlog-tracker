@@ -179,5 +179,28 @@ printf '## Round 7 — t · codex\n\n### Status\nDONE\n\n## Round 8 — t\n\n###
 OUT="$(DEVLOG_PLATFORM=codex DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/span-open.sh")"
 check "codex span-open uses its own last round" '[ "$OUT" = "OPENED=7" ] && grep -q "\"round\": 7" "$D/.span-open@codex" && [ ! -e "$D/.span-open" ]'
 
+# --- Task 6: whole-devlog commands --------------------------------------
+new_project cmds
+submit claude "claude task" >/dev/null
+submit codex "codex task" >/dev/null
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null 2>"$TMP_ROOT/cleanerr"
+check "clean refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次" "$TMP_ROOT/cleanerr" && [ -f "$D/.round-current@codex.md" ]'
+printf '## Round 9 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-move.sh" --from 9 --to 9 --name x >/dev/null 2>"$TMP_ROOT/keeperr"
+check "keep-move refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次（claude、codex）" "$TMP_ROOT/keeperr" && [ ! -e "$D/devlog.x.md" ]'
+
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/pause-devlog.sh" >/dev/null
+check "pause clears every platform's markers" '[ ! -e "$D/.round-open" ] && [ ! -e "$D/.round-open@codex" ]'
+
+new_project clean1
+printf '## Round 1 — t\n\n### Status\nDONE\n\n## Round 2 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+submit codex "only codex" >/dev/null
+check "codex got round 3 before clean" 'grep -q "^## Round 3 — .* · codex$" "$D/.round-current@codex.md"'
+echo "old claude handoff" > "$D/handoff.md"
+echo "old codex handoff" > "$D/handoff@codex.md"
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null 2>&1
+check "clean keeps the single open codex round as Round 1" 'grep -q "^## Round 1 — .* · codex$" "$D/.round-current@codex.md"'
+check "clean removes every platform handoff" '[ ! -e "$D/handoff.md" ] && [ ! -e "$D/handoff@codex.md" ]'
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

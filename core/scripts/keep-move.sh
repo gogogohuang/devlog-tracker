@@ -41,8 +41,9 @@ TARGET="$DEVLOG_DIR/devlog.$NAME.md"
 [ -f "$MAIN" ] || { echo "devlog.md 不存在" >&2; exit 1; }
 [ ! -e "$TARGET" ] || { echo "目標檔案已存在：$TARGET" >&2; exit 1; }
 
-OPEN=""
-[ ! -f "$DEVLOG_DIR/.round-open" ] || OPEN="$(json_int_get "$DEVLOG_DIR/.round-open" round)"
+OPEN_ROW="$(devlog_single_open_round)" || exit 1
+OPEN="$(printf '%s' "$OPEN_ROW" | cut -f2)"
+OPEN_MARKER="$DEVLOG_DIR/$(devlog_platform_file .round-open '' "${OPEN_ROW%%	*}")"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/devlog-keep.XXXXXX")" || exit 1
 trap 'rm -rf "$TMP"; devlog_lock_release' EXIT
 STARTS="$TMP/starts"
@@ -148,14 +149,17 @@ EXISTING_KEPT_LINES="$(devlog_kept_index_lines "$MAIN")"
 } > "$KEPT_STRIPPED.new" && mv "$KEPT_STRIPPED.new" "$MAIN" || exit 1
 
 if [ "$FULL" -eq 1 ]; then
-  rm -f "$DEVLOG_DIR/.span-open"
-  [ ! -f "$DEVLOG_DIR/.round-open" ] || json_int_set "$DEVLOG_DIR/.round-open" round 1
+  rm -f "$DEVLOG_DIR"/.span-open "$DEVLOG_DIR"/.span-open@*
+  [ -z "$OPEN_ROW" ] || json_int_set "$OPEN_MARKER" round 1
   [ ! -f "$DEVLOG_DIR/.checkpoint-state" ] || json_int_set "$DEVLOG_DIR/.checkpoint-state" rounds_since_checkpoint 0
-elif [ -f "$DEVLOG_DIR/.span-open" ]; then
-  SPAN_ROUND="$(json_int_get "$DEVLOG_DIR/.span-open" round)"
-  if [ -n "$SPAN_ROUND" ] && [ "$SPAN_ROUND" -ge "$FROM" ] && [ "$SPAN_ROUND" -le "$TO" ]; then
-    rm -f "$DEVLOG_DIR/.span-open"
-  fi
+else
+  for SPAN in "$DEVLOG_DIR"/.span-open "$DEVLOG_DIR"/.span-open@*; do
+    [ -f "$SPAN" ] || continue
+    SPAN_ROUND="$(json_int_get "$SPAN" round)"
+    if [ -n "$SPAN_ROUND" ] && [ "$SPAN_ROUND" -ge "$FROM" ] && [ "$SPAN_ROUND" -le "$TO" ]; then
+      rm -f "$SPAN"
+    fi
+  done
 fi
 
 REMAINING="$(devlog_list_round_starts "$MAIN" | wc -l | tr -d ' ')"

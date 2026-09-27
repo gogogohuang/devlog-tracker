@@ -20,11 +20,10 @@ PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 [ -d "$DEVLOG_DIR" ] || { echo "NOTHING"; exit 0; }
 
-OPEN=""
-[ ! -f "$DEVLOG_DIR/.round-open" ] || OPEN="$(json_int_get "$DEVLOG_DIR/.round-open" round)"
-
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
+OPEN_ROW="$(devlog_single_open_round)" || exit 1
+OPEN="$(printf '%s' "$OPEN_ROW" | cut -f2)"
 node "$SCRIPT_DIR/keep-all.js" "$@" \
   --dir "$DEVLOG_DIR" --project "$PROJECT_DIR" --current "${DEVLOG_FILE##*/}" \
   --open "$OPEN" --origin "${DEVLOG_ORIGIN:-}"

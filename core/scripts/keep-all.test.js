@@ -228,3 +228,17 @@ test('apply clears .span-open only when its round moved out of current', () => {
   apply(c, `b\t\t${k2.join(',')}\n`, s2.fingerprint, s2.rounds.length);
   assert.ok(!exists(d, '.span-open'));
 });
+
+test('apply clears a platform .span-open@codex when its round moved out of current', () => {
+  const d = world();
+  fs.writeFileSync(path.join(d, '.span-open@codex'), '{"round": 1, "ticks": 0}\n');
+  const c = ctx(d);
+  const s = scan(c);
+  const k = [...idsOf(s, 'devlog.topic.md', [5]), ...idsOf(s, 'devlog.other.md', [9]), ...idsOf(s, 'devlog.md', [2])].join(',');
+  apply(c, `a\t\t${k}\n`, s.fingerprint, s.rounds.length);
+  assert.ok(exists(d, '.span-open@codex'));
+  const s2 = scan(c);
+  const k2 = [...s2.rounds.filter(r => r.file === 'devlog.a.md').map(r => r.id), ...idsOf(s2, 'devlog.md', [1])];
+  apply(c, `b\t\t${k2.join(',')}\n`, s2.fingerprint, s2.rounds.length);
+  assert.ok(!exists(d, '.span-open@codex'));
+});

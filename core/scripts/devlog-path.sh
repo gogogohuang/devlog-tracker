@@ -89,6 +89,20 @@ devlog_open_rounds() {
   done
 }
 
+# Prints "<platform>\t<round>" of the only open round; nothing when none.
+# Returns 2 (message on stderr) when two or more platforms have one open.
+devlog_single_open_round() {
+  local rows count
+  rows="$(devlog_open_rounds)"
+  [ -n "$rows" ] || return 0
+  count="$(printf '%s\n' "$rows" | grep -c .)"
+  if [ "$count" -gt 1 ]; then
+    echo "其他平台還有進行中的輪次（$(printf '%s\n' "$rows" | cut -f1 | paste -sd '、' -)），等它們收尾再執行。" >&2
+    return 2
+  fi
+  printf '%s\n' "$rows" | cut -f1,2
+}
+
 # One line per other platform's non-empty handoff for this branch.
 devlog_other_handoffs() {
   local q f

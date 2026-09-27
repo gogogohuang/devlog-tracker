@@ -73,7 +73,7 @@ first_visit() {
   DONE_FILES="${DONE_FILES}${1}"$'\n'
 }
 
-for f in "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/devlog.md" "$CUR_DEVLOG"; do
+for f in "$DEVLOG_DIR"/.round-current.md "$DEVLOG_DIR"/.round-current@*.md "$DEVLOG_DIR/devlog.md" "$CUR_DEVLOG"; do
   [ -n "$f" ] && [ -s "$f" ] && first_visit "$f" && migrate_round_file "$f"
 done
 for f in "$DEVLOG_DIR"/devlog.*.md; do
@@ -81,7 +81,7 @@ for f in "$DEVLOG_DIR"/devlog.*.md; do
   head -n 1 "$f" | grep -q '^<!-- devlog-origin: ' || continue
   first_visit "$f" && migrate_round_file "$f"
 done
-for f in "$DEVLOG_DIR"/handoff.md "$CUR_HANDOFF" "$DEVLOG_DIR"/handoff.*.md; do
+for f in "$DEVLOG_DIR"/handoff.md "$CUR_HANDOFF" "$DEVLOG_DIR"/handoff@*.md "$DEVLOG_DIR"/handoff.*.md; do
   [ -n "$f" ] && [ -s "$f" ] && first_visit "$f" && migrate_snapshot_file "$f"
 done
 
