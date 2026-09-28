@@ -53,7 +53,8 @@ function roundStatus(lines) {
 }
 
 function tsKey(ts) {
-  const iso = ts.replace(/([+-]\d\d)(\d\d)$/, '$1:$2');
+  // Platform ownership is part of the displayed heading, not the timestamp.
+  const iso = ts.replace(/ · [a-z]+$/, '').replace(/([+-]\d\d)(\d\d)$/, '$1:$2');
   const t = Date.parse(iso);
   return Number.isNaN(t) ? Infinity : t;
 }
@@ -408,8 +409,8 @@ function apply(c, planText, expected, count) {
     throw new Error(`寫入途中失敗：${e.message}\n原始檔備份在 ${backup}`);
   }
 
-  const span = path.join(c.devlogDir, '.span-open');
-  if (fs.existsSync(span)) {
+  for (const name of fs.readdirSync(c.devlogDir).filter(f => /^\.span-open(@[a-z]+)?$/.test(f))) {
+    const span = path.join(c.devlogDir, name);
     const m = fs.readFileSync(span, 'utf8').match(/"round"\s*:\s*(\d+)/);
     if (m && movedFromCurrent.has(Number(m[1]))) fs.rmSync(span, { force: true });
   }

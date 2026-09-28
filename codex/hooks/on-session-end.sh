@@ -11,6 +11,7 @@ PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../core/scripts" && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
 export DEVLOG_PROJECT_DIR="$ROOT"
+export DEVLOG_PLATFORM=codex
 
 REASON=""
 if command -v jq >/dev/null 2>&1; then

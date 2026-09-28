@@ -288,5 +288,131 @@ devlog_resolve_paths "$DETACHEDREPO"
   && echo "PASS: detached HANDOFF_FILE uses worktree dirname" \
   || { echo "FAIL: detached HANDOFF_FILE=$HANDOFF_FILE"; FAIL=1; }
 
+# --- platform identity ---------------------------------------------------
+assert_path() {
+  if [ "$2" = "$3" ]; then echo "PASS: $1"; else echo "FAIL: $1 (expected [$2], got [$3])"; FAIL=1; fi
+}
+assert_path "unset platform is claude" claude "$(unset DEVLOG_PLATFORM; devlog_platform)"
+assert_path "codex platform" codex "$(DEVLOG_PLATFORM=codex devlog_platform)"
+assert_path "unknown platform falls back to claude" claude "$(DEVLOG_PLATFORM='x;rm' devlog_platform)"
+assert_path "claude keeps plain name" .round-current.md "$(devlog_platform_file .round-current .md claude)"
+assert_path "codex gets @ suffix" .round-current@codex.md "$(devlog_platform_file .round-current .md codex)"
+assert_path "extensionless @ suffix" .round-open@cursor "$(devlog_platform_file .round-open '' cursor)"
+
+# --- per-platform state paths --------------------------------------------
+PLATREPO="$TMP/platrepo"
+mkdir -p "$PLATREPO"
+git_setup "$PLATREPO"
+git -C "$PLATREPO" branch -M main
+DEVLOG_PLATFORM=codex devlog_resolve_paths "$PLATREPO"
+assert_path "codex ROUND_CURRENT" "$PLATREPO/.devlog/.round-current@codex.md" "$ROUND_CURRENT"
+assert_path "codex ROUND_OPEN" "$PLATREPO/.devlog/.round-open@codex" "$ROUND_OPEN"
+assert_path "codex TURN_MARKER" "$PLATREPO/.devlog/.turn-start@codex" "$TURN_MARKER"
+assert_path "codex SEGMENT_FILE" "$PLATREPO/.devlog/.segment-state@codex" "$SEGMENT_FILE"
+assert_path "codex AWAITING_FILE" "$PLATREPO/.devlog/.awaiting-reply@codex" "$AWAITING_FILE"
+assert_path "codex INTERRUPTED_FLAG" "$PLATREPO/.devlog/.interrupted@codex" "$INTERRUPTED_FLAG"
+assert_path "codex SPAN_FILE" "$PLATREPO/.devlog/.span-open@codex" "$SPAN_FILE"
+assert_path "codex MISMATCH_FILE" "$PLATREPO/.devlog/.workspace-mismatch@codex" "$MISMATCH_FILE"
+assert_path "codex main HANDOFF_FILE" "$PLATREPO/.devlog/handoff@codex.md" "$HANDOFF_FILE"
+assert_path "codex DEVLOG_FILE shared" "$PLATREPO/.devlog/devlog.md" "$DEVLOG_FILE"
+unset DEVLOG_PLATFORM
+devlog_resolve_paths "$PLATREPO"
+assert_path "claude ROUND_CURRENT unchanged" "$PLATREPO/.devlog/.round-current.md" "$ROUND_CURRENT"
+assert_path "claude ROUND_OPEN unchanged" "$PLATREPO/.devlog/.round-open" "$ROUND_OPEN"
+assert_path "claude HANDOFF_FILE unchanged" "$PLATREPO/.devlog/handoff.md" "$HANDOFF_FILE"
+git -C "$PLATREPO" checkout -q -b codex
+DEVLOG_PLATFORM=cursor devlog_resolve_paths "$PLATREPO"
+assert_path "branch named codex + cursor platform" "$PLATREPO/.devlog/handoff.codex@cursor.md" "$HANDOFF_FILE"
+assert_path "HANDOFF_STEM" "$PLATREPO/.devlog/handoff.codex" "$HANDOFF_STEM"
+unset DEVLOG_PLATFORM
+
+# --- legacy claim ----------------------------------------------------------
+CLAIMREPO="$TMP/claimrepo"
+mkdir -p "$CLAIMREPO/.devlog"
+git_setup "$CLAIMREPO"
+git -C "$CLAIMREPO" branch -M main
+touch "$CLAIMREPO/.devlog/.enabled"
+echo "open round" > "$CLAIMREPO/.devlog/.round-current.md"
+printf '{"round": 3, "opened_at": "t", "file": "devlog.md"}\n' > "$CLAIMREPO/.devlog/.round-open"
+echo "legacy handoff" > "$CLAIMREPO/.devlog/handoff.md"
+echo "segment cfg" > "$CLAIMREPO/.devlog/.segment-state"
+DEVLOG_PLATFORM=codex devlog_resolve_paths "$CLAIMREPO"
+if [ -f "$CLAIMREPO/.devlog/.round-current@codex.md" ] && [ ! -f "$CLAIMREPO/.devlog/.round-current.md" ] \
+  && [ -f "$CLAIMREPO/.devlog/.round-open@codex" ] \
+  && grep -q "legacy handoff" "$CLAIMREPO/.devlog/handoff@codex.md" \
+  && [ -f "$CLAIMREPO/.devlog/.segment-state" ] \
+  && [ -f "$CLAIMREPO/.devlog/.platform-claimed" ]; then
+  echo "PASS: first non-claude platform claims legacy state (segment config stays)"
+else
+  echo "FAIL: legacy claim"; ls -a "$CLAIMREPO/.devlog"; FAIL=1
+fi
+echo "later claude round" > "$CLAIMREPO/.devlog/.round-current.md"
+DEVLOG_PLATFORM=cursor devlog_resolve_paths "$CLAIMREPO"
+if [ -f "$CLAIMREPO/.devlog/.round-current.md" ] && [ ! -f "$CLAIMREPO/.devlog/.round-current@cursor.md" ]; then
+  echo "PASS: marker stops later claims"
+else
+  echo "FAIL: second claim happened"; FAIL=1
+fi
+unset DEVLOG_PLATFORM
+
+CLAUDEFIRST="$TMP/claudefirst"
+mkdir -p "$CLAUDEFIRST/.devlog"
+git_setup "$CLAUDEFIRST"
+git -C "$CLAUDEFIRST" branch -M main
+touch "$CLAUDEFIRST/.devlog/.enabled"
+echo "open round" > "$CLAUDEFIRST/.devlog/.round-current.md"
+devlog_resolve_paths "$CLAUDEFIRST"
+if [ -f "$CLAUDEFIRST/.devlog/.round-current.md" ] && [ -f "$CLAUDEFIRST/.devlog/.platform-claimed" ]; then
+  echo "PASS: claude-first claims nothing, writes marker"
+else
+  echo "FAIL: claude-first claim"; FAIL=1
+fi
+
+NOTENABLED="$TMP/notenabled"
+mkdir -p "$NOTENABLED/.devlog"
+echo "x" > "$NOTENABLED/.devlog/.round-current.md"
+DEVLOG_PLATFORM=codex devlog_resolve_paths "$NOTENABLED"
+if [ -f "$NOTENABLED/.devlog/.round-current.md" ] && [ ! -e "$NOTENABLED/.devlog/.platform-claimed" ]; then
+  echo "PASS: no claim without .enabled"
+else
+  echo "FAIL: claimed while disabled"; FAIL=1
+fi
+unset DEVLOG_PLATFORM
+
+# --- open rounds / other handoffs -----------------------------------------
+LISTREPO="$TMP/listrepo"
+mkdir -p "$LISTREPO/.devlog"
+git_setup "$LISTREPO"
+git -C "$LISTREPO" branch -M main
+touch "$LISTREPO/.devlog/.enabled" "$LISTREPO/.devlog/.platform-claimed"
+printf '{"round": 5, "opened_at": "t", "file": "devlog.md"}\n' > "$LISTREPO/.devlog/.round-open"
+printf '{"round": 6, "opened_at": "t", "file": "devlog.md"}\n' > "$LISTREPO/.devlog/.round-open@codex"
+echo "claude h" > "$LISTREPO/.devlog/handoff.md"
+echo "cursor h" > "$LISTREPO/.devlog/handoff@cursor.md"
+: > "$LISTREPO/.devlog/handoff@codex.md"
+DEVLOG_PLATFORM=codex devlog_resolve_paths "$LISTREPO"
+assert_path "open rounds listing" "$(printf 'claude\t5\tdevlog.md\ncodex\t6\tdevlog.md')" "$(devlog_open_rounds)"
+assert_path "other handoffs (non-empty, not own)" \
+  "$(printf 'claude\t%s\ncursor\t%s' "$LISTREPO/.devlog/handoff.md" "$LISTREPO/.devlog/handoff@cursor.md")" \
+  "$(DEVLOG_PLATFORM=codex devlog_other_handoffs)"
+unset DEVLOG_PLATFORM
+
+# --- branch tail migration moves every platform's handoff -----------------
+PTAIL="$TMP/ptail"
+mig_repo "$PTAIL"
+write_main_devlog "$PTAIL/.devlog/devlog.md" 1:DONE 2:IN_PROGRESS
+touch "$PTAIL/.devlog/.platform-claimed"
+echo "claude handoff" > "$PTAIL/.devlog/handoff.md"
+echo "codex handoff" > "$PTAIL/.devlog/handoff@codex.md"
+git -C "$PTAIL" checkout -q -b feature-p
+devlog_resolve_paths "$PTAIL"
+if grep -q "claude handoff" "$PTAIL/.devlog/handoff.feature-p.md" \
+  && grep -q "codex handoff" "$PTAIL/.devlog/handoff.feature-p@codex.md" \
+  && [ ! -f "$PTAIL/.devlog/handoff@codex.md" ]; then
+  echo "PASS: tail migration moves every platform's handoff"
+else
+  echo "FAIL: platform handoff tail migration"; ls -a "$PTAIL/.devlog"; FAIL=1
+fi
+
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

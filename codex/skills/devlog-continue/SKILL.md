@@ -13,7 +13,7 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 請執行 devlog continue（接續上一題）。這是使用者主動執行 `/devlog-tracker:continue`，或明確說「continue」「接續」「繼續上一題」時才做的事。`/clear` 之後的一般新請求不要先讀檔接舊工作。
 
 1. 讀取 `.devlog/devlog.md`。若檔案不存在，告知「目前沒有 devlog 可接續」，不要建立 `.devlog/` 或任何新檔，結束。記下 `.devlog/` 的上層目錄（也就是專案根目錄）的絕對路徑，作為本輪接下來都要用的專案根目錄——後面步驟（尤其是步驟 5.1）一律沿用這個值，不要再用 shell 的 `pwd` 重新推。Bash 工具的工作目錄會在同一段對話裡的呼叫之間持續累積，中途若因為別的原因 `cd` 過，`pwd` 就不再代表這個專案根目錄。
-2. 若 `.devlog/.span-open` 存在：先告訴使用者有一個還沒關的 span（Round 編號與 `opened_at`，若讀得到），問要繼續這個自動化任務還是先關掉它。沒有明確要關就當成要繼續，不要自己刪 `.span-open`。
+2. 若你所在平台的 span 檔存在（Claude Code 是 `.devlog/.span-open`，Codex／Cursor 是 `.devlog/.span-open@codex`／`.devlog/.span-open@cursor`）：先告訴使用者有一個還沒關的 span（Round 編號與 `opened_at`，若讀得到），問要繼續這個自動化任務還是先關掉它。沒有明確要關就當成要繼續，不要自己刪 span 檔。
 3. 讀最近的 Round（不夠再往前讀；有 `## Checkpoint` 就一併看最後一個）。不要讀 `devlog.archive.md` 或 `devlog.<name>.md`，除非 Handoff 下一步明確指向它們。
 4. 依**最後一個歷史 Round**（不是這一輪 continue 自己的 skeleton）的 Status 行動。`DONE`：告訴使用者上一題已經結束，等新需求。不要核對、不要自己找下一件工作。
 5. `IN_PROGRESS`、`INTERRUPTED`、`BLOCKED`：先核對，再行動。不要先問「上次做到哪」。不要改歷史 Round。

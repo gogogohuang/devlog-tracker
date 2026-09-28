@@ -19,7 +19,7 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 ## 1. 讀檔、找出開著的 Round
 
 1. 讀取 `.devlog/devlog.md` 全文。若檔案不存在，告知「目前沒有東西可 keep」，不要建立 `.devlog/` 或任何新檔，結束。
-2. 開著的 Round：若 `.devlog/.round-open` 存在且有 `"round"` 數字，用那個編號。若 `.round-open` 不存在（從未 start 或已 pause），表示沒有開著的 Round，檔案裡所有 `## Round` 都是歷史，不要把最後一個 Round 當成開著的 Round 來排除。
+2. 開著的 Round：若你所在平台的 `.round-open` 檔（Claude Code 是 `.devlog/.round-open`，Codex／Cursor 是 `.devlog/.round-open@codex`／`.devlog/.round-open@cursor`）存在且有 `"round"` 數字，用那個編號。若它不存在（從未 start 或已 pause），表示沒有開著的 Round，檔案裡所有 `## Round` 都是歷史，不要把最後一個 Round 當成開著的 Round 來排除。
 3. 歷史 Round = 檔案裡除了開著的 Round 以外的所有 `## Round`（判斷 `## ` 標題時，略過圍欄程式碼區塊 ``` 內的行，與 hook 腳本解析方式一致）。若沒有任何歷史 Round，告知「目前沒有東西可 keep」，不要建立新檔，結束。
 
 ## 2. 切出主題段落，過濾瑣碎段落
@@ -92,13 +92,13 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/keep-move.sh" \
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/keep-move.sh" \
   --from <from> --to <to> --name "<name>" --desc "<這段在做什麼的一句話>"
 ```
 
 `<from>`、`<to>`、`<name>` 必須使用該段步驟 4 確認後的值。`<這段在做什麼的一句話>` 用步驟 2.5 記下的那句描述（純文字，不要換行、不要含反引號）；腳本會把它原樣接在 `## Kept 索引` 那一行的 `kept_at` 之後。腳本是搬移、Checkpoint 歸屬、full keep 重編與 checkpoint counter reset 的唯一實作來源；它一次只認一段範圍，完全不知道這是批次的一部分，`commands/keep.md` 自己負責依序呼叫。
 
-任一段的腳本 exit 1：立刻停止整批，原樣顯示那一段的 stderr，不要自行重試刪除，也不要手動補做搬移，也不要繼續跑後面還沒處理的段落。已經成功搬走的段落不要回滾。
+任一段的腳本 exit 1：立刻停止整批，原樣顯示那一段的 stderr，不要自行重試刪除，也不要手動補做搬移，也不要繼續跑後面還沒處理的段落。已經成功搬走的段落不要回滾。同一工作樹有兩個以上平台的輪次開著時，腳本會以 `其他平台還有進行中的輪次（…），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。` 拒絕，請使用者等其他平台收尾再跑。
 
 如果這批段落最終涵蓋了 `devlog.md` 目前剩下的所有歷史 Round（沒有瑣碎段落留下），跑到最後一段（Round 號碼最新的那一段）時，腳本會自動判定為 full keep：專案摘要併入那一檔、開著的 Round 重編號成 1、`.span-open` 刪除、checkpoint counter 歸零。這是預期行為，不用特別處理，也不用另外判斷「這是不是 full keep」。
 
@@ -123,6 +123,6 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" 
 
 依段落回報：每個具名檔路徑、搬走幾輪（哪些編號）；再依最後一次成功執行的 `REMAINING` 回報 `devlog.md` 目前剩幾輪（這個數字含還開著的那一輪，不是只算歷史 Round）。若中途因某段腳本失敗而中止，清楚列出哪些段落已經搬走（連檔名）、哪些完全沒嘗試。不要讀寫 `devlog.archive.md`。
 
-若 `.round-open` 存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。若沒有開著的 Round：不要改寫歷史 Round 的收尾。
+若你所在平台的 `.round-open` 檔（Claude Code 是 `.round-open`，Codex／Cursor 是 `.round-open@codex`／`.round-open@cursor`）存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。若沒有開著的 Round：不要改寫歷史 Round 的收尾。
 
 使用者提供的額外參數：請看觸發這個 skill 的使用者訊息。

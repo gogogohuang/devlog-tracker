@@ -15,10 +15,12 @@ PLUGIN_SCRIPTS="$(cd "$SCRIPT_DIR/../../core/scripts" 2>/dev/null && pwd)"
 INPUT="$(cat 2>/dev/null || true)"
 ROOT="$(printf '%s' "$INPUT" | bash "$SCRIPT_DIR/project-dir.sh")"
 export DEVLOG_PROJECT_DIR="$ROOT"
+export DEVLOG_PLATFORM=codex
+ROUND_FILE=".devlog/.round-current@codex.md"
 
 codex_access_payload() {
-  printf '{"tool_name":"%s","tool_input":{"file_path":".devlog/.round-current.md"},"session_id":"%s","agent_id":"%s"}' \
-    "$1" "$(json_escape "$(json_str_field "$INPUT" session_id)")" "$(json_escape "$(json_str_field "$INPUT" agent_id)")"
+  printf '{"tool_name":"%s","tool_input":{"file_path":"%s"},"session_id":"%s","agent_id":"%s"}' \
+    "$1" "$ROUND_FILE" "$(json_escape "$(json_str_field "$INPUT" session_id)")" "$(json_escape "$(json_str_field "$INPUT" agent_id)")"
 }
 
 TOOL_NAME="$(json_str_field "$INPUT" tool_name)"
@@ -35,10 +37,10 @@ fi
 if [ "$TOOL_NAME" = Bash ]; then
   CWD="$(json_str_field "$INPUT" cwd)"
   case "$COMMAND" in
-    "cat $ROOT/.devlog/.round-current.md"|"cat \"$ROOT/.devlog/.round-current.md\"")
+    "cat $ROOT/$ROUND_FILE"|"cat \"$ROOT/$ROUND_FILE\"")
       INPUT="$(codex_access_payload Read)"
       ;;
-    'cat .devlog/.round-current.md'|'cat ".devlog/.round-current.md"')
+    "cat $ROUND_FILE"|"cat \"$ROUND_FILE\"")
       [ "$CWD" != "$ROOT" ] || INPUT="$(codex_access_payload Read)"
       ;;
   esac
@@ -51,7 +53,7 @@ if [ "$TOOL_NAME" = apply_patch ]; then
   CWD="$(json_str_field "$INPUT" cwd)"
   [ -n "$CWD" ] || CWD="$ROOT"
   PATCH="$COMMAND"
-  if printf '%s\n' "$PATCH" | awk -v cwd="$CWD" -v root="$ROOT" '
+  if printf '%s\n' "$PATCH" | awk -v cwd="$CWD" -v root="$ROOT" -v round_file="$ROUND_FILE" '
     function normalize(path, count, parts, stack, depth, i, result) {
       if (substr(path, 1, 1) != "/") path = cwd "/" path
       count = split(path, parts, "/")
@@ -68,7 +70,7 @@ if [ "$TOOL_NAME" = apply_patch ]; then
     NR == 1 && $0 != "*** Begin Patch" { bad = 1 }
     /^\*\*\* (Add|Update|Delete) File: / {
       path = $0; sub(/^\*\*\* (Add|Update|Delete) File: /, "", path)
-      if ($0 ~ /^\*\*\* Delete File: / || normalize(path) != normalize(root "/.devlog/.round-current.md")) bad = 1
+      if ($0 ~ /^\*\*\* Delete File: / || normalize(path) != normalize(root "/" round_file)) bad = 1
       files++
     }
     /^\*\*\* Move to: / { bad = 1 }
@@ -81,7 +83,7 @@ fi
 printf '%s' "$INPUT" | bash "$PLUGIN_SCRIPTS/segment-watch.sh"
 RC=$?
 if [ "$RC" -eq 2 ]; then
-  printf 'Codex CLI：先用 cat "%s/.devlog/.round-current.md" 讀取，再用 apply_patch 只修改這份檔案；完成後重試原工具。\n' "$ROOT" >&2
+  printf 'Codex CLI：先用 cat "%s/%s" 讀取，再用 apply_patch 只修改這份檔案；完成後重試原工具。\n' "$ROOT" "$ROUND_FILE" >&2
   exit 2
 fi
 exit 0

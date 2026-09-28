@@ -475,6 +475,36 @@ NONGIT_DIR="$TMP_ROOT/nongit"
 mkdir -p "$NONGIT_DIR"
 assert_eq "unclosed fence still yields a claim (MISMATCH, not NO_CLAIM)" "MISMATCH" "$(workspace_claim_state "$NONGIT_DIR" "$TMP_ROOT/unclosed-fence.md")"
 
+WS_FILE="$TMP_ROOT/per-platform-claim.md"
+cat > "$WS_FILE" <<'EOF'
+## Round 1 — 2026-09-27T10:00:00+0800
+
+### Handoff
+<handoff>
+<workspace>
+非 git 工作區
+</workspace>
+</handoff>
+
+### Status
+IN_PROGRESS
+
+## Round 2 — 2026-09-27T10:05:00+0800 · codex
+
+### Handoff
+<handoff>
+<workspace>
+bogus
+</workspace>
+</handoff>
+
+### Status
+IN_PROGRESS
+EOF
+assert_eq "claude claim ignores codex's later round" "MATCH" "$(workspace_claim_state "$NONGIT_DIR" "$WS_FILE" claude)"
+assert_eq "claude is the default platform" "MATCH" "$(workspace_claim_state "$NONGIT_DIR" "$WS_FILE")"
+assert_eq "codex claim sees its own round" "MISMATCH" "$(workspace_claim_state "$NONGIT_DIR" "$WS_FILE" codex)"
+
 cat > "$TMP_ROOT/unclosed-fence-segments.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
@@ -515,30 +545,61 @@ devlog_merge_round_current "$MERGE_MAIN" "$MERGE_CUR"
 AFTER="$(cat "$MERGE_MAIN")"
 if [ "$BEFORE" = "$AFTER" ]; then echo "PASS: merge no-op when round-current absent"; else echo "FAIL: merge no-op when round-current absent"; FAIL=1; fi
 
-# --- devlog_reopen_last_round ------------------------------------------
-REOPEN_MAIN="$TMP_ROOT/.devlog/reopen-main.md"
-REOPEN_CUR="$TMP_ROOT/.devlog/reopen-current.md"
-rm -f "$REOPEN_CUR"
+# --- per-platform round lookup --------------------------------------------
+MP="$TMP_ROOT/mp.md"
+cat > "$MP" <<'EOF'
+# 專案摘要
 
-printf '## Round 1 — 2026-09-17T09:00:00+0800\n\n### Summary\ns1\n\n### Handoff\n#### 現況\nc1\n\n### Status\nDONE\n\n## Round 2 — 2026-09-17T09:10:00+0800\n\n### User Input\n```text\n問題？\n```\n\n### Summary\ns2\n\n### Handoff\n#### 現況\nBLOCKED 等答案\n\n### Status\nBLOCKED\n' > "$REOPEN_MAIN"
+## Round 1 — 2026-09-27T10:00:00+0800
 
-devlog_reopen_last_round "$REOPEN_MAIN" "$REOPEN_CUR"
-RC=$?
-assert_exit "reopen: returns 0 when a round exists" 0 "$RC"
+### Status
+DONE
 
-REOPENED="$(cat "$REOPEN_CUR" 2>/dev/null || echo '')"
-assert_contains "reopen: round 2 moved into round-current" "## Round 2" "$REOPENED"
-assert_not_contains "reopen: round 1 not pulled along" "## Round 1" "$REOPENED"
+## Round 3 — 2026-09-27T10:05:00+0800 · codex
 
-REMAINING="$(cat "$REOPEN_MAIN")"
-assert_contains "reopen: round 1 stays in main file" "## Round 1" "$REMAINING"
-assert_not_contains "reopen: round 2 removed from main file" "## Round 2" "$REMAINING"
+### Status
+IN_PROGRESS
+
+## Round 2 — 2026-09-27T10:01:00+0800
+
+```text
+## Round 9 — fenced · codex
+```
+
+### Status
+DONE
+
+## Round 4 — 2026-09-27T10:09:00+0800 · cursor
+
+### Status
+DONE
+EOF
+assert_eq "claude rounds" "3 1
+13 2" "$(devlog_list_round_starts_of "$MP" claude)"
+assert_eq "codex rounds (fenced ignored)" "8 3" "$(devlog_list_round_starts_of "$MP" codex)"
+assert_eq "cursor rounds" "22 4" "$(devlog_list_round_starts_of "$MP" cursor)"
+assert_eq "by number: middle round" "8" "$(devlog_round_start_by_number "$MP" 3)"
+assert_eq "by number: missing" "" "$(devlog_round_start_by_number "$MP" 8)"
+
+# --- devlog_reopen_round ----------------------------------------------------
+REOPEN_MAIN="$TMP_ROOT/reopen.md"
+REOPEN_CUR="$TMP_ROOT/reopen-cur.md"
+cp "$MP" "$REOPEN_MAIN"
+devlog_reopen_round "$REOPEN_MAIN" "$REOPEN_CUR" 3
+assert_eq "reopen middle: returns 0" "0" "$?"
+assert_contains "reopen middle: current has round 3" "## Round 3 — 2026-09-27T10:05:00+0800 · codex" "$(cat "$REOPEN_CUR")"
+assert_not_contains "reopen middle: devlog lost round 3" "## Round 3 " "$(cat "$REOPEN_MAIN")"
+assert_eq "reopen middle: others stay in order" "1 2 4 " "$(devlog_list_round_starts "$REOPEN_MAIN" | awk '{printf "%s ", $2}')"
+devlog_reopen_round "$REOPEN_MAIN" "$TMP_ROOT/should-not-exist.md" 3
+assert_eq "reopen missing: returns 1" "1" "$?"
+assert_file_absent "reopen missing: no current file" "$TMP_ROOT/should-not-exist.md"
 
 # reopen on a file with no round at all fails without touching either file
+mkdir -p "$TMP_ROOT/.devlog"
 EMPTY_MAIN="$TMP_ROOT/.devlog/empty-main.md"
 : > "$EMPTY_MAIN"
 rm -f "$TMP_ROOT/.devlog/should-not-exist.md"
-devlog_reopen_last_round "$EMPTY_MAIN" "$TMP_ROOT/.devlog/should-not-exist.md"
+devlog_reopen_round "$EMPTY_MAIN" "$TMP_ROOT/.devlog/should-not-exist.md" 1
 assert_exit "reopen: returns 1 when no round exists" 1 $?
 assert_file_absent "reopen: no round-current created on failure" "$TMP_ROOT/.devlog/should-not-exist.md"
 

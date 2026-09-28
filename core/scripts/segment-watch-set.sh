@@ -24,21 +24,25 @@ case "$SECONDS_ARG" in
     ;;
 esac
 
-if [ -f "$DEVLOG_DIR/.segment-state" ]; then
-  json_int_set "$DEVLOG_DIR/.segment-state" max_silent_seconds "$SECONDS_ARG"
-  APPLIED="$(json_int_get "$DEVLOG_DIR/.segment-state" max_silent_seconds)"
+APPLIED_ANY=0
+for SEG in "$DEVLOG_DIR"/.segment-state "$DEVLOG_DIR"/.segment-state@*; do
+  [ -f "$SEG" ] || continue
+  APPLIED_ANY=1
+  json_int_set "$SEG" max_silent_seconds "$SECONDS_ARG"
+  APPLIED="$(json_int_get "$SEG" max_silent_seconds)"
   if [ "$APPLIED" != "$SECONDS_ARG" ]; then
     # Existing file didn't have a matching max_silent_seconds key to patch
     # (malformed / hand-edited) -- rebuild it fresh rather than leave the
     # requested value silently unapplied.
-    LAST_EPOCH="$(json_int_get "$DEVLOG_DIR/.segment-state" last_change_epoch)"
-    LAST_SUM="$(json_str_get "$DEVLOG_DIR/.segment-state" last_seen_cksum)"
-    SESSION="$(json_str_get "$DEVLOG_DIR/.segment-state" session_id)"
+    LAST_EPOCH="$(json_int_get "$SEG" last_change_epoch)"
+    LAST_SUM="$(json_str_get "$SEG" last_seen_cksum)"
+    SESSION="$(json_str_get "$SEG" session_id)"
     case "$LAST_EPOCH" in ''|*[!0-9]*) LAST_EPOCH=0 ;; esac
     printf '%s\n' "{\"last_change_epoch\": ${LAST_EPOCH}, \"last_seen_cksum\": \"${LAST_SUM}\", \"max_silent_seconds\": ${SECONDS_ARG}, \"session_id\": \"${SESSION}\"}" \
-      > "$DEVLOG_DIR/.segment-state" || exit 1
+      > "$SEG" || exit 1
   fi
-else
+done
+if [ "$APPLIED_ANY" -eq 0 ]; then
   printf '%s\n' "{\"last_change_epoch\": 0, \"last_seen_cksum\": \"\", \"max_silent_seconds\": ${SECONDS_ARG}, \"session_id\": \"\"}" \
     > "$DEVLOG_DIR/.segment-state" || exit 1
 fi

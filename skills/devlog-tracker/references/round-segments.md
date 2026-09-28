@@ -57,8 +57,8 @@ DONE
 
 主路徑仍是判斷何時寫段落，不是照時間機械切段。另外有一道保底：`/devlog-tracker:start`
 之後，同一輪若連續 10 分鐘（`max_silent_seconds`，預設 600）都沒改
-`.devlog/.round-current.md`（目前開著的這一輪，見 `docs/design/round-current-split.md`），
-下一個工具會被 PreToolUse hook 擋住。被擋時先 **Read** `.devlog/.round-current.md`，再用
+你所在平台的 round 檔（見 `SKILL.md`「檔案位置」；目前開著的這一輪，見 `docs/design/round-current-split.md`），
+下一個工具會被 PreToolUse hook 擋住（訊息會寫出確切檔名）。被擋時先 **Read** 那個 round 檔，再用
 Edit／StrReplace **追加**一段 `### 段落`（一行也可以）；**禁止**用 Write 覆寫整份檔。
 寫了任何內容計時就歸零。不要用 Bash 繞過。沒呼叫工具就不會響。Claude Code
 dynamic workflow／subagent 的 PreToolUse 若帶非空 `agent_id`，此閥門會跳過（它們

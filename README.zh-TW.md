@@ -75,9 +75,9 @@ npx devlog-tracker init --codex
 
 - 互動模式：有 hook 待審核時，Codex 啟動時會顯示警告。用 `/hooks` 檢查並信任它們。之後 hook 的設定有變動（例如重跑 `init` 讓路徑或指令改變）也可能要再審核一次。
 - 非互動的 `codex exec`（CI、腳本）：未審核的 hook 會被靜默略過。`--dangerously-bypass-hook-trust` 可以讓它們跑起來，但那個旗標會略過所有 hook 的信任檢查，只適合已經自己確認過 hook 來源的自動化環境。
-- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
+- 想確認有沒有生效：`start` 之後送一則訊息，看 `.devlog/.round-current@codex.md` 有沒有出現這一輪的 User Input skeleton；沒有就代表 hook 沒被執行。
 
-沉默或工作區檢查擋住工具時，Codex 可用單一 `cat <專案>/.devlog/.round-current.md` 指令讀取當輪，再用 `apply_patch` 修改；封鎖訊息會附上專案路徑。
+沉默或工作區檢查擋住工具時，Codex 可用單一 `cat <專案>/.devlog/.round-current@codex.md` 指令讀取當輪，再用 `apply_patch` 修改；封鎖訊息會附上專案路徑。
 
 Codex 的 `Interrupt` hook 會把主執行緒被中斷的輪次標成 `INTERRUPTED`。Codex 沒有處理其他異常結束的 `StopFailure` 事件；未收尾輪次會在下次訊息、下次 session start，或 `SessionEnd` 執行時補記。Codex 的 `SessionEnd` 原因目前只有 `other`，切換對話後也可能等閒置一段時間才觸發。正常輪次仍由 `Stop` hook 強制收尾。從已安裝專案的子目錄啟動 Codex 時，hook 也會找到安裝根目錄。
 
@@ -100,6 +100,8 @@ npx devlog-tracker init
 沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
 會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
+
+Claude Code、Codex、Cursor 可以在同一個工作樹同時使用。三者共用一份 `devlog.md`，但每個平台各自保有開著的輪次（Claude Code 是 `.devlog/.round-current.md`，其他平台是 `.round-current@codex.md`／`.round-current@cursor.md`）與各自的 Session Handoff；輪次號碼跨平台不重複，Codex／Cursor 的 Round 標題結尾帶 ` · codex`／` · cursor`。有兩個以上平台的輪次開著時，`clean`、`keep`、`keep-all` 會拒絕執行。同一個平台在同一個工作樹開多個視窗不支援——它們共用同一格。各平台的安裝要一起升級到同一個 devlog-tracker 版本：某個平台還停在舊版時，它仍寫共用的無後綴檔案，會破壞各平台分開的狀態。細節見 [`docs/design/multi-platform-concurrency.md`](docs/design/multi-platform-concurrency.md)。
 
 `.devlog-tracker/` 放的是安裝進專案的程式；`.devlog/` 放的是這個專案的紀錄資料，執行 start 指令後才會建立。因此 `npx init` 後先看到 `.devlog-tracker/` 是預期行為，單跑 `init` 不會開始記錄。
 
@@ -214,7 +216,7 @@ Stop hook 會做這些事：
 
 ### 升級到 XML Handoff
 
-舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑對應的 migrate 指令（Claude plugin 用 `/devlog-tracker:migrate`，Codex 用 `$devlog-migrate`；底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、開著的 Round（`.round-current.md`）與 `handoff.md`／`handoff.<branch>.md`，每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，請更新 plugin 或重跑 `npx devlog-tracker init`，再使用對應的 start 指令（Claude plugin 用 `/devlog-tracker:start`，Codex 用 `$devlog-start`）。
+舊輪次是 `####` 小節格式，讀取端照樣相容。archive、keep 與 lessons 檔（`devlog.archive.md`、`devlog.<name>.md`、`devlog.lessons.*.md`）永遠不會被改寫。當 Stop hook 在收尾時擋下舊格式的 Handoff，訊息會叫 agent 自己跑對應的 migrate 指令（Claude plugin 用 `/devlog-tracker:migrate`，Codex 用 `$devlog-migrate`；底層是 `migrate-handoff.sh`）再重新結束這一輪——一般情況不用你動手。migrate 會直接改寫 `devlog.md`、分支 devlog 檔、每個平台開著的 Round（`.round-current.md`、`.round-current@codex.md`、`.round-current@cursor.md`）與交接檔（`handoff.md`／`handoff.<branch>.md` 及其 `@codex`／`@cursor` 版本），每個改過的檔旁邊留一份 `*.pre-migrate` 備份；無法精確轉換的輪次保留原樣，列在 `SKIP` 行。如果 agent 一直寫舊格式、沒有照著修，請更新 plugin 或重跑 `npx devlog-tracker init`，再使用對應的 start 指令（Claude plugin 用 `/devlog-tracker:start`，Codex 用 `$devlog-start`）。
 
 ## Hook 會自動做的事
 
@@ -243,7 +245,7 @@ Stop hook 會做這些事：
 
 #### 段落記錄
 
-長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 10 分鐘沒改 `.round-current.md`，`PreToolUse` hook 會擋住下一個工具；先 Read 再 Edit／StrReplace 追加一段（不要 Write 覆寫整檔）。門檻可用 `/devlog-tracker:segment-watch <時間長度>` 調整。Claude Code subagent／dynamic workflow（PreToolUse 帶 `agent_id`）不套用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
+長輪不要憋到最後，邊做邊寫 `### 段落`。同一輪連續約 10 分鐘沒改開著的 round 檔（`.round-current.md`；Codex／Cursor 是 `.round-current@codex.md`／`.round-current@cursor.md`），`PreToolUse` hook 會擋住下一個工具；先 Read 再 Edit／StrReplace 追加一段（不要 Write 覆寫整檔）。門檻可用 `/devlog-tracker:segment-watch <時間長度>` 調整。Claude Code subagent／dynamic workflow（PreToolUse 帶 `agent_id`）不套用父輪這道閥。細節見 [`docs/design/segment-watch.md`](docs/design/segment-watch.md)。
 
 #### Checkpoint Mode
 

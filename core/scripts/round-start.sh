@@ -29,12 +29,7 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
-SPAN_FILE="$DEVLOG_DIR/.span-open"
 CHECKPOINT_FILE="$DEVLOG_DIR/.checkpoint-state"
-SEGMENT_FILE="$DEVLOG_DIR/.segment-state"
-ROUND_OPEN="$DEVLOG_DIR/.round-open"
-AWAITING_FILE="$DEVLOG_DIR/.awaiting-reply"
 ADVISORY_FILE="$DEVLOG_DIR/.lessons-advisory-state"
 
 devlog_lock_acquire
@@ -59,11 +54,9 @@ if [ -f "$AWAITING_FILE" ]; then
   case "$AWAIT_ROUND" in
     ''|*[!0-9]*) AWAIT_ROUND='' ;;
   esac
-  if [ -n "$AWAIT_ROUND" ] && [ -f "$DEVLOG_FILE" ]; then
-    CURRENT_LAST="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $2 }')"
-    if [ "$CURRENT_LAST" = "$AWAIT_ROUND" ]; then
-      FOLD_ROUND="$AWAIT_ROUND"
-    fi
+  if [ -n "$AWAIT_ROUND" ] && [ -f "$DEVLOG_FILE" ] \
+    && [ -n "$(devlog_fold_round_start "$DEVLOG_FILE" "$AWAIT_ROUND" "$DEVLOG_PLATFORM")" ]; then
+    FOLD_ROUND="$AWAIT_ROUND"
   fi
 fi
 
@@ -155,7 +148,7 @@ if [ "$SPAN_SKIP" -eq 1 ]; then
 fi
 
 if [ "$TASK_NOTIF" -eq 1 ] && [ -z "$FOLD_ROUND" ] && [ "$SPAN_SKIP" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; then
-  TASK_NOTIF_LAST="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $2 }')"
+  TASK_NOTIF_LAST="$(devlog_list_round_starts_of "$DEVLOG_FILE" "$DEVLOG_PLATFORM" | awk 'END { print $2 }')"
   case "$TASK_NOTIF_LAST" in
     ''|*[!0-9]*) : ;;
     *)
@@ -165,18 +158,17 @@ if [ "$TASK_NOTIF" -eq 1 ] && [ -z "$FOLD_ROUND" ] && [ "$SPAN_SKIP" -eq 0 ] && 
   esac
 fi
 
-MISMATCH_FILE="$DEVLOG_DIR/.workspace-mismatch"
 rm -f "$MISMATCH_FILE" 2>/dev/null || true
 if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; then
-  CLAIM_ST="$(workspace_claim_state "$PROJECT_DIR" "$DEVLOG_FILE" 2>/dev/null || echo NO_CLAIM)"
+  CLAIM_ST="$(workspace_claim_state "$PROJECT_DIR" "$DEVLOG_FILE" "$DEVLOG_PLATFORM" 2>/dev/null || echo NO_CLAIM)"
   if [ "$CLAIM_ST" = "MISMATCH" ]; then
-    LAST_START="$(devlog_list_round_starts "$DEVLOG_FILE" | awk 'END { print $1 }')"
+    LAST_START="$(devlog_list_round_starts_of "$DEVLOG_FILE" "$DEVLOG_PLATFORM" | awk 'END { print $1 }')"
     LAST_END="$(devlog_block_end "$DEVLOG_FILE" "$LAST_START")"
     CLAIMED_WS="$(devlog_round_workspace_body "$DEVLOG_FILE" "$LAST_START" "$LAST_END")"
     LIVE_WS="$(workspace_snapshot "$PROJECT_DIR")"
     if [ -n "$LIVE_WS" ]; then
       printf '%s\n' "$LIVE_WS" > "$MISMATCH_FILE" 2>/dev/null || true
-      printf '%s\n' "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。"
+      printf '%s\n' "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。先在這一輪追加 ### 段落，寫宣稱 vs 實際（實際用下面「實際」逐字內容），再依實際工作樹行動，不要照上一輪「現況／下一步」的字面。（若同一工作樹還有其他平台在跑，差異可能來自它。）"
       printf '\n宣稱：\n%s\n\n實際：\n%s\n' "$CLAIMED_WS" "$LIVE_WS"
 
       if [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then
@@ -188,7 +180,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ]; t
 fi
 
 if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ] && [ -f "$DEVLOG_DIR/.lessons-enabled" ]; then
-  BLOCKED_ROUND_STARTS="$(devlog_list_round_starts "$DEVLOG_FILE")"
+  BLOCKED_ROUND_STARTS="$(devlog_list_round_starts_of "$DEVLOG_FILE" "$DEVLOG_PLATFORM")"
   BLOCKED_ROUND_COUNT="$(printf '%s\n' "$BLOCKED_ROUND_STARTS" | grep -c '.' || true)"
   BLOCKED_LAST_LINE="$(printf '%s\n' "$BLOCKED_ROUND_STARTS" | awk 'END { print }')"
   BLOCKED_LAST_START="$(printf '%s\n' "$BLOCKED_LAST_LINE" | awk '{ print $1 }')"
@@ -214,7 +206,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ] &&
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
-  devlog_reopen_last_round "$DEVLOG_FILE" "$ROUND_CURRENT" || : > "$ROUND_CURRENT"
+  devlog_reopen_round "$DEVLOG_FILE" "$ROUND_CURRENT" "$FOLD_ROUND" "$DEVLOG_PLATFORM" || : > "$ROUND_CURRENT"
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
   fi
@@ -251,6 +243,7 @@ if [ -n "$FOLD_ROUND" ]; then
   fi
 
   printf '{"round": %s, "opened_at": "%s", "file": "%s"}\n' "$FOLD_ROUND" "$FULL_TS" "${DEVLOG_FILE##*/}" > "$ROUND_OPEN" 2>/dev/null || true
+  [ "$DEVLOG_PLATFORM" = claude ] || printf '這一輪寫在 .devlog/%s。\n' "${ROUND_CURRENT##*/}"
 elif [ "$SPAN_SKIP" -eq 0 ]; then
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
@@ -285,11 +278,20 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
     ' "$DEVLOG_FILE" 2>/dev/null || echo 0)"
     case "$LAST_N" in ''|*[!0-9]*) LAST_N=0 ;; esac
   fi
+  # Another platform's still-open round already owns its number
+  # (docs/design/multi-platform-concurrency.md "Round numbering").
+  RESERVED_N="$(devlog_open_rounds | awk -F '\t' -v f="${DEVLOG_FILE##*/}" '
+    ($3 == f || $3 == "") && $2 ~ /^[0-9]+$/ && $2 + 0 > m { m = $2 + 0 }
+    END { print m + 0 }')"
+  case "$RESERVED_N" in ''|*[!0-9]*) RESERVED_N=0 ;; esac
+  [ "$RESERVED_N" -gt "$LAST_N" ] && LAST_N="$RESERVED_N"
   NEXT_N=$((LAST_N + 1))
   TS="$(date +%Y-%m-%dT%H:%M:%S%z 2>/dev/null || echo unknown)"
 
+  HEADING_SOURCE=""
+  [ "$DEVLOG_PLATFORM" = claude ] || HEADING_SOURCE=" · $DEVLOG_PLATFORM"
   {
-    printf '## Round %s — %s\n\n' "$NEXT_N" "$TS"
+    printf '## Round %s — %s%s\n\n' "$NEXT_N" "$TS" "$HEADING_SOURCE"
     printf '### User Input\n'
     printf '```text\n'
     printf '%s\n' "$PROMPT"
@@ -302,13 +304,14 @@ elif [ "$SPAN_SKIP" -eq 0 ]; then
 
   if [ -f "$ROUND_CURRENT" ]; then
     printf '{"round": %s, "opened_at": "%s", "file": "%s"}\n' "$NEXT_N" "$TS" "${DEVLOG_FILE##*/}" > "$ROUND_OPEN" 2>/dev/null || true
+    [ "$DEVLOG_PLATFORM" = claude ] || printf '這一輪寫在 .devlog/%s。\n' "${ROUND_CURRENT##*/}"
   fi
 fi
 
 if [ -f "$ROUND_CURRENT" ]; then
-  cksum < "$ROUND_CURRENT" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+  cksum < "$ROUND_CURRENT" > "$TURN_MARKER" 2>/dev/null || true
 else
-  echo "MISSING" > "$DEVLOG_DIR/.turn-start" 2>/dev/null || true
+  echo "MISSING" > "$TURN_MARKER" 2>/dev/null || true
 fi
 
 SPAN_WILL_PASS_THROUGH=0
@@ -335,6 +338,14 @@ if [ "$SPAN_WILL_PASS_THROUGH" -eq 0 ] && [ -z "$FOLD_ROUND" ] && [ -f "$CHECKPO
       json_int_set "$CHECKPOINT_FILE" rounds_since_checkpoint "$NEW_CP_ROUNDS"
       ;;
   esac
+fi
+
+CLAUDE_SEGMENT="$DEVLOG_DIR/.segment-state"
+if [ "$SEGMENT_FILE" != "$CLAUDE_SEGMENT" ] && [ ! -f "$SEGMENT_FILE" ] && [ -f "$CLAUDE_SEGMENT" ]; then
+  SEED_MAX="$(json_int_get "$CLAUDE_SEGMENT" max_silent_seconds)"
+  case "$SEED_MAX" in ''|*[!0-9]*) SEED_MAX=600 ;; esac
+  printf '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": %s, "session_id": ""}\n' \
+    "$SEED_MAX" > "$SEGMENT_FILE" 2>/dev/null || true
 fi
 
 if [ -f "$SEGMENT_FILE" ]; then

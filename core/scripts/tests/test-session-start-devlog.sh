@@ -603,6 +603,21 @@ else
   echo "FAIL: clear should be silent, got: $OUTPUT"; FAIL=1
 fi
 
+# --- other platform's handoff: noted by path, not injected ---------------
+touch "$DEVLOG_DIR/.platform-claimed"
+rm -f "$DEVLOG_DIR/handoff.md"
+printf '<session-handoff>\n<decisions>\n- codex only decision\n</decisions>\n</session-handoff>\n' > "$DEVLOG_DIR/handoff@codex.md"
+OUTPUT="$(echo '{"source":"startup"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "claude notes codex handoff" "另一個平台（codex）有未完成的交接：.devlog/handoff@codex.md" "$OUTPUT"
+assert_not_contains "claude does not inject codex handoff" "codex only decision" "$OUTPUT"
+OUTPUT="$(echo '{"source":"clear"}' | bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+if [ -z "$OUTPUT" ]; then
+  echo "PASS: clear stays silent with another platform's handoff"
+else
+  echo "FAIL: clear should be silent, got: $OUTPUT"; FAIL=1
+fi
+rm -f "$DEVLOG_DIR/handoff@codex.md"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0

@@ -13,7 +13,7 @@ description: 在專案的 .devlog/devlog.md 維護逐輪對話紀錄。使用者
 | 維度 | 契約（短） |
 |---|---|
 | **Requirements** | 強制記錄需 `.devlog/.enabled`（Claude plugin 用 `/devlog-tracker:start`，Codex 用 `$devlog-start`）。`/clear` 後不自動接續；要開工用對應的 continue 指令（或明確說接續）。Cursor／npx 安裝的 Codex 對照 `.devlog-tracker/commands/*.md`；Codex plugin 對照 plugin 根目錄的 `commands/*.md`。 |
-| **Output** | 編輯開著的 Round（`.round-current.md`）：必有 `### Summary`／`### Reply`／`### Handoff`／`### Status`；Handoff／Session Handoff 用 XML 標籤，標籤順序固定。格式見「每一輪的紀錄格式」。 |
+| **Output** | 編輯開著的 Round（你所在平台的 round 檔，見「檔案位置」）：必有 `### Summary`／`### Reply`／`### Handoff`／`### Status`；Handoff／Session Handoff 用 XML 標籤，標籤順序固定。格式見「每一輪的紀錄格式」。 |
 | **Invariants** | L1 寫回義務；聊天不旁白記錄動作；不改 User Input（除非 hook `（無 prompt）`）；不為同一則訊息再 append `## Round`；設計真相在 `docs/design/*.md`，不是 lessons。 |
 | **Validation** | Soft：收尾前自檢欄位與工作區。Hard：Stop／PreToolUse／workspace／files snapshot（見「每一輪的紀錄格式」末段與 hook 腳本）。fail-open／loop guard 見下方開關一節。 |
 | **Transformation** | 單次動作走對應 `commands/*.md`（start／continue／compact／keep／…）；本檔管協定與跨指令不變式，不重抄步驟。 |
@@ -34,7 +34,7 @@ devlog.md 是**跨 session 交接連續性**（決策軌跡、目前卡點、下
 
 `### Summary`／`### Reply`／`### Handoff`／`### 段落`／`## Checkpoint` 這些內容是寫給「下一個
 讀 devlog.md 的人」看的，不是講給正在對話的使用者聽的——這是兩件不同的事，收尾時
-用 Edit／Write 工具**安靜地**寫進 `.devlog/.round-current.md`（這一輪還開著時的
+用 Edit／Write 工具**安靜地**寫進你所在平台的 round 檔（見「檔案位置」；這一輪還開著時的
 實際編輯對象，收尾成功或被判定中斷後才會由 hook 自動併回 `.devlog/devlog.md`；
 工具呼叫本身不會顯示給使用者），寫完之後**不要**在聊天回覆裡再提這件事。
 
@@ -57,10 +57,10 @@ IN_PROGRESS，因為背景任務還在跑）。等它跑完我會回報結果並
 內部記錄動作。
 
 **最容易漏掉的一種情況：結尾的「這輪改了什麼」總結。** 這輪如果除了
-`.devlog/.round-current.md`（收尾後才會併入 `devlog.md`）還真的改了別的檔案
+你所在平台的 round 檔（見「檔案位置」；收尾後才會併入 `devlog.md`）還真的改了別的檔案
 （例如 README.md、程式碼），結尾照常給一兩句話總結改了什麼、下一步是什麼——
 但這個異動本身**不算在「改了什麼」裡面，永遠不要提**，因為那是記錄動作本身、
-不是產出。舉例：這輪同時修了 `README.md` 又寫了 `.devlog/.round-current.md`，
+不是產出。舉例：這輪同時修了 `README.md` 又寫了 round 檔，
 結尾只講「README.md 已更新成...」，不要接著再講「devlog 也已更新／已補上這輪的
 Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 
@@ -71,9 +71,12 @@ Summary/Handoff」——後面這句要整句刪掉，不是縮短。
 - 歸檔：`.devlog/devlog.archive.md`
 - 具名保存：`.devlog/devlog.<name>.md`（`/devlog-tracker:keep`／`keep-all` 搬走的主題檔，第一行是 `# Kept log`；SessionStart 不讀這些檔）
 - keep-all 備份：`.devlog/.keep-all-backup/<時間戳>/`（`/devlog-tracker:keep-all` 動手前的原始檔複本）
-- 當輪暫存：`.devlog/.round-current.md`（目前開著的那一輪，Claude 該讀寫的是這個檔，不是 `devlog.md`；
-  收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`）
+- 當輪暫存：`.devlog/.round-current.md`（Claude Code）／`.devlog/.round-current@codex.md`（Codex）／`.devlog/.round-current@cursor.md`（Cursor）：這一輪還沒收尾時寫在這裡，只寫你所在平台那一份；hook 的提示會寫出確切檔名。同一個工作樹可以有多個平台同時在跑，別的平台的檔案不要讀寫。
+  該讀寫的是這個檔，不是 `devlog.md`；收尾或中斷時由 hook 自動合併回 `devlog.md` 並清空，設計見 `docs/design/round-current-split.md`；多平台見 `docs/design/multi-platform-concurrency.md`。
+  Codex／Cursor 的 Round 標題結尾會帶 ` · codex`／` · cursor`（例如 `## Round 12 — <時間> · codex`），由 hook 寫入，不要自己加或刪。
+  下文說「你所在平台的 round 檔」就是指這一份。
 - Session Handoff 快照：`.devlog/handoff.md`（`main`／`master`）；其他分支 `.devlog/handoff.<branch>.md`。
+  Codex／Cursor 各有自己的一份，檔名在 `.md` 前加 `@codex`／`@cursor`（例如 `handoff@codex.md`、`handoff.<branch>@cursor.md`）。
   由 Stop 在 `IN_PROGRESS`／`BLOCKED` 收尾時覆寫、`DONE` 時刪除；Claude 只寫 Round 內的
   `### Session Handoff`，不要直接編這個檔。設計見 `docs/design/session-handoff-file.md`。
 - Cursor／Codex 上沒有 `/devlog-tracker:*` slash 選單。若專案是用 `npx devlog-tracker init` 裝的，指令對照就是 `.devlog-tracker/commands/*.md`：先 `source .devlog-tracker/env.sh`，再照使用者意圖對應的那份 `.md` 檔案的步驟做。Codex plugin 安裝時，指令對照在 plugin 根目錄的 `commands/*.md`，也可直接用 `$devlog-start` 等 skill。手動裝的專案見 README 安裝章節。
@@ -100,24 +103,25 @@ Claude Code 目前沒有正式、穩定的方式讓 hook 知道「這一輪有�
 開關啟動之後，才會進入下面這套強制流程：
 
 1. 使用者送出新訊息時，`UserPromptSubmit` hook（`core/scripts/round-start.sh`）
-   若開關開著，就在 `.devlog/.round-current.md` 寫入這一輪的 skeleton（`### User Input`
-   + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`。
+   若開關開著，就在你所在平台的 round 檔（見「檔案位置」）寫入這一輪的 skeleton（`### User Input`
+   + `Status: IN_PROGRESS`），並寫 `.devlog/.round-open`（Codex／Cursor 是 `.round-open@codex`／`.round-open@cursor`）。
+   Codex／Cursor 上 hook 會多印一行 `這一輪寫在 .devlog/<檔名>。`。
 2. Claude 編輯**同一個** Round：不要再 append 一個新的 `## Round`。不要改 User Input
    （除非裡面是 hook 的 `（無 prompt）` 占位）。補上 `### Summary` / `### Reply` / `### Handoff`，
    把 Status 改成 `DONE` / `IN_PROGRESS` / `BLOCKED`。這一輪還開著的時候，編輯的對象
-   是 `.devlog/.round-current.md`，不是 `devlog.md`——這一輪還沒併回去之前，
+   是你所在平台的 round 檔，不是 `devlog.md`——這一輪還沒併回去之前，
    `devlog.md` 完全看不到它。
 3. `Stop` hook（`core/scripts/enforce-devlog.sh`）若雜湊沒變、或最後一個 Round
    缺少 `### Summary` / `### Reply` / `### Handoff`，就用 exit code 2 擋下來。通過則刪掉
-   `.round-open`，並把 `.round-current.md` 的內容併回 `devlog.md` 尾端、清空
-   `.round-current.md`（設計見 `docs/design/round-current-split.md`）。
+   `.round-open`，並把 round 檔的內容併回 `devlog.md` 尾端、清空
+   round 檔（設計見 `docs/design/round-current-split.md`）。
 
 好處：就算工作做到一半被中斷（下一輪還沒開始就被使用者關掉、或換 session），
 只要**上一輪有正常結束過**，devlog.md 就一定留有當時的 Status（多半是 `IN_PROGRESS`
 或 `BLOCKED`）可以接續——這跟「plan 是否完成」完全無關，純粹綁在「這一輪有沒有結束」
 這個事件上。
 
-需要誠實說明的邊界：User Input 在送出當下就已經在 `.devlog/.round-current.md`
+需要誠實說明的邊界：User Input 在送出當下就已經在你所在平台的 round 檔
 （收尾成功或被判定中斷後才會併回 `devlog.md`）。正常結束時 Stop 仍保證有 Summary / Reply / Handoff。
 意外中斷會把同一塊標成 `INTERRUPTED`（process 被殺、或 mid-turn 取消時，Status 通常要等
 **下一則訊息**或**下次 SessionStart（startup / resume / clear / fork）**才補上）。
@@ -245,7 +249,7 @@ DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 
 下文提到「決策」「檔案」「工作區」「現況」「完成條件」「下一步」時，指的就是對應標籤。
 
-Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。
+Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。（hook 併回時若這個編號已被佔用——例如另一個平台同時開著一輪——會自動改成下一個空號，不用自己處理。）
 
 寫入原則：
 - **User Input：送出原文優先。** hook 在 `UserPromptSubmit` 已寫入送出當下的 prompt（截斷／遮罩規則見
@@ -356,8 +360,8 @@ Reply 一句（對使用者說過的話）、Handoff 只留 `<state>` 一句（�
 呼叫次數機械觸發。不要把段落內容再抄進 Summary 或 Handoff。
 
 另有一道保底：同一輪連續約 10 分鐘（可用 `/devlog-tracker:segment-watch <時間長度>`
-調整）沒改 `.devlog/.round-current.md`，下一個工具會被 PreToolUse hook 擋住，先
-Read `.devlog/.round-current.md` 再用 Edit／StrReplace 追加一段（**禁止**用 Write
+調整）沒改你所在平台的 round 檔（見「檔案位置」），下一個工具會被 PreToolUse hook 擋住，先
+Read 那個 round 檔再用 Edit／StrReplace 追加一段（**禁止**用 Write
 覆寫整份檔）。
 
 完整格式範例、寫入細則、跟 dynamic workflow／subagent 的例外情況，見
@@ -376,7 +380,8 @@ Reply Fold 讓它折進同一個 Round。
 
 **提問前**（純文字跨 turn；結束 turn 之前）：先用 Edit 在 `### Summary` 之前插入一段
 `### 段落（Claude 提問）` 記下問題原文，再跑
-`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh` 標記「下一則訊息大概是在
+`${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh`（前面要帶
+`DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>"`，完整指令見 `references/reply-fold.md`）標記「下一則訊息大概是在
 回答這個 Round」。使用者回答時 `round-start.sh` 會自動折成對應段落，不用手動
 處理。連續多輪一問一答（例如 grilling）時不必每題重寫 Summary／Reply／Handoff／
 Status，只有整場問答真正結束才收尾一次。
@@ -390,7 +395,7 @@ Status，只有整場問答真正結束才收尾一次。
 完成通知）反覆喚醒、不是使用者手動打字觸發的長任務，如果每個自動 tick 都當一
 輪強制寫，會逼出大量沒意義的紀錄或卡住整條自動化流程。只有**確定接下來會進入
 一連串自動續接**時才開（一般互動式對話不需要，也不應該開），用
-`/devlog-tracker:span` 建立 `.devlog/.span-open`，累積到門檻
+`/devlog-tracker:span` 建立 `.devlog/.span-open`（Codex／Cursor 是 `.span-open@codex`／`.span-open@cursor`），累積到門檻
 （`max_silent_ticks`）才強制寫一次；崩潰最多漏記固定數量的 tick，不是整段 span。
 
 JSON 格式、開關步驟、已知限制（分辨不出自動續接 vs 真人插話），見
@@ -493,4 +498,4 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 ## 無條件清空：`/devlog-tracker:clean`
 
-把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下（若有開著，內容讀自 `.devlog/.round-current.md`，不是已經清空的 `devlog.md`），重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。
+把 `devlog.md` 整份清空（含專案摘要與所有 Round 歷史），不搬移、不備份，不可復原。跟 compact／keep 不一樣：那兩個都是「搬去別的檔案保留」，clean 是真的丟棄。執行前一定要先問使用者、拿到明確的「清空」才動手；只有目前開著的那一輪會留下（若有開著，內容讀自該平台的 round 檔，不是已經清空的 `devlog.md`；同一工作樹有兩個以上平台的輪次開著時腳本會拒絕執行），重編成 `## Round 1`。步驟見 `commands/clean.md`。不要自動觸發。

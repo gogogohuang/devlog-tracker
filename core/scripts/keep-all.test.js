@@ -135,6 +135,23 @@ test('apply moves a cross-file topic into one file in time order and consumes ke
   assert.ok(fs.existsSync(path.join(backup, 'devlog.md')));
 });
 
+test('scan and apply keep platform-tagged rounds in chronological order', () => {
+  const d = setup({
+    'devlog.md': round(3, '2026-09-01T11:00:00+0800', 'DONE') + '\n' +
+      round(2, '2026-09-01T10:00:00+0800 · codex', 'DONE') + '\n' +
+      round(1, '2026-09-01T01:00:00Z · cursor', 'DONE'),
+  });
+  const c = ctx(d);
+  const s = scan(c);
+  assert.deepEqual(s.rounds.map(r => r.round), [1, 2, 3]);
+
+  apply(c, 'topic\t\t1,2,3\n', s.fingerprint, s.rounds.length);
+  const kept = read(d, 'devlog.topic.md');
+  assert.deepEqual([...kept.matchAll(/^## Round (\d+)/gm)].map(m => Number(m[1])), [1, 2, 3]);
+  assert.match(kept, /^## Round 1 — 2026-09-01T01:00:00Z · cursor$/m);
+  assert.match(kept, /^## Round 2 — 2026-09-01T10:00:00\+0800 · codex$/m);
+});
+
 test('apply deletes a branch file it emptied, but not an active branch or devlog.md', () => {
   const d = setup({
     'devlog.feat-main.md': '<!-- devlog-origin: branch=feat/main -->\n\n' + round(1, '2026-09-05T10:00:00+0800', 'IN_PROGRESS'),
@@ -227,4 +244,18 @@ test('apply clears .span-open only when its round moved out of current', () => {
   const k2 = [...s2.rounds.filter(r => r.file === 'devlog.a.md').map(r => r.id), ...idsOf(s2, 'devlog.md', [1])];
   apply(c, `b\t\t${k2.join(',')}\n`, s2.fingerprint, s2.rounds.length);
   assert.ok(!exists(d, '.span-open'));
+});
+
+test('apply clears a platform .span-open@codex when its round moved out of current', () => {
+  const d = world();
+  fs.writeFileSync(path.join(d, '.span-open@codex'), '{"round": 1, "ticks": 0}\n');
+  const c = ctx(d);
+  const s = scan(c);
+  const k = [...idsOf(s, 'devlog.topic.md', [5]), ...idsOf(s, 'devlog.other.md', [9]), ...idsOf(s, 'devlog.md', [2])].join(',');
+  apply(c, `a\t\t${k}\n`, s.fingerprint, s.rounds.length);
+  assert.ok(exists(d, '.span-open@codex'));
+  const s2 = scan(c);
+  const k2 = [...s2.rounds.filter(r => r.file === 'devlog.a.md').map(r => r.id), ...idsOf(s2, 'devlog.md', [1])];
+  apply(c, `b\t\t${k2.join(',')}\n`, s2.fingerprint, s2.rounds.length);
+  assert.ok(!exists(d, '.span-open@codex'));
 });

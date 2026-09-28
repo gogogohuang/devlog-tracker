@@ -394,7 +394,9 @@ compact rules. Do not invent a second compact mechanism.
   types that are not those names get recorded.
 - **Concurrent sessions** use a short `.devlog/.lock` around writes.
   Sessions can still interleave after the 2-second fail-open timeout;
-  the lock covers the common overlapping-write window.
+  the lock covers the common overlapping-write window. Different
+  platforms (Claude Code, Codex, Cursor) in one worktree keep separate
+  per-round state; see `multi-platform-concurrency.md`.
 - **Secrets in the prompt** — common provider-prefix tokens are masked
   (`sk-ant-*`, OpenAI-style `sk-…`, `ghp_` / `github_pat_`, Slack `xox*`,
   `AKIA*`, `Bearer …`, JWT-shaped `eyJ…`, PEM private keys). Truncation at

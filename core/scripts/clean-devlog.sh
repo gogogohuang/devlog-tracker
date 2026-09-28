@@ -17,8 +17,12 @@ devlog_resolve_paths "${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 MAIN="$DEVLOG_FILE"
-ROUND_OPEN="$DEVLOG_DIR/.round-open"
-ROUND_CURRENT="$DEVLOG_DIR/.round-current.md"
+OPEN_ROW="$(devlog_single_open_round)" || exit 1
+if [ -n "$OPEN_ROW" ]; then
+  OPEN_PLATFORM="${OPEN_ROW%%	*}"
+  ROUND_OPEN="$DEVLOG_DIR/$(devlog_platform_file .round-open '' "$OPEN_PLATFORM")"
+  ROUND_CURRENT="$DEVLOG_DIR/$(devlog_platform_file .round-current .md "$OPEN_PLATFORM")"
+fi
 # Post-split, devlog.md may legitimately not exist yet (a project's very
 # first round can still be open, with real content sitting only in
 # .round-current.md) — accept either devlog.md existing or .round-current.md
@@ -55,12 +59,14 @@ if [ "$HAS_OPEN" -eq 1 ]; then
   json_int_set "$ROUND_OPEN" round 1
   KEPT_ROUND=1
 else
-  rm -f "$MAIN" "$ROUND_CURRENT" || exit 1
+  rm -f "$MAIN" "$DEVLOG_DIR"/.round-current.md "$DEVLOG_DIR"/.round-current@*.md || exit 1
   KEPT_ROUND=0
 fi
 
-rm -f "$DEVLOG_DIR/.span-open" "$DEVLOG_DIR/.interrupted" "$DEVLOG_DIR/.awaiting-reply"
-rm -f "$HANDOFF_FILE"
+rm -f "$DEVLOG_DIR"/.span-open "$DEVLOG_DIR"/.span-open@* \
+  "$DEVLOG_DIR"/.interrupted "$DEVLOG_DIR"/.interrupted@* \
+  "$DEVLOG_DIR"/.awaiting-reply "$DEVLOG_DIR"/.awaiting-reply@*
+rm -f "$HANDOFF_STEM.md" "$HANDOFF_STEM"@*.md
 if [ -f "$DEVLOG_DIR/.checkpoint-state" ]; then
   json_int_set "$DEVLOG_DIR/.checkpoint-state" rounds_since_checkpoint 0
   json_int_set "$DEVLOG_DIR/.checkpoint-state" checkpoint_marker_count 0

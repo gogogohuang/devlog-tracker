@@ -58,17 +58,19 @@ assert_single_json "empty workspace single json" "$EMPTY"
 SUBMIT="$TMP/submit"
 mkdir -p "$SUBMIT/.devlog"
 touch "$SUBMIT/.devlog/.enabled"
+touch "$SUBMIT/.devlog/.platform-claimed"
 OUT="$(printf '{"workspace_roots":["%s"],"prompt":"hello","session_id":"cursor-1"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-submit-prompt.sh")"
 case "$OUT" in *'"continue":true'*) echo "PASS: submit continues" ;; *) echo "FAIL: submit [$OUT]"; FAIL=1 ;; esac
 assert_single_json "submit single json" "$OUT"
-grep -q 'hello' "$SUBMIT/.devlog/.round-current.md" && echo "PASS: submit writes round" || { echo "FAIL: submit round"; FAIL=1; }
-ROUNDS="$(grep -c '^## Round ' "$SUBMIT/.devlog/.round-current.md" || true)"
+grep -q 'hello' "$SUBMIT/.devlog/.round-current@cursor.md" && echo "PASS: submit writes round" || { echo "FAIL: submit round"; FAIL=1; }
+ROUNDS="$(grep -c '^## Round ' "$SUBMIT/.devlog/.round-current@cursor.md" || true)"
 if [ "$ROUNDS" -eq 1 ]; then echo "PASS: submit writes one round"; else echo "FAIL: submit round count [$ROUNDS]"; FAIL=1; fi
 
 # submit prompt with stale 工作區 forwards additional_context
 MIS="$TMP/mismatch-submit"
 mkdir -p "$MIS/.devlog"
 touch "$MIS/.devlog/.enabled"
+touch "$MIS/.devlog/.platform-claimed"
 git -C "$MIS" init -q -b main
 git -C "$MIS" config user.email test@example.com
 git -C "$MIS" config user.name test
@@ -76,7 +78,7 @@ echo hello > "$MIS/a.txt"
 git -C "$MIS" add a.txt
 git -C "$MIS" commit -q -m init
 cat > "$MIS/.devlog/devlog.md" <<'EOF'
-## Round 1 — 2026-09-11T00:00:00+08:00
+## Round 1 — 2026-09-11T00:00:00+08:00 · cursor
 
 ### Handoff
 #### 工作區
@@ -93,17 +95,17 @@ OUT="$(printf '{"workspace_roots":["%s"],"prompt":"keep going","session_id":"cur
 case "$OUT" in *'"continue":true'*) echo "PASS: mismatch submit continues" ;; *) echo "FAIL: mismatch submit [$OUT]"; FAIL=1 ;; esac
 case "$OUT" in *'"additional_context"'*工作區*) echo "PASS: mismatch submit additional_context" ;; *) echo "FAIL: mismatch context [$OUT]"; FAIL=1 ;; esac
 assert_single_json "mismatch submit single json" "$OUT"
-[ -f "$MIS/.devlog/.workspace-mismatch" ] && echo "PASS: mismatch submit writes marker" || { echo "FAIL: no cursor marker"; FAIL=1; }
+[ -f "$MIS/.devlog/.workspace-mismatch@cursor" ] && echo "PASS: mismatch submit writes marker" || { echo "FAIL: no cursor marker"; FAIL=1; }
 
 # preToolUse allowlists writes to the devlog and denies expired other tools
 NOW="$(date +%s)"
 OLD=$((NOW - 1000))
-SUM="$(cksum < "$SUBMIT/.devlog/.round-current.md" | tr -d '\n')"
-printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "cursor-1"}\n' "$OLD" "$SUM" > "$SUBMIT/.devlog/.segment-state"
-OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
+SUM="$(cksum < "$SUBMIT/.devlog/.round-current@cursor.md" | tr -d '\n')"
+printf '{"last_change_epoch": %s, "last_seen_cksum": "%s", "max_silent_seconds": 900, "session_id": "cursor-1"}\n' "$OLD" "$SUM" > "$SUBMIT/.devlog/.segment-state@cursor"
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Write","tool_input":{"file_path":"%s/.devlog/.round-current@cursor.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
 case "$OUT" in *'"permission":"deny"'*) echo "FAIL: devlog write denied"; FAIL=1 ;; *) echo "PASS: devlog write allowed" ;; esac
 assert_single_json "preTool write single json" "$OUT"
-OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"StrReplace","tool_input":{"file_path":"%s/.devlog/.round-current.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
+OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"StrReplace","tool_input":{"file_path":"%s/.devlog/.round-current@cursor.md"},"session_id":"cursor-1"}' "$SUBMIT" "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
 case "$OUT" in *'"permission":"deny"'*) echo "FAIL: StrReplace devlog denied"; FAIL=1 ;; *) echo "PASS: StrReplace devlog allowed" ;; esac
 assert_single_json "preTool StrReplace single json" "$OUT"
 OUT="$(printf '{"workspace_roots":["%s"],"tool_name":"Bash","tool_input":{},"session_id":"cursor-1"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-pre-tool.sh")"
@@ -122,15 +124,15 @@ case "$OUT" in *followup_message*) echo "FAIL: non-completed stop enforced [$OUT
 assert_single_json "non-completed stop single json" "$OUT"
 
 # aborted stop and session end close the open round
-printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open"
+printf '%s\n' '{"round": 1, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open@cursor"
 OUT="$(printf '{"workspace_roots":["%s"],"status":"aborted"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-stop.sh")"
 grep -q 'INTERRUPTED' "$SUBMIT/.devlog/devlog.md" && echo "PASS: aborted closes round" || { echo "FAIL: aborted"; FAIL=1; }
 assert_single_json "aborted stop single json" "$OUT"
 
 # sessionEnd delegates its reason to the existing close helper
-printf '\n## Round 2 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current.md"
-printf '%s\n' '{"round": 2, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open"
-cksum < "$SUBMIT/.devlog/.round-current.md" > "$SUBMIT/.devlog/.turn-start"
+printf '\n## Round 2 — now\n\n### Status\nIN_PROGRESS\n' > "$SUBMIT/.devlog/.round-current@cursor.md"
+printf '%s\n' '{"round": 2, "opened_at": "now"}' > "$SUBMIT/.devlog/.round-open@cursor"
+cksum < "$SUBMIT/.devlog/.round-current@cursor.md" > "$SUBMIT/.devlog/.turn-start@cursor"
 OUT="$(printf '{"workspace_roots":["%s"],"reason":"windowClosed"}' "$SUBMIT" | bash "$SCRIPT_DIR/on-session-end.sh")"
 grep -q 'SessionEnd:windowClosed' "$SUBMIT/.devlog/devlog.md" && echo "PASS: session end reason" || { echo "FAIL: session end"; FAIL=1; }
 assert_single_json "sessionEnd single json" "$OUT"
@@ -146,17 +148,18 @@ ROOT="$(printf '{"workspace_roots":["%s"]}' "$SUBMIT" | PATH="$PATH_NO_JQ" bash 
 if [ "$ROOT" = "$SUBMIT" ]; then echo "PASS: project-dir without jq"; else echo "FAIL: project-dir without jq [$ROOT]"; FAIL=1; fi
 
 # tool interruption marker
-rm -f "$SUBMIT/.devlog/.interrupted"
+rm -f "$SUBMIT/.devlog/.interrupted@cursor"
 OUT="$(printf '{"workspace_roots":["%s"],"is_interrupt":true}' "$SUBMIT" | bash "$SCRIPT_DIR/on-tool-failure.sh")"
-[ -f "$SUBMIT/.devlog/.interrupted" ] && echo "PASS: tool interruption marked" || { echo "FAIL: interrupt marker"; FAIL=1; }
+[ -f "$SUBMIT/.devlog/.interrupted@cursor" ] && echo "PASS: tool interruption marked" || { echo "FAIL: interrupt marker"; FAIL=1; }
 assert_single_json "toolFailure single json" "$OUT"
 
 # --- no-jq session_id must reach segment-state via round-start ------------
 NOJQ_HOME="$TMP/nojq_home"
 mkdir -p "$NOJQ_HOME/.devlog" "$TMP/nojq_path"
 touch "$NOJQ_HOME/.devlog/.enabled"
+touch "$NOJQ_HOME/.devlog/.platform-claimed"
 printf '%s\n' '{"last_change_epoch": 0, "last_seen_cksum": "", "max_silent_seconds": 600, "session_id": ""}' \
-  > "$NOJQ_HOME/.devlog/.segment-state"
+  > "$NOJQ_HOME/.devlog/.segment-state@cursor"
 CLEAN_PATH="$TMP/nojq_path"
 # Resolve real binaries (zsh `command -v` may return aliases / builtins).
 for cmd in bash sh cksum date grep sed cat mkdir tr mktemp rm head awk touch \
@@ -171,7 +174,7 @@ done
 OUT="$(printf '{"workspace_roots":["%s"],"prompt":"nojq-hi","session_id":"cursor-nojq"}' "$NOJQ_HOME" \
   | env PATH="$CLEAN_PATH" bash "$SCRIPT_DIR/on-submit-prompt.sh")"
 case "$OUT" in *'"continue":true'*) echo "PASS: nojq submit continues" ;; *) echo "FAIL: nojq submit [$OUT]"; FAIL=1 ;; esac
-SEG_SID="$(grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$NOJQ_HOME/.devlog/.segment-state" 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
+SEG_SID="$(grep -o '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' "$NOJQ_HOME/.devlog/.segment-state@cursor" 2>/dev/null | head -1 | sed 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true)"
 if [ "$SEG_SID" = "cursor-nojq" ]; then
   echo "PASS: nojq session_id stored in segment-state"
 else

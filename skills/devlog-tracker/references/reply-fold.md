@@ -33,7 +33,7 @@
 
 1. 先用 Edit 在這個 Round 的 `### Summary` 之前插入一個小段落，記下**這次
    問的問題原文**（跟自動折入答案用同一種格式，方便前後對照）。這一步的
-   編輯對象是 `.devlog/.round-current.md`——提問當下這一輪還沒收尾，本來就
+   編輯對象是你所在平台的 round 檔（見 `SKILL.md`「檔案位置」）——提問當下這一輪還沒收尾，本來就
    還沒併回 `.devlog/devlog.md`（見 `docs/design/round-current-split.md`）：
 
    `````markdown
@@ -52,24 +52,24 @@
 3. 用 Bash 執行：
 
 ```bash
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh"
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/await-open.sh"
 ```
 
-這會寫入 `.devlog/.awaiting-reply`，記住「下一則訊息大概是在回答這個
+這會寫入 `.devlog/.awaiting-reply`（Codex／Cursor 是 `.awaiting-reply@codex`／`.awaiting-reply@cursor`），記住「下一則訊息大概是在回答這個
 Round」。不需要使用者下任何指令，也不用手寫這個 JSON。
 
 上面第 2 步已經讓這一輪正常收尾（Summary／Reply／Handoff／Status 都有效），所以
 這個 turn 結束時它會照一般流程併回 `.devlog/devlog.md`。也就是說，**提問
 出去、答案還沒進來的這段期間**（使用者可能過很久才回覆），這一輪確實已經
-完整躺在 `devlog.md` 的歷史裡，不是懸在 `.devlog/.round-current.md` 裡假裝
+完整躺在 `devlog.md` 的歷史裡，不是懸在 round 檔裡假裝
 還開著——只有在下一則訊息真的進來、被判定是在回答時，才會被下面的機制短
 暫重新打開，回覆折進去、這個 turn 收尾後又立刻併回去。
 
 **下一則訊息進來之後會自動發生什麼事：** `round-start.sh` 看到
-`.awaiting-reply`、且輪次跟 `devlog.md` 目前最後一個 `## Round` 吻合（提問
-時那一輪已經正常收尾過，這時只會存在於 `devlog.md`，不在
-`.devlog/.round-current.md` 裡），就不開新 Round，而是先把 `devlog.md` 裡
-那個 Round 整段搬回 `.devlog/.round-current.md`（`devlog_reopen_last_round`，
+`.awaiting-reply`、且標記的輪次號碼還在 `devlog.md` 裡（提問
+時那一輪已經正常收尾過，這時只會存在於 `devlog.md`，不在 round 檔裡；
+其他平台之後併進來的 Round 可能排在它後面，所以是照號碼找，不是看最後一個），就不開新 Round，而是先把 `devlog.md` 裡
+那個 Round 整段搬回你所在平台的 round 檔（`devlog_reopen_round`，
 `devlog.md` 那邊同步移除），再改成在那個 Round 的 `### Summary` 之前插入一個
 新段落：
 

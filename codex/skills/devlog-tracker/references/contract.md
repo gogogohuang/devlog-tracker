@@ -35,7 +35,7 @@
 | 聊天不旁白記錄動作／不提 Round 欄位名 | `SKILL.md`「寫進 devlog 不等於講給使用者聽」 |
 | 不改 User Input（除 hook 占位） | `SKILL.md` 寫入原則 |
 | 同一則使用者訊息不另開 `## Round` | `SKILL.md` 強制流程步驟 2 |
-| 編輯對象是 `.round-current.md`（開著時） | `SKILL.md`「檔案位置」；`docs/design/round-current-split.md` |
+| 編輯對象是你所在平台的 round 檔（開著時；Claude Code `.round-current.md`，Codex／Cursor `.round-current@codex.md`／`.round-current@cursor.md`），不碰別的平台的檔 | `SKILL.md`「檔案位置」；`docs/design/round-current-split.md`；`docs/design/multi-platform-concurrency.md` |
 | Lessons ≠ 架構知識庫；設計在 `docs/design/` | `SKILL.md`「Lessons Mode」；`references/lessons-mode.md` |
 | `INTERRUPTED` 只由 hook 寫 | `SKILL.md` Status 規則 |
 
@@ -69,7 +69,7 @@
 
 | 主題 | 權威位置 |
 |---|---|
-| 主檔／分支檔／歸檔／keep／round-current／handoff | `SKILL.md`「檔案位置」；`docs/design/branch-scoped-devlog.md`；`docs/design/session-handoff-file.md` |
+| 主檔／分支檔／歸檔／keep／round-current／handoff | `SKILL.md`「檔案位置」；`docs/design/branch-scoped-devlog.md`；`docs/design/session-handoff-file.md`；`docs/design/multi-platform-concurrency.md` |
 | 錄製時機與截斷 | `docs/design/recording-moments.md` |
 | Span／Checkpoint／Lessons／Reply Fold／Segments | 各 `references/*.md` + 對應 `docs/design/*` |
 | 下一步黑名單 | `docs/design/next-step-blacklist.md` |

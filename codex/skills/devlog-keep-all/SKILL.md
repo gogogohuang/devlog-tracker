@@ -22,7 +22,7 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/keep-all.sh" --scan
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/keep-all.sh" --scan
 ```
 
 - `NO_NODE`：告知 keep-all 需要 Node.js（可改用 `/devlog-tracker:keep` 整理目前分支），結束。
@@ -84,13 +84,13 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 然後：
 
 ```bash
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/keep-all.sh" \
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/keep-all.sh" \
   --apply "<專案根目錄絕對路徑>/.devlog/.keep-all-plan.tsv" --fingerprint <fp> --count <n>
 ```
 
 `<fp>`／`<n>` 用步驟 1 的值。不要自己搬檔、刪檔或改索引——腳本是唯一的實作：驗證計畫、把所有會動到的檔備份到 `.devlog/.keep-all-backup/<時間戳>/`、組好新檔、改寫來源、刪除被整理掉的 kept 檔、清空的 archive 與搬空的分支檔、重建 `## Kept 索引`（新索引行寫在目前分支的主檔）。搬空的分支檔只在該分支不是 `active` 時才刪；目前主檔與 `devlog.md` 一律不刪。
 
-- exit 1：原樣顯示 stderr，不要自行重試或手動補做。驗證錯誤時不會寫任何檔；fingerprint 不符代表掃描後檔案被改過，回到步驟 1 重新掃描。
+- exit 1：原樣顯示 stderr，不要自行重試或手動補做。驗證錯誤時不會寫任何檔；fingerprint 不符代表掃描後檔案被改過，回到步驟 1 重新掃描。同一工作樹有兩個以上平台的輪次開著時，腳本會以 `其他平台還有進行中的輪次（…），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。` 拒絕，請使用者等其他平台收尾再跑。
 - 成功後刪除 `.devlog/.keep-all-plan.tsv`。
 
 ## 5. 選配：摘要
@@ -101,6 +101,6 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 
 依 stdout 回報：每個 `KEPT=<路徑> ROUNDS=<n>`、每個 `DELETED=<路徑>`、`BACKUP=<目錄>`（出錯時可從這裡還原），以及哪幾段套用了摘要。
 
-若 `.devlog/.round-open` 存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
+若你所在平台的 `.round-open` 檔（Claude Code 是 `.devlog/.round-open`，Codex／Cursor 是 `.devlog/.round-open@codex`／`.devlog/.round-open@cursor`）存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
 
 使用者提供的額外參數：請看觸發這個 skill 的使用者訊息。
