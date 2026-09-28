@@ -16,7 +16,7 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/status-devlog.sh"
 ```
 ```
 把 stdout 翻譯成給人看的幾行（含 `LESSONS=yes/no`：Lessons Mode 開關狀態；`LESSONS_ADVISORY=<count>/<threshold>`：Lessons Mode 開著時，機制性訊號（工作區漂移不符、或

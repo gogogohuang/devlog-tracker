@@ -101,7 +101,7 @@ npx devlog-tracker init
 
 會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
 
-Claude Code、Codex、Cursor 可以在同一個工作樹同時使用。三者共用一份 `devlog.md`，但每個平台各自保有開著的輪次（Claude Code 是 `.devlog/.round-current.md`，其他平台是 `.round-current@codex.md`／`.round-current@cursor.md`）與各自的 Session Handoff；輪次號碼跨平台不重複，Codex／Cursor 的 Round 標題結尾帶 ` · codex`／` · cursor`。有兩個以上平台的輪次開著時，`clean`、`keep`、`keep-all` 會拒絕執行。同一個平台在同一個工作樹開多個視窗不支援——它們共用同一格。細節見 [`docs/design/multi-platform-concurrency.md`](docs/design/multi-platform-concurrency.md)。
+Claude Code、Codex、Cursor 可以在同一個工作樹同時使用。三者共用一份 `devlog.md`，但每個平台各自保有開著的輪次（Claude Code 是 `.devlog/.round-current.md`，其他平台是 `.round-current@codex.md`／`.round-current@cursor.md`）與各自的 Session Handoff；輪次號碼跨平台不重複，Codex／Cursor 的 Round 標題結尾帶 ` · codex`／` · cursor`。有兩個以上平台的輪次開著時，`clean`、`keep`、`keep-all` 會拒絕執行。同一個平台在同一個工作樹開多個視窗不支援——它們共用同一格。各平台的安裝要一起升級到同一個 devlog-tracker 版本：某個平台還停在舊版時，它仍寫共用的無後綴檔案，會破壞各平台分開的狀態。細節見 [`docs/design/multi-platform-concurrency.md`](docs/design/multi-platform-concurrency.md)。
 
 `.devlog-tracker/` 放的是安裝進專案的程式；`.devlog/` 放的是這個專案的紀錄資料，執行 start 指令後才會建立。因此 `npx init` 後先看到 `.devlog-tracker/` 是預期行為，單跑 `init` 不會開始記錄。
 

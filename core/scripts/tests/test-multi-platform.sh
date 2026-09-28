@@ -194,11 +194,12 @@ check "codex span-open uses its own last round" '[ "$OUT" = "OPENED=7" ] && grep
 new_project cmds
 submit claude "claude task" >/dev/null
 submit codex "codex task" >/dev/null
-DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null 2>"$TMP_ROOT/cleanerr"
-check "clean refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次" "$TMP_ROOT/cleanerr" && [ -f "$D/.round-current@codex.md" ]'
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null 2>"$TMP_ROOT/cleanerr"; rc=$?
+check "clean refuses with two open rounds" '[ "$rc" -ne 0 ] && grep -q "其他平台還有進行中的輪次" "$TMP_ROOT/cleanerr" && [ -f "$D/.round-current@codex.md" ]'
+check "refusal names the pause/start escape hatch" 'grep -q "若該平台已不再使用，可先 pause 再 start 清掉它的標記。" "$TMP_ROOT/cleanerr"'
 printf '## Round 9 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
-DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-move.sh" --from 9 --to 9 --name x >/dev/null 2>"$TMP_ROOT/keeperr"
-check "keep-move refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次（codex）" "$TMP_ROOT/keeperr" && [ ! -e "$D/devlog.x.md" ]'
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-move.sh" --from 9 --to 9 --name x >/dev/null 2>"$TMP_ROOT/keeperr"; rc=$?
+check "keep-move refuses with two open rounds" '[ "$rc" -ne 0 ] && grep -q "其他平台還有進行中的輪次（codex）" "$TMP_ROOT/keeperr" && [ ! -e "$D/devlog.x.md" ]'
 
 DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/pause-devlog.sh" >/dev/null
 check "pause clears every platform's markers" '[ ! -e "$D/.round-open" ] && [ ! -e "$D/.round-open@codex" ]'

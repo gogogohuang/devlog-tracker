@@ -34,11 +34,11 @@ description: 無條件清空 .devlog/devlog.md（含專案摘要與所有 Round 
 
 ```bash
 PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"
-DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/clean-devlog.sh" --confirmed
+DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/clean-devlog.sh" --confirmed
 ```
 ```
 
-`--confirmed` 是必要參數，只有在使用者明確回覆「清空」之後才可以帶這個參數執行；不要在其他情況下跑這支腳本。腳本是唯一的實作來源：有沒有開著的 Round、要重編成 Round 1 還是整份刪除、重置 `.span-open` 與 checkpoint 狀態，都不要自己動手做。exit 1 時原樣顯示 stderr，不要自行重試、不要自己動手改檔案。同一工作樹有兩個以上平台的輪次開著時，腳本會以 `其他平台還有進行中的輪次（…），等它們收尾再執行。` 拒絕，請使用者等其他平台收尾再跑。
+`--confirmed` 是必要參數，只有在使用者明確回覆「清空」之後才可以帶這個參數執行；不要在其他情況下跑這支腳本。腳本是唯一的實作來源：有沒有開著的 Round、要重編成 Round 1 還是整份刪除、重置 `.span-open` 與 checkpoint 狀態，都不要自己動手做。exit 1 時原樣顯示 stderr，不要自行重試、不要自己動手改檔案。同一工作樹有兩個以上平台的輪次開著時，腳本會以 `其他平台還有進行中的輪次（…），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。` 拒絕，請使用者等其他平台收尾再跑。
 
 ## 4. 處理結果並收尾這一輪
 

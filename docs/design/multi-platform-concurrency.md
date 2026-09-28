@@ -107,6 +107,12 @@ first after upgrade most likely wrote them, so a Codex-only user keeps
 their open round and handoff. If Claude is first, nothing moves. After
 the marker exists, nothing is ever claimed again.
 
+Limitation: any script run without a `DEVLOG_PLATFORM` prefix resolves
+as Claude — including a user-run CLI such as `npx devlog-tracker report`.
+If that is the first resolve after upgrade, it writes `.platform-claimed`
+without moving anything, and a Codex-only user's open round and handoff
+stay under Claude's names (Codex then no longer sees them).
+
 **Segment Watch config.** `start-devlog.sh` still creates only
 `.segment-state`. The first round of a non-Claude platform seeds
 `.segment-state@<p>` from it (same `max_silent_seconds`, fresh counters).
@@ -188,7 +194,9 @@ project-wide.
 - `clean-devlog.sh`, `keep-move.sh`, `keep-all.sh` look at every
   platform's `.round-open*`. With zero or one open round they behave as
   today (operating on that platform's files). With two or more they
-  refuse: `其他平台還有進行中的輪次（<platforms>），等它們收尾再執行。`
+  refuse: `其他平台還有進行中的輪次（<platforms>），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。`
+  (`pause` removes every platform's markers, so a platform that will
+  never close its round can be cleared that way.)
 - `clean-devlog.sh` removes every platform's handoff for the branch.
 - `migrate-handoff.sh` also scans `.round-current@*.md` and
   `handoff*@*.md`.

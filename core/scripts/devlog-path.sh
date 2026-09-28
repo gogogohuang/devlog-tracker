@@ -97,7 +97,7 @@ devlog_single_open_round() {
   [ -n "$rows" ] || return 0
   count="$(printf '%s\n' "$rows" | grep -c .)"
   if [ "$count" -gt 1 ]; then
-    echo "其他平台還有進行中的輪次（$(printf '%s\n' "$rows" | cut -f1 | grep -vxF "$(devlog_platform)" | paste -sd '、' -)），等它們收尾再執行。" >&2
+    echo "其他平台還有進行中的輪次（$(printf '%s\n' "$rows" | cut -f1 | grep -vxF "$(devlog_platform)" | paste -sd '、' -)），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。" >&2
     return 2
   fi
   printf '%s\n' "$rows" | cut -f1,2
@@ -213,6 +213,8 @@ _devlog_migrate_unfinished_tail() {
 # Also sets DEVLOG_ORIGIN ("branch=<raw name>" / "detached=<dir>", empty
 # for devlog.md): the first line written into a new branch file records it
 # as an origin marker (docs/design/keep-all.md "Origin marker").
+# Call before taking the devlog lock: it may acquire/release the lock
+# itself, and a nested acquire would reset the caller's lock state.
 devlog_resolve_paths() {
   local dir="${1:-.}"
   DEVLOG_DIR="$dir/.devlog"
