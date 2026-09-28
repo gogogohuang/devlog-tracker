@@ -135,6 +135,23 @@ test('apply moves a cross-file topic into one file in time order and consumes ke
   assert.ok(fs.existsSync(path.join(backup, 'devlog.md')));
 });
 
+test('scan and apply keep platform-tagged rounds in chronological order', () => {
+  const d = setup({
+    'devlog.md': round(3, '2026-09-01T11:00:00+0800', 'DONE') + '\n' +
+      round(2, '2026-09-01T10:00:00+0800 · codex', 'DONE') + '\n' +
+      round(1, '2026-09-01T01:00:00Z · cursor', 'DONE'),
+  });
+  const c = ctx(d);
+  const s = scan(c);
+  assert.deepEqual(s.rounds.map(r => r.round), [1, 2, 3]);
+
+  apply(c, 'topic\t\t1,2,3\n', s.fingerprint, s.rounds.length);
+  const kept = read(d, 'devlog.topic.md');
+  assert.deepEqual([...kept.matchAll(/^## Round (\d+)/gm)].map(m => Number(m[1])), [1, 2, 3]);
+  assert.match(kept, /^## Round 1 — 2026-09-01T01:00:00Z · cursor$/m);
+  assert.match(kept, /^## Round 2 — 2026-09-01T10:00:00\+0800 · codex$/m);
+});
+
 test('apply deletes a branch file it emptied, but not an active branch or devlog.md', () => {
   const d = setup({
     'devlog.feat-main.md': '<!-- devlog-origin: branch=feat/main -->\n\n' + round(1, '2026-09-05T10:00:00+0800', 'IN_PROGRESS'),

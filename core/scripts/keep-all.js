@@ -53,7 +53,8 @@ function roundStatus(lines) {
 }
 
 function tsKey(ts) {
-  const iso = ts.replace(/([+-]\d\d)(\d\d)$/, '$1:$2');
+  // Platform ownership is part of the displayed heading, not the timestamp.
+  const iso = ts.replace(/ · [a-z]+$/, '').replace(/([+-]\d\d)(\d\d)$/, '$1:$2');
   const t = Date.parse(iso);
   return Number.isNaN(t) ? Infinity : t;
 }
