@@ -223,6 +223,7 @@ _devlog_renumber_current() {
     BEGIN {
       k = split(reserved, r, " ")
       for (i = 1; i <= k; i++) { taken[r[i] + 0] = 1; if (r[i] + 0 > max) max = r[i] + 0 }
+      if (own != "") { taken[own + 0] = 1; if (own + 0 > max) max = own + 0 }
       while ((getline line < devlog) > 0) {
         if (line ~ /^[ \t]*```/) { f = !f; continue }
         if (!f && line ~ /^## Round [0-9]+/) { x = num(line); taken[x] = 1; if (x > max) max = x }
@@ -236,7 +237,8 @@ _devlog_renumber_current() {
       next_n = max + 1
       for (i = 1; i <= NR; i++) {
         line = lines[i]
-        if (head[i] && !(own != "" && num(line) == own + 0)) {
+        if (head[i] && own != "" && !own_seen && num(line) == own + 0) { own_seen = 1 }
+        else if (head[i]) {
           x = num(line)
           if (x in taken) {
             rest = line; sub(/^## Round [0-9]+/, "", rest)
@@ -250,7 +252,7 @@ _devlog_renumber_current() {
         print line
       }
     }
-  ' "$current" > "$current.renum" 2>/dev/null && mv "$current.renum" "$current" 2>/dev/null
+  ' "$current" 2>/dev/null >"$current.renum" && mv "$current.renum" "$current" 2>/dev/null
   rm -f "$current.renum" 2>/dev/null
   return 0
 }

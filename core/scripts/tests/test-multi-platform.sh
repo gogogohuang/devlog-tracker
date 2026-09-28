@@ -255,6 +255,24 @@ BEFORE="$(head -1 "$D/.round-current.md")"
 close_round claude IN_PROGRESS "$D/.round-current.md" 2>/dev/null
 check "reserved round heading passes through unchanged" '[ "$(grep "^## Round " "$D/devlog.md")" = "$BEFORE" ]'
 
+new_project renum_own_dup
+submit claude "claude task" >/dev/null
+OWN_N="$(head -1 "$D/.round-current.md" | sed 's/^## Round \([0-9]*\).*/\1/')"
+printf '\n## Round %s — dup\n\n### Status\nIN_PROGRESS\n' "$OWN_N" >> "$D/.round-current.md"
+close_round claude IN_PROGRESS "$D/.round-current.md" 2>/dev/null
+# shellcheck disable=SC2034 # read inside check's eval strings
+DUP_N=$((OWN_N + 1))
+check "second heading reusing the reserved number is renumbered" '[ "$(grep -c "^## Round $OWN_N " "$D/devlog.md")" -eq 1 ] && grep -q "^## Round $DUP_N — dup$" "$D/devlog.md"'
+
+new_project renum_unwritable
+printf '## Round 1 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+printf '## Round 1 — t\n' > "$D/.round-current.md"
+chmod a-w "$D"
+# shellcheck disable=SC2034 # read inside check's eval strings
+RENUM_ERR="$(DEVLOG_DIR="$D" DEVLOG_PLATFORM=claude bash -c '. "$1/devlog-path.sh"; . "$1/devlog-md.sh"; _devlog_renumber_current "$2" "$3"' _ "$SCRIPT_DIR" "$D/devlog.md" "$D/.round-current.md" 2>&1)"
+chmod u+w "$D"
+check "renumber stays quiet and leaves round-current alone when it cannot write" '[ -z "$RENUM_ERR" ] && [ "$(cat "$D/.round-current.md")" = "## Round 1 — t" ]'
+
 # --- Reply Fold prefers the caller's own round when numbers repeat ---------
 new_project fold_dup
 printf '## Round 5 — t · codex\n\n### Summary\ncodex asked\n\n### Status\nDONE\n\n## Round 5 — t\n\n### Summary\nclaude five\n\n### Status\nDONE\n' > "$D/devlog.md"
