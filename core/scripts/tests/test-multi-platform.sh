@@ -187,7 +187,7 @@ DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/nul
 check "clean refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次" "$TMP_ROOT/cleanerr" && [ -f "$D/.round-current@codex.md" ]'
 printf '## Round 9 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
 DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-move.sh" --from 9 --to 9 --name x >/dev/null 2>"$TMP_ROOT/keeperr"
-check "keep-move refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次（claude、codex）" "$TMP_ROOT/keeperr" && [ ! -e "$D/devlog.x.md" ]'
+check "keep-move refuses with two open rounds" '[ $? -ne 0 ] && grep -q "其他平台還有進行中的輪次（codex）" "$TMP_ROOT/keeperr" && [ ! -e "$D/devlog.x.md" ]'
 
 DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/pause-devlog.sh" >/dev/null
 check "pause clears every platform's markers" '[ ! -e "$D/.round-open" ] && [ ! -e "$D/.round-open@codex" ]'

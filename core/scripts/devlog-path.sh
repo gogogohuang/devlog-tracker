@@ -97,7 +97,7 @@ devlog_single_open_round() {
   [ -n "$rows" ] || return 0
   count="$(printf '%s\n' "$rows" | grep -c .)"
   if [ "$count" -gt 1 ]; then
-    echo "其他平台還有進行中的輪次（$(printf '%s\n' "$rows" | cut -f1 | paste -sd '、' -)），等它們收尾再執行。" >&2
+    echo "其他平台還有進行中的輪次（$(printf '%s\n' "$rows" | cut -f1 | grep -vxF "$(devlog_platform)" | paste -sd '、' -)），等它們收尾再執行。" >&2
     return 2
   fi
   printf '%s\n' "$rows" | cut -f1,2

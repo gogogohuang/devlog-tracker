@@ -16,7 +16,7 @@
 ## 怎麼開一個 span
 
 寫完這一輪正常的 Round 區塊（Status 用 `IN_PROGRESS`）之後，使用
-`/devlog-tracker:span`（或跑 `span-open.sh`）建立 `.devlog/.span-open`。
+`/devlog-tracker:span`（或跑 `DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/span-open.sh"`）建立你所在平台的 span 檔（Claude Code 是 `.devlog/.span-open`，Codex／Cursor 是 `.devlog/.span-open@codex`／`.devlog/.span-open@cursor`）。
 除非腳本不可用，否則不要手寫 JSON。檔案格式如下：
 
 ```json
@@ -48,14 +48,16 @@ devlog.md 完全不用動。一旦累積到門檻，Stop hook 會退回正常模
 整個 Ask 真的做完時：**開一個新的 Round**（不要回頭改寫當初開 span 那個
 Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」，其餘照 SKILL.md
 「每一輪的紀錄格式」完整收尾（Summary／Reply／Handoff／Status，Handoff 小節的
-必寫與省略規則相同），內容總結整段 span 做了什麼；然後刪掉 `.devlog/.span-open`。
+必寫與省略規則相同），內容總結整段 span 做了什麼；然後跑
+`DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/span-close.sh"`
+關掉 span（不要手動刪 span 檔）。
 
 ## 已知限制：分辨不出「這是自動續接還是真人插話」
 
 Claude Code 目前沒有任何 hook 欄位能分辨一個 tick 是自動排程觸發的，還是使用
 者真的手動打了新訊息——這兩種在 span 開著時會被一視同仁地當成一個 tick。如果
 span 開著時你發現進來的其實是一個跟自動任務無關的新請求，應該自己先關掉 span
-（刪除 `.span-open`、補寫收尾的 Round）再處理新請求，不要讓它悄悄被吞進正在
+（跑上面那行 `span-close.sh`、補寫收尾的 Round）再處理新請求，不要讓它悄悄被吞進正在
 開著的 span 裡。
 
 ## 崩潰時的風險

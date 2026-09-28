@@ -11,7 +11,7 @@ description: 掃描整份 devlog.md，把值得留名的主題段落一次分別
 ## 1. 讀檔、找出開著的 Round
 
 1. 讀取 `.devlog/devlog.md` 全文。若檔案不存在，告知「目前沒有東西可 keep」，不要建立 `.devlog/` 或任何新檔，結束。
-2. 開著的 Round：若 `.devlog/.round-open` 存在且有 `"round"` 數字，用那個編號。若 `.round-open` 不存在（從未 start 或已 pause），表示沒有開著的 Round，檔案裡所有 `## Round` 都是歷史，不要把最後一個 Round 當成開著的 Round 來排除。
+2. 開著的 Round：若你所在平台的 `.round-open` 檔（Claude Code 是 `.devlog/.round-open`，Codex／Cursor 是 `.devlog/.round-open@codex`／`.devlog/.round-open@cursor`）存在且有 `"round"` 數字，用那個編號。若它不存在（從未 start 或已 pause），表示沒有開著的 Round，檔案裡所有 `## Round` 都是歷史，不要把最後一個 Round 當成開著的 Round 來排除。
 3. 歷史 Round = 檔案裡除了開著的 Round 以外的所有 `## Round`（判斷 `## ` 標題時，略過圍欄程式碼區塊 ``` 內的行，與 hook 腳本解析方式一致）。若沒有任何歷史 Round，告知「目前沒有東西可 keep」，不要建立新檔，結束。
 
 ## 2. 切出主題段落，過濾瑣碎段落
@@ -115,4 +115,4 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" 
 
 依段落回報：每個具名檔路徑、搬走幾輪（哪些編號）；再依最後一次成功執行的 `REMAINING` 回報 `devlog.md` 目前剩幾輪（這個數字含還開著的那一輪，不是只算歷史 Round）。若中途因某段腳本失敗而中止，清楚列出哪些段落已經搬走（連檔名）、哪些完全沒嘗試。不要讀寫 `devlog.archive.md`。
 
-若 `.round-open` 存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。若沒有開著的 Round：不要改寫歷史 Round 的收尾。
+若你所在平台的 `.round-open` 檔（Claude Code 是 `.round-open`，Codex／Cursor 是 `.round-open@codex`／`.round-open@cursor`）存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。若沒有開著的 Round：不要改寫歷史 Round 的收尾。

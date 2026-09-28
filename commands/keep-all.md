@@ -93,4 +93,4 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 
 依 stdout 回報：每個 `KEPT=<路徑> ROUNDS=<n>`、每個 `DELETED=<路徑>`、`BACKUP=<目錄>`（出錯時可從這裡還原），以及哪幾段套用了摘要。
 
-若 `.devlog/.round-open` 存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
+若你所在平台的 `.round-open` 檔（Claude Code 是 `.devlog/.round-open`，Codex／Cursor 是 `.devlog/.round-open@codex`／`.devlog/.round-open@cursor`）存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
