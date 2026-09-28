@@ -36,6 +36,28 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=handoff-fields.sh
 . "$SCRIPT_DIR/handoff-fields.sh"
 
+# 擋下時附上的最小格式：agent 在 /clear 之後通常沒載入 skill，只寫「依
+# SKILL.md」會讓它每輪去 grep／sed 整份 SKILL.md，輸出攤在使用者面前。
+# 這裡給夠填完一輪的骨架；細節錯誤由後面各道檢查的訊息各自說明。
+round_format_hint() {
+  cat <<'EOF'
+格式如下，不用另外讀 SKILL.md（Status 只留一個值）：
+### Summary
+2–4 句結論
+### Reply
+對使用者說了什麼
+### Handoff
+<handoff>
+<state>
+做到哪、卡在哪
+</state>
+</handoff>
+### Status
+DONE
+IN_PROGRESS／BLOCKED 另需：<handoff> 內依序 decisions→files→workspace→state→done-when→next，必寫 <workspace>（git 快照，如 `main @ a1b2c3d，工作樹乾淨`）、<done-when>、<next>；再加 ### Session Handoff，內含 <session-handoff> 包 <decisions>／<open-questions>／<failed-attempts>（沒有寫 - （無））。標籤各佔一行。
+EOF
+}
+
 # --- loop guard -------------------------------------------------------
 # 有 jq 就用 jq 精準解析；沒有 jq 就退化成字串比對（沒有更嚴謹的 parse，但
 # 足以涵蓋 Claude Code 實際送出的 stop_hook_active 欄位形狀），兩種環境都要生效。
@@ -132,9 +154,9 @@ fi
 
 if [ "$CURRENT_HASH" = "$TURN_START_HASH" ]; then
   if [ "$SPAN_VALID" -eq 1 ]; then
-    echo "這一輪尚未寫入。請依 skills/devlog-tracker/SKILL.md 在 .devlog/${ROUND_CURRENT##*/} 建立一個新的 ## Round（編號接在 devlog.md 目前最後一輪之後），包含 User Input / Summary / Reply / Handoff / Status；收尾成功後 hook 會自動併回 devlog.md，不要自己直接寫進 devlog.md。" >&2
+    { echo "這一輪尚未寫入。請在 .devlog/${ROUND_CURRENT##*/} 建立一個新的 ## Round（編號接在 devlog.md 目前最後一輪之後），包含 User Input / Summary / Reply / Handoff / Status；收尾成功後 hook 會自動併回 devlog.md，不要自己直接寫進 devlog.md。"; round_format_hint; } >&2
   else
-    echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請依 skills/devlog-tracker/SKILL.md 編輯最後一個 Round，補上 User Input / Summary / Reply / Handoff / Status。不要再新增一個 ## Round。" >&2
+    { echo "這一輪的 Round 只有 hook 寫的 User Input skeleton，還沒有收尾。請在 .devlog/${ROUND_CURRENT##*/} 裡編輯最後一個 Round，補上 User Input / Summary / Reply / Handoff / Status。不要再新增一個 ## Round。"; round_format_hint; } >&2
   fi
   exit 2
 fi
@@ -171,7 +193,7 @@ if [ -n "$LAST_ROUND" ]; then
   printf '%s\n' "$LAST_ROUND" | grep -q '^### Reply' && HAS_REPLY=1
   printf '%s\n' "$LAST_ROUND" | grep -q '^### Handoff' && HAS_HANDOFF=1
   if [ "$HAS_SUMMARY" -eq 0 ] || [ "$HAS_REPLY" -eq 0 ] || [ "$HAS_HANDOFF" -eq 0 ]; then
-    echo "最後一個 Round 缺少 \`### Summary\`、\`### Reply\` 或 \`### Handoff\`。請依 skills/devlog-tracker/SKILL.md 補上這三個標題（Summary 給人掃、Reply 記對使用者說過的話、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    { echo "最後一個 Round 缺少 \`### Summary\`、\`### Reply\` 或 \`### Handoff\`。請補上這三個標題（Summary 給人掃、Reply 記對使用者說過的話、Handoff 給下一輪接續），寫在同一個 Round 裡，不要再新增一個 ## Round。"; round_format_hint; } >&2
     exit 2
   fi
 
@@ -224,7 +246,7 @@ if [ -n "$LAST_ROUND" ]; then
   nonempty_body '^### Reply' && REPLY_BODY_OK=1
   nonempty_body '^### Handoff' && HAN_BODY_OK=1
   if [ "$SUM_BODY_OK" -eq 0 ] || [ "$REPLY_BODY_OK" -eq 0 ] || [ "$HAN_BODY_OK" -eq 0 ]; then
-    echo "最後一個 Round 的 ### Summary、### Reply 或 ### Handoff 是空的。請依 skills/devlog-tracker/SKILL.md 寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。" >&2
+    { echo "最後一個 Round 的 ### Summary、### Reply 或 ### Handoff 是空的。請寫上內容（不要只留標題），寫在同一個 Round 裡，不要再新增一個 ## Round。"; round_format_hint; } >&2
     exit 2
   fi
 
