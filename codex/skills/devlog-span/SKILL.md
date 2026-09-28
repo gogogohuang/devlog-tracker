@@ -12,12 +12,12 @@ Codex plugin 安裝：目前這份 `SKILL.md` 的絕對路徑位於
 
 先判斷使用者要開啟或關閉：
 
-- 使用者明確要求關閉，或 `.devlog/.span-open` 已存在且沒有明確要求重新開啟：
-  先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄），設 `PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"`，再跑 `DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/span-close.sh"`，
+- 使用者明確要求關閉，或你所在平台的 span 檔（Claude Code 是 `.devlog/.span-open`，Codex／Cursor 是 `.devlog/.span-open@codex`／`.devlog/.span-open@cursor`）已存在且沒有明確要求重新開啟：
+  先決定 plugin 根目錄（有 `DEVLOG_TRACKER_ROOT` 用它；否則用 `CLAUDE_PLUGIN_ROOT`；兩者都空就用含 `.claude-plugin/plugin.json` 的本 plugin 根目錄），設 `PLUGIN_ROOT="${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT:-}}"`，再跑 `DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/span-close.sh"`，
   再依 SKILL 的 span 收尾規則寫一個**新的 Round**，總結整段 span。
 - 使用者要求開啟：先把目前 Round 正常寫完，`Status` 設為 `IN_PROGRESS`，再跑
-  `DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/span-open.sh"`。
+  `DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd) 重新推>" bash "${PLUGIN_ROOT}/core/scripts/span-open.sh"`。
 
-不要手寫 `.span-open` JSON。腳本 exit 1 時顯示 stderr，停止操作。
+不要手寫 span 檔的 JSON。腳本 exit 1 時顯示 stderr，停止操作。
 
 使用者提供的額外參數：請看觸發這個 skill 的使用者訊息。

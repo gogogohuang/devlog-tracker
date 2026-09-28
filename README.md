@@ -75,9 +75,9 @@ Merges the `hooks` from `codex/hooks.json` into the project's `.codex/hooks.json
 
 - Interactive mode: Codex warns at startup when hooks need review. Use `/hooks` to inspect and trust them. A later change to hook configuration (e.g. re-running `init` and changing paths or commands) may require another review.
 - Non-interactive `codex exec` (CI, scripts): unapproved hooks are silently skipped. `--dangerously-bypass-hook-trust` lets them run, but that flag skips trust checks for *all* hooks, so it's only appropriate for automation environments where you've already vetted the hook sources yourself.
-- To confirm it's working: after `start`, send a message and check whether `.devlog/.round-current.md` shows this round's User Input skeleton; if not, the hook didn't run.
+- To confirm it's working: after `start`, send a message and check whether `.devlog/.round-current@codex.md` shows this round's User Input skeleton; if not, the hook didn't run.
 
-When the silence or workspace guard blocks a tool, Codex can read the current round with a single `cat <project>/.devlog/.round-current.md` command and update it with `apply_patch`. The block message includes the project path.
+When the silence or workspace guard blocks a tool, Codex can read the current round with a single `cat <project>/.devlog/.round-current@codex.md` command and update it with `apply_patch`. The block message includes the project path.
 
 Codex's `Interrupt` hook records an interrupted main-thread turn as `INTERRUPTED`. Codex has no `StopFailure` event for other abnormal endings; an open round is recovered on the next prompt or session start, or when `SessionEnd` runs. Codex's `SessionEnd` reason is currently only `other`, and it may run after an idle session rather than immediately when you switch conversations. The `Stop` hook still enforces completion of normal turns. Codex can also start from a subdirectory of an installed project; the hooks find the installation root.
 
@@ -100,6 +100,8 @@ npx devlog-tracker init
 Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
 Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
+
+Claude Code, Codex, and Cursor can run in the same worktree at the same time. They share one `devlog.md`, but each platform keeps its own open round (`.devlog/.round-current.md` for Claude Code, `.round-current@codex.md`／`.round-current@cursor.md` for the others) and its own Session Handoff; round numbers stay unique across platforms, and Codex／Cursor round headings end with ` · codex`／` · cursor`. `clean`, `keep`, and `keep-all` refuse to run while two or more platforms have a round open. Several windows of the *same* platform in one worktree are not supported — they share one slot. See [`docs/design/multi-platform-concurrency.md`](docs/design/multi-platform-concurrency.md).
 
 `.devlog-tracker/` contains the installed program. `.devlog/` contains your project's tracking data and is created only when you run the start command. Therefore, seeing `.devlog-tracker/` immediately after `npx init` is expected; `init` alone does not start recording.
 
@@ -214,7 +216,7 @@ See [`docs/design/summary-handoff.md`](docs/design/summary-handoff.md), [`docs/d
 
 ### Upgrading to XML Handoff
 
-Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run the migrate command (`/devlog-tracker:migrate` on the Claude plugin or `$devlog-migrate` on Codex; underlying script: `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, the open round (`.round-current.md`) and `handoff.md`／`handoff.<branch>.md` in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, update the plugin or rerun `npx devlog-tracker init`, then use the start command for your installation (`/devlog-tracker:start` on the Claude plugin or `$devlog-start` on Codex).
+Rounds written before this change are in the legacy `####`-headed form and are still read fine. Archive, keep and lessons files (`devlog.archive.md`, `devlog.<name>.md`, `devlog.lessons.*.md`) are never rewritten. When the Stop hook blocks on a legacy Handoff in the round it's checking, it tells the agent to run the migrate command (`/devlog-tracker:migrate` on the Claude plugin or `$devlog-migrate` on Codex; underlying script: `migrate-handoff.sh`) itself, then finish the turn again — no action needed from you in the common case. Migrate rewrites `devlog.md`, the branch devlog files, every platform's open round (`.round-current.md`, `.round-current@codex.md`, `.round-current@cursor.md`) and handoff files (`handoff.md`／`handoff.<branch>.md` and their `@codex`／`@cursor` variants) in place, leaving a `*.pre-migrate` backup next to each file it changes; a round it cannot map exactly is left as-is and listed on a `SKIP` line. If the agent keeps writing the legacy form instead of picking up the fix, update the plugin or rerun `npx devlog-tracker init`, then use the start command for your installation (`/devlog-tracker:start` on the Claude plugin or `$devlog-start` on Codex).
 
 ## What the hooks do automatically
 
@@ -243,7 +245,7 @@ Non-usage API errors, SessionEnd, and a leftover `.round-open` mark an open Roun
 
 #### Segment recording
 
-Don't hold a long round until the very end — write `### Segment` entries as you go. If `.round-current.md` hasn't been touched for about 10 minutes within the same round, the `PreToolUse` hook blocks the next tool call; Read first, then Edit/StrReplace to append a segment (don't Write over the whole file). The threshold is adjustable with `/devlog-tracker:segment-watch <duration>`. Claude Code subagents/dynamic workflows (`PreToolUse` carrying `agent_id`) don't apply this gate from the parent round. See [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
+Don't hold a long round until the very end — write `### Segment` entries as you go. If the open round file (`.round-current.md`, or `.round-current@codex.md`／`.round-current@cursor.md` on Codex／Cursor) hasn't been touched for about 10 minutes within the same round, the `PreToolUse` hook blocks the next tool call; Read first, then Edit/StrReplace to append a segment (don't Write over the whole file). The threshold is adjustable with `/devlog-tracker:segment-watch <duration>`. Claude Code subagents/dynamic workflows (`PreToolUse` carrying `agent_id`) don't apply this gate from the parent round. See [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
 
 #### Checkpoint Mode
 

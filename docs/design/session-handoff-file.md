@@ -202,9 +202,8 @@ If `HANDOFF_FILE` is missing or empty, skip step 2 silently.
 
 ## Out of scope
 
-- Multi-agent／multi-session file locking on `handoff.md` (Known
-  limitation; revisit if Codex + Claude write the same worktree
-  concurrently).
+- Multi-agent／multi-session writes to `handoff.md`: resolved for
+  different platforms by `multi-platform-concurrency.md`.
 - Claude editing `handoff.md` directly.
 - Replacing or dropping the last-two-rounds SessionStart excerpt.
 - Renaming `handoff.md` into a branch-scoped file on first checkout.

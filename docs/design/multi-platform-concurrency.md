@@ -2,7 +2,7 @@
 
 Lets Claude Code, Codex, and Cursor run devlog-tracker **at the same time
 in the same worktree** without corrupting each other's rounds. Status:
-design approved, not yet implemented. Plan:
+implemented. Plan:
 `multi-platform-concurrency-plan.md`.
 
 ## Problem
