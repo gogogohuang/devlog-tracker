@@ -46,8 +46,18 @@ devlog_list_round_starts_of() {
   devlog_list_round_starts "$1" "$2"
 }
 
+# Start line of the last "## Round $2" heading; with platform $3, only its own.
 devlog_round_start_by_number() {
-  devlog_list_round_starts "$1" | awk -v n="$2" '$2 == n { s = $1 } END { if (s) print s }'
+  devlog_list_round_starts "$1" "${3:-}" | awk -v n="$2" '$2 == n { s = $1 } END { if (s) print s }'
+}
+
+# Reply Fold target for platform $3: its own "## Round $2" first, else any
+# owner's (a pre-claim heading it wrote without a suffix).
+devlog_fold_round_start() {
+  local s
+  s="$(devlog_round_start_by_number "$1" "$2" "$3")"
+  [ -n "$s" ] || s="$(devlog_round_start_by_number "$1" "$2")"
+  [ -z "$s" ] || printf '%s\n' "$s"
 }
 
 devlog_block_end() {
@@ -194,6 +204,57 @@ devlog_origin_of() {
   sed -n '1s/^<!-- devlog-origin: \(.*\) -->$/\1/p' "$1"
 }
 
+# Span Mode rounds are numbered by the LLM, not reserved by round-start.sh.
+# So before a merge (caller holds the lock), every "## Round N" heading in
+# $2 whose N is already a round in $1, reserved by another platform's open
+# round on $1, or repeated within $2 gets the next free number; a
+# non-Claude heading without an owner suffix gains " · <platform>". The
+# caller's own reserved round passes through unchanged. Leaves $2 alone on
+# any error.
+_devlog_renumber_current() {
+  local devlog="$1" current="$2" p="${DEVLOG_PLATFORM:-claude}" rows="" own="" reserved=""
+  if [ -n "${DEVLOG_DIR:-}" ] && type devlog_open_rounds >/dev/null 2>&1; then
+    rows="$(devlog_open_rounds | awk -F '\t' -v f="${devlog##*/}" '($3 == f || $3 == "") && $2 ~ /^[0-9]+$/')"
+    own="$(printf '%s\n' "$rows" | awk -F '\t' -v p="$p" '$1 == p { print $2 }')"
+    reserved="$(printf '%s\n' "$rows" | awk -F '\t' -v p="$p" '$1 != p && $2 != "" { printf "%s ", $2 }')"
+  fi
+  LC_ALL=C awk -v p="$p" -v own="$own" -v reserved="$reserved" -v devlog="$devlog" '
+    function num(s) { sub(/^## Round /, "", s); sub(/[^0-9].*$/, "", s); return s + 0 }
+    BEGIN {
+      k = split(reserved, r, " ")
+      for (i = 1; i <= k; i++) { taken[r[i] + 0] = 1; if (r[i] + 0 > max) max = r[i] + 0 }
+      while ((getline line < devlog) > 0) {
+        if (line ~ /^[ \t]*```/) { f = !f; continue }
+        if (!f && line ~ /^## Round [0-9]+/) { x = num(line); taken[x] = 1; if (x > max) max = x }
+      }
+      close(devlog)
+    }
+    { lines[NR] = $0 }
+    /^[ \t]*```/ { fence = !fence; next }
+    !fence && /^## Round [0-9]+/ { head[NR] = 1; x = num($0); if (x > max) max = x }
+    END {
+      next_n = max + 1
+      for (i = 1; i <= NR; i++) {
+        line = lines[i]
+        if (head[i] && !(own != "" && num(line) == own + 0)) {
+          x = num(line)
+          if (x in taken) {
+            rest = line; sub(/^## Round [0-9]+/, "", rest)
+            x = next_n++
+            line = "## Round " x rest
+          }
+          taken[x] = 1
+          owner = line
+          if (p != "claude" && !(sub(/.* · /, "", owner) && owner ~ /^[a-z]+$/)) line = line " · " p
+        }
+        print line
+      }
+    }
+  ' "$current" > "$current.renum" 2>/dev/null && mv "$current.renum" "$current" 2>/dev/null
+  rm -f "$current.renum" 2>/dev/null
+  return 0
+}
+
 devlog_merge_round_current() {
   # Appends $2's content onto $1 (one blank line separator, matching the
   # existing "\n## Round N" append convention) and removes $2. No-op if $2
@@ -202,6 +263,7 @@ devlog_merge_round_current() {
   # goes first.
   local devlog="$1" current="$2"
   [ -s "$current" ] || return 0
+  _devlog_renumber_current "$devlog" "$current"
   {
     [ -s "$devlog" ] || [ -z "${DEVLOG_ORIGIN:-}" ] || devlog_origin_line "$DEVLOG_ORIGIN"
     printf '\n'
@@ -213,9 +275,11 @@ devlog_merge_round_current() {
 
 devlog_reopen_round() {
   # Moves the "## Round $3" block (wherever it sits in $1) into $2, removing
-  # it from $1. Returns 1 and touches neither file if $1 has no such round.
+  # it from $1. With platform $4, picks the block devlog_fold_round_start
+  # does. Returns 1 and touches neither file if $1 has no such round.
   local devlog="$1" current="$2" start end
-  start="$(devlog_round_start_by_number "$devlog" "$3")"
+  if [ -n "${4:-}" ]; then start="$(devlog_fold_round_start "$devlog" "$3" "$4")"
+  else start="$(devlog_round_start_by_number "$devlog" "$3")"; fi
   [ -n "$start" ] || return 1
   end="$(devlog_block_end "$devlog" "$start")"
   awk -v start="$start" -v end="$end" 'NR >= start && NR <= end' "$devlog" > "$current" 2>/dev/null || return 1

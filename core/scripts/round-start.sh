@@ -55,7 +55,7 @@ if [ -f "$AWAITING_FILE" ]; then
     ''|*[!0-9]*) AWAIT_ROUND='' ;;
   esac
   if [ -n "$AWAIT_ROUND" ] && [ -f "$DEVLOG_FILE" ] \
-    && [ -n "$(devlog_round_start_by_number "$DEVLOG_FILE" "$AWAIT_ROUND")" ]; then
+    && [ -n "$(devlog_fold_round_start "$DEVLOG_FILE" "$AWAIT_ROUND" "$DEVLOG_PLATFORM")" ]; then
     FOLD_ROUND="$AWAIT_ROUND"
   fi
 fi
@@ -206,7 +206,7 @@ if [ "$SPAN_SKIP" -eq 0 ] && [ "$TASK_NOTIF" -eq 0 ] && [ -f "$DEVLOG_FILE" ] &&
 fi
 
 if [ -n "$FOLD_ROUND" ]; then
-  devlog_reopen_round "$DEVLOG_FILE" "$ROUND_CURRENT" "$FOLD_ROUND" || : > "$ROUND_CURRENT"
+  devlog_reopen_round "$DEVLOG_FILE" "$ROUND_CURRENT" "$FOLD_ROUND" "$DEVLOG_PLATFORM" || : > "$ROUND_CURRENT"
   if [ -z "$PROMPT" ]; then
     PROMPT="（無 prompt）"
   fi

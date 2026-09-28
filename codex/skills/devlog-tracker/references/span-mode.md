@@ -52,6 +52,11 @@ Round），User Input 可以寫「（自動續接收尾，接續 Round 12）」�
 `DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑，不要用 $(pwd)>" bash "${DEVLOG_TRACKER_ROOT:-${CLAUDE_PLUGIN_ROOT}}/core/scripts/span-close.sh"`
 關掉 span（不要手動刪 span 檔）。
 
+span 裡自己新開的 Round 編號照 SKILL.md 的規則取（最後一個 `## Round <N>` 加 1）。
+這種 Round 沒有經過 hook 預留編號，所以併回 devlog.md 時如果編號已經被佔用
+（devlog.md 已有、或另一個平台開著的輪次預留了它），hook 會自動改成下一個
+空號——之後引用這個 Round 時以 devlog.md 裡的編號為準。
+
 ## 已知限制：分辨不出「這是自動續接還是真人插話」
 
 Claude Code 目前沒有任何 hook 欄位能分辨一個 tick 是自動排程觸發的，還是使用

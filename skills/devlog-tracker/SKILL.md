@@ -249,7 +249,7 @@ DONE | IN_PROGRESS | BLOCKED | INTERRUPTED
 
 下文提到「決策」「檔案」「工作區」「現況」「完成條件」「下一步」時，指的就是對應標籤。
 
-Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。
+Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔案不存在就從 Round 1 開始。（hook 併回時若這個編號已被佔用——例如另一個平台同時開著一輪——會自動改成下一個空號，不用自己處理。）
 
 寫入原則：
 - **User Input：送出原文優先。** hook 在 `UserPromptSubmit` 已寫入送出當下的 prompt（截斷／遮罩規則見

@@ -146,15 +146,26 @@ EOF
   awk -v st="$2" '/^### Status$/ { print; getline; print st; next } { print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
   printf '{}' | DEVLOG_PLATFORM="$1" DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/enforce-devlog.sh"
 }
+new_project stops_claude_first
+submit claude "claude task" >/dev/null
+submit codex "codex task" >/dev/null
+close_round claude IN_PROGRESS "$D/.round-current.md" 2>"$TMP_ROOT/err0"; rc=$?
+check "claude-first: claude Stop passes" '[ "$rc" -eq 0 ] || { cat "$TMP_ROOT/err0"; false; }'
+check "claude-first: claude merged, codex still open" 'grep -q "closed by claude" "$D/devlog.md" && [ -f "$D/.round-open@codex" ] && [ ! -e "$D/.round-open" ]'
+close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>"$TMP_ROOT/err0"; rc=$?
+check "claude-first: codex Stop passes" '[ "$rc" -eq 0 ] || { cat "$TMP_ROOT/err0"; false; }'
+check "claude-first: numbers unique" '[ "$(grep -o "^## Round [0-9]*" "$D/devlog.md" | tr "\n" ",")" = "## Round 1,## Round 2," ]'
+check "claude-first: neither INTERRUPTED" '! grep -q INTERRUPTED "$D/devlog.md"'
+
 new_project stops
 submit claude "claude task" >/dev/null
 submit codex "codex task" >/dev/null
-close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>"$TMP_ROOT/err1"
-check "codex Stop passes" '[ $? -eq 0 ] || { cat "$TMP_ROOT/err1"; false; }'
+close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>"$TMP_ROOT/err1"; rc=$?
+check "codex Stop passes" '[ "$rc" -eq 0 ] || { cat "$TMP_ROOT/err1"; false; }'
 check "codex merged, claude still open" 'grep -q "closed by codex" "$D/devlog.md" && [ -f "$D/.round-open" ] && [ ! -e "$D/.round-open@codex" ]'
 check "codex handoff written" 'grep -q "codex decision" "$D/handoff@codex.md"'
-close_round claude IN_PROGRESS "$D/.round-current.md" 2>"$TMP_ROOT/err2"
-check "claude Stop passes" '[ $? -eq 0 ] || { cat "$TMP_ROOT/err2"; false; }'
+close_round claude IN_PROGRESS "$D/.round-current.md" 2>"$TMP_ROOT/err2"; rc=$?
+check "claude Stop passes" '[ "$rc" -eq 0 ] || { cat "$TMP_ROOT/err2"; false; }'
 check "file order is close order, numbers unique" '[ "$(grep -o "^## Round [0-9]*" "$D/devlog.md" | tr "\n" ",")" = "## Round 2,## Round 1," ]'
 check "handoffs coexist" 'grep -q "claude decision" "$D/handoff.md" && grep -q "codex decision" "$D/handoff@codex.md"'
 check "neither INTERRUPTED" '! grep -q INTERRUPTED "$D/devlog.md"'
@@ -201,6 +212,56 @@ echo "old codex handoff" > "$D/handoff@codex.md"
 DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/clean-devlog.sh" --confirmed >/dev/null 2>&1
 check "clean keeps the single open codex round as Round 1" 'grep -q "^## Round 1 — .* · codex$" "$D/.round-current@codex.md"'
 check "clean removes every platform handoff" '[ ! -e "$D/handoff.md" ] && [ ! -e "$D/handoff@codex.md" ]'
+
+# --- Span rounds are renumbered at merge when their number is taken -------
+# A span-written round (no .round-open of its own) numbered by the LLM.
+span_round() { # platform heading
+  local f="$D/.round-current@$1.md" t="$D/.turn-start@$1"
+  [ "$1" != claude ] || { f="$D/.round-current.md"; t="$D/.turn-start"; }
+  printf '%s\n\n### User Input\n```text\nspan tick\n```\n\n### Status\nIN_PROGRESS\n' "$2" > "$f"
+  echo stale > "$t"
+  close_round "$1" IN_PROGRESS "$f" 2>"$TMP_ROOT/spanerr"
+}
+headings() { grep -o '^## Round .*' "$D/devlog.md" | sed 's/ — [^ ]*//' | tr '\n' ','; }
+
+new_project renum_reserved
+printf '## Round 1 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+submit codex "codex task" >/dev/null
+span_round claude "## Round 2 — 2026-09-28T10:00:00+0800"
+# shellcheck disable=SC2034 # read inside check's eval strings
+rc=$?
+check "span claude round passes Stop" '[ "$rc" -eq 0 ] || { cat "$TMP_ROOT/spanerr"; false; }'
+check "claude span round 2 renumbered past codex reservation" '[ "$(headings)" = "## Round 1,## Round 3," ]'
+check "renumbered heading keeps its timestamp" 'grep -q "^## Round 3 — 2026-09-28T10:00:00+0800$" "$D/devlog.md"'
+close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>"$TMP_ROOT/spanerr"
+check "codex reserved round keeps 2" '[ "$(headings)" = "## Round 1,## Round 3,## Round 2 · codex," ]'
+
+new_project renum_existing
+printf '## Round 1 — t\n\n### Status\nDONE\n\n## Round 2 — t · codex\n\n### Status\nDONE\n\n## Round 3 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+span_round claude "## Round 3 — t"
+check "span round whose number exists gets the next free one" '[ "$(headings)" = "## Round 1,## Round 2 · codex,## Round 3,## Round 4," ]'
+
+new_project renum_suffix
+printf '## Round 4 — t\n\n### Status\nDONE\n' > "$D/devlog.md"
+span_round codex "## Round 5 — t"
+check "codex span round without suffix gets it on merge" '[ "$(headings)" = "## Round 4,## Round 5 · codex," ]'
+
+new_project renum_passthrough
+submit claude "claude task" >/dev/null
+submit codex "codex task" >/dev/null
+# shellcheck disable=SC2034 # read inside check's eval strings
+BEFORE="$(head -1 "$D/.round-current.md")"
+close_round claude IN_PROGRESS "$D/.round-current.md" 2>/dev/null
+check "reserved round heading passes through unchanged" '[ "$(grep "^## Round " "$D/devlog.md")" = "$BEFORE" ]'
+
+# --- Reply Fold prefers the caller's own round when numbers repeat ---------
+new_project fold_dup
+printf '## Round 5 — t · codex\n\n### Summary\ncodex asked\n\n### Status\nDONE\n\n## Round 5 — t\n\n### Summary\nclaude five\n\n### Status\nDONE\n' > "$D/devlog.md"
+printf '{"round": 5, "opened_at": "t"}\n' > "$D/.awaiting-reply@codex"
+submit codex "the answer" >/dev/null
+check "codex fold reopens codex's Round 5" 'grep -q "codex asked" "$D/.round-current@codex.md" && grep -q "claude five" "$D/devlog.md" && ! grep -q "codex asked" "$D/devlog.md"'
+close_round codex IN_PROGRESS "$D/.round-current@codex.md" 2>/dev/null
+check "folded round keeps its number on merge" '[ "$(headings)" = "## Round 5,## Round 5 · codex," ]'
 
 if [ "$FAIL" -eq 0 ]; then echo "All checks passed."; exit 0
 else echo "Some checks FAILED."; exit 1; fi

@@ -130,6 +130,21 @@ already holds it for its whole body):
   closes before Round 13, it is appended first. Consumers already
   tolerate this — `LAST_N` takes the max, `devlog_list_round_starts`'s
   "last" means last in file, timeline and keep-all sort by timestamp.
+- **Span exception: renumber at merge.** Rounds the LLM opens itself
+  inside a Span (no `round-start.sh`, no `.round-open*`) take max+1 from
+  `devlog.md` and so can collide with another platform's reservation.
+  `devlog_merge_round_current` (every merge path: Stop, dangling close,
+  orphan rescue; all under the lock) first rewrites each `## Round N`
+  heading in the round file whose N is already a round in the target
+  devlog, reserved by another platform's `.round-open*` for that file, or
+  repeated in the same merge, to the next free number (above all of
+  those), and appends ` · <p>` to a non-Claude heading without an owner
+  suffix. The caller's own reserved number passes through unchanged
+  (a reserved round never collides; a Reply Fold reopening a duplicate
+  pre-upgrade number keeps it). Markers that stored the old number are not
+  rewritten: `.span-open*` holds the reserved round that opened the span,
+  and `await-open.sh` without `.round-open*` names a round already in
+  `devlog.md`, so neither points at a renumbered span round.
 - Heading parsers take only the digits after `## Round `
   (`report-scan.awk`, `keep-all.js`, `keep-move.sh`, `clean-devlog.sh`,
   `devlog_list_round_starts`). Timeline's time text becomes
@@ -151,9 +166,12 @@ to the caller's own last round:
 
 - Reply Fold detection in `round-start.sh`: the awaited round must still
   exist in `devlog.md` **by number**; `devlog_reopen_last_round` becomes
-  `devlog_reopen_round <devlog> <current> <n>`, which cuts that numbered
-  block out of anywhere in the file. The merge re-appends it at the tail
-  with its original number.
+  `devlog_reopen_round <devlog> <current> <n> [platform]`, which cuts that
+  numbered block out of anywhere in the file. With duplicate numbers
+  (pre-upgrade collisions) the caller's own heading wins; any owner's is
+  the fallback (a pre-claim heading the platform wrote unsuffixed —
+  `devlog_fold_round_start`). The merge re-appends it at the tail with its
+  original number.
 - Task-notification fold target.
 - Workspace-mismatch claim (`workspace_claim_state` gains a platform
   argument) and the Lessons BLOCKED→unblocked advisory.
