@@ -70,6 +70,9 @@ is_devlog_tool_allowed() {
     Bash)
       is_safe_readonly_git_command "$3" && return 0
       ;;
+    # Asking the user is the way out of a workspace mismatch, so it must
+    # never be gated by the valve that demands the question.
+    AskUserQuestion) return 0 ;;
   esac
   return 1
 }
@@ -100,7 +103,7 @@ if [ -f "$MISMATCH_FILE" ]; then
       *"$mark_flat"*) rm -f "$MISMATCH_FILE" 2>/dev/null || true ;;
       *)
         if ! is_devlog_tool_allowed "$TOOL_NAME" "$FILE_PATH" "$COMMAND"; then
-          echo "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。請先 Read .devlog/${ROUND_CURRENT##*/}，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進段落（宣稱 vs 實際）。寫完再呼叫其他工具。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
+          echo "上一輪 Handoff 的工作區（\`<workspace>\`；舊格式是 \`#### 工作區\`）跟目前 git 不符。這不是要你照舊指令硬做，也不是永遠擋住：請先用 AskUserQuestion（沒有這個工具就直接在對話裡問並等回覆）問使用者「要不要在目前工作區繼續」，選項至少有「接受現況繼續」與「先停下來，我自己處理」。使用者接受後，Read .devlog/${ROUND_CURRENT##*/}，再用 Edit／StrReplace 在這一輪追加 ### 段落，把下面「實際」逐字貼進去（宣稱 vs 實際，並註明使用者已接受），這道檢查才會放行；使用者不接受就停手，不要動工作樹。不要照上一輪 Handoff「現況／下一步」的字面行動。（唯讀的 git status／diff／log／show／rev-parse 仍可執行，方便自行核對。）" >&2
           echo "" >&2
           echo "實際：" >&2
           printf '%s\n' "$LIVE_MARK" >&2

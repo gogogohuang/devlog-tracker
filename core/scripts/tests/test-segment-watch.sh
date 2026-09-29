@@ -343,6 +343,14 @@ printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/.round-curre
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch marker + Read devlog -> allowed" 0 $?
 
+printf '%s' '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + AskUserQuestion -> allowed" 0 $?
+
+ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
+assert_contains "mismatch block message tells agent to ask the user first" "問使用者" "$ERR"
+assert_contains "mismatch block message offers stopping" "先停下來" "$ERR"
 ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
 case "$ERR" in
