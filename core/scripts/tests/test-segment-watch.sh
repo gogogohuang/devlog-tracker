@@ -343,12 +343,34 @@ printf '%s' '{"tool_name":"Read","tool_input":{"file_path":".devlog/.round-curre
   | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "mismatch marker + Read devlog -> allowed" 0 $?
 
+printf '%s' '{"tool_name":"AskUserQuestion","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + AskUserQuestion -> allowed" 0 $?
+
+ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
+assert_contains "mismatch block message tells agent to ask the user first" "問使用者" "$ERR"
+assert_contains "mismatch block message offers stopping" "先停下來" "$ERR"
 ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' \
   | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
 case "$ERR" in
   *實際*deadbeef*) echo "PASS: mismatch stderr includes live snapshot" ;;
   *) echo "FAIL: mismatch stderr [$ERR]"; FAIL=1 ;;
 esac
+
+# no open round in round-current (empty/archived) -> stale marker dropped, not a deadlock
+cp "$DEVLOG_DIR/.round-current.md" "$DEVLOG_DIR/.round-current.bak"
+: > "$DEVLOG_DIR/.round-current.md"
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
+printf '%s' '{"tool_name":"Bash","tool_input":{"command":"git push"},"session_id":"aaa"}' \
+  | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "mismatch marker + no open round -> allowed" 0 $?
+[ ! -f "$DEVLOG_DIR/.workspace-mismatch" ] && echo "PASS: stale marker removed when no open round" || { echo "FAIL: stale marker remains"; FAIL=1; }
+mv "$DEVLOG_DIR/.round-current.bak" "$DEVLOG_DIR/.round-current.md"
+printf '%s\n' 'main @ deadbeef，工作樹乾淨' > "$DEVLOG_DIR/.workspace-mismatch"
+write_state "$NOW" "$(cksum < "$DEVLOG_DIR/.round-current.md" | tr -d '\n')" 900
+ERR="$(printf '%s' '{"tool_name":"Bash","tool_input":{},"session_id":"aaa"}' | bash "$SCRIPT_DIR/segment-watch.sh" 2>&1 >/dev/null || true)"
+assert_contains "no-segment diagnosis" "還沒有段落" "$ERR"
 
 # last Round contains the live snapshot -> marker cleared, Bash allowed
 # (fresh clock so the silence valve does not also fire)

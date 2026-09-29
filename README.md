@@ -237,7 +237,7 @@ The `SessionStart` hook, on new session / resume / `/compact` / `/fork`, first i
 
 #### Same-round workspace-drift detection
 
-When the next message in the same conversation is sent, `UserPromptSubmit` compares the previous round's Handoff "Workspace" against the current git state; on a mismatch, it injects a notice and has `PreToolUse` block non-devlog tools until this round adds a `### Segment` containing an actual snapshot (read-only `git status`/`diff`/`log`/`show`/`rev-parse` are unaffected, so you can check for yourself). Quiet Span ticks, task-notifications, and `DONE` aren't blocked. See [`docs/design/continue.md`](docs/design/continue.md) and [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
+When the next message in the same conversation is sent, `UserPromptSubmit` compares the previous round's Handoff "Workspace" against the current git state; on a mismatch, it injects a notice telling the agent to ask you whether to continue on the current workspace, and has `PreToolUse` block non-devlog tools until this round adds a `### Segment` containing an actual snapshot (recorded after you accept; `AskUserQuestion` is never blocked) (read-only `git status`/`diff`/`log`/`show`/`rev-parse` are unaffected, so you can check for yourself). Quiet Span ticks, task-notifications, and `DONE` aren't blocked. See [`docs/design/continue.md`](docs/design/continue.md) and [`docs/design/segment-watch.md`](docs/design/segment-watch.md).
 
 #### Unexpected interruption
 

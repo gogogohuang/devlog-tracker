@@ -84,7 +84,10 @@ itself a test command. Do not ask 「上次做到哪」.
 Same-session next user message (not `/clear`, not a new session) goes
 through `round-start.sh` + PreToolUse: mismatch writes
 `.devlog/.workspace-mismatch` and blocks non-devlog tools until this
-Round records the live snapshot in a `### 段落`. Continue.md step 5
+Round records the live snapshot in a `### 段落`. The block message and
+stdout note tell the agent to first ask the user (AskUserQuestion, never
+blocked by this gate) whether to continue on the live workspace; the
+`### 段落` is written after acceptance, and a refusal means stop. Continue.md step 5
 remains the explicit continue path; this gate is for the message that
 never invoked continue. Span ticks and `DONE` last rounds skip it.
 A turn that uses no tools never hits PreToolUse; the stdout /
