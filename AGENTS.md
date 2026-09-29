@@ -48,6 +48,12 @@ npm test                          # CLI 與 scripts 的 node 測試
 在乾淨的 `main` 上（工作區不能有未 commit 的變更）：
 
 ```bash
+pnpm release minor            # 或 patch；加 --dry-run 只做檢查、印出會跑的步驟
+```
+
+`scripts/release.js` 先檢查在 `main`、工作區乾淨、與 `origin/main` 同步，再依序執行下面三步（前面先跑 `npm test`）。要手動發版也可以直接跑：
+
+```bash
 pnpm version minor            # 同步版號檔案、產生 `0.X.Y` commit、打 `v0.X.Y` tag
 git push --follow-tags        # 推 commit 與 tag
 gh release create v0.X.Y --generate-notes   # 建 Release；這一步會觸發自動發版
