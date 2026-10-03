@@ -35,6 +35,8 @@ if [ "${1:-}" = "--write-analysis" ]; then
   [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
   grep -q '[^[:space:]]' "$SRC" || { echo "keep-all: analysis source is empty: $SRC" >&2; exit 1; }
   DEST="$(cd "$DEVLOG_DIR" && pwd)/keep-all.analysis.md"
+  # mv would move the temp file into a directory (or a link to one) and still succeed.
+  [ -d "$DEST" ] && { echo "keep-all: analysis destination is a directory: $DEST" >&2; exit 1; }
   # mktemp creates the file exclusively (O_EXCL), so a pre-planted symlink
   # cannot redirect the copy outside .devlog.
   TMP_DEST="$(mktemp "$DEST.tmp.XXXXXX")" || exit 1

@@ -121,6 +121,22 @@ check "AC-7: empty path exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
 check "AC-7: empty path has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
 check "AC-7: empty path preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
 
+# A directory (or a symlink to one) at the destination is rejected, not filled with the tmp.
+rm -f "$DEST"
+printf 'replacement\n' > "$SRC"
+for kind in dir symlink; do
+  rm -rf "$DEST" "$TMP/linked-dir"
+  if [ "$kind" = dir ]; then mkdir "$DEST"; else mkdir "$TMP/linked-dir"; ln -s "$TMP/linked-dir" "$DEST"; fi
+  DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "$kind destination exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "$kind destination has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+  check "$kind destination does not report ANALYSIS=" '! grep -q "ANALYSIS=" "$TMP/analysis.out"'
+  check "$kind destination leaves no tmp" 'no_analysis_tmp && [ -z "$(find "$TMP/linked-dir" -type f 2>/dev/null)" ]'
+  check "$kind destination releases lock" '[ ! -e "$A/.devlog/.lock" ] && [ ! -d "$A/.devlog/.lock.d" ]'
+done
+rm -rf "$DEST" "$TMP/linked-dir"
+
 # AC-22: a live process holding the devlog lock makes --write-analysis refuse
 # after the contention timeout, leaving that process's lock untouched.
 sleep 30 &

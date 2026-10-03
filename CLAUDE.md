@@ -1,1 +1,1 @@
-# Mode
+@AGENTS.md
