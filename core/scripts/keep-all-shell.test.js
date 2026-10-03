@@ -4,6 +4,23 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+test('keep-all.sh --write-analysis works in a git repo with Node excluded from PATH', () => {
+  const result = spawnSync('bash', [
+    path.join(__dirname, 'tests', 'test-keep-all.sh'),
+    '--write-analysis-tests-only',
+  ], { encoding: 'utf8' });
+  assert.ifError(result.error);
+  for (const contract of [
+    'AC-21: fixture excludes Node',
+    'AC-21: fixture is a git repo',
+    'AC-21: write-analysis without Node exits 0',
+    'AC-21: write-analysis without Node copies exact content',
+    'AC-21: write-analysis without Node reports absolute path',
+    'AC-21: write-analysis without Node does not report NO_NODE',
+  ]) assert.ok(result.stdout.includes(`PASS: ${contract}`), `${contract}\n${result.stdout}\n${result.stderr}`);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('keep-all.sh analysis write failures preserve bytes, report errors and clean tmp and lock', () => {
   const result = spawnSync('bash', [
     path.join(__dirname, 'tests', 'test-keep-all.sh'),

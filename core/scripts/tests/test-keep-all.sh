@@ -143,6 +143,14 @@ wait "$HOLDER_PID" 2>/dev/null
 rm -rf "$A/.devlog/.lock"
 
 # Keep normal shell utilities available while excluding Node deterministically.
+NO_NODE_REPO="$TMP/no-node project"
+mkdir -p "$NO_NODE_REPO/.devlog"
+git -C "$NO_NODE_REPO" init -q
+git -C "$NO_NODE_REPO" -c user.email=t@t.t -c user.name=t commit -q --allow-empty -m init
+NO_NODE_REPO="$(cd "$NO_NODE_REPO" && pwd -P)"
+NO_NODE_SRC="$TMP/no-node source.md"
+# shellcheck disable=SC2034 # read by check() via eval below
+NO_NODE_DEST="$NO_NODE_REPO/.devlog/keep-all.analysis.md"
 NO_NODE_PATH="$TMP/no-node-bin"
 mkdir -p "$NO_NODE_PATH"
 for utility in bash cat cp mv mkdir rmdir rm date sleep mktemp git sed awk cut dirname basename tr grep head cksum; do
@@ -150,16 +158,17 @@ for utility in bash cat cp mv mkdir rmdir rm date sleep mktemp git sed awk cut d
   ln -s "$UTILITY_PATH" "$NO_NODE_PATH/$utility"
 done
 BASH_BIN="$(command -v bash)"
-check "no-node fixture excludes Node" '! PATH="$NO_NODE_PATH" "$BASH_BIN" -c "command -v node"'
-rm -f "$DEST"
-printf 'analysis without Node\n' > "$SRC"
+check "AC-21: fixture excludes Node" '! PATH="$NO_NODE_PATH" "$BASH_BIN" -c "command -v node"'
+check "AC-21: fixture is a git repo" 'git -C "$NO_NODE_REPO" rev-parse --is-inside-work-tree >/dev/null'
+printf '# 無 Node 分析\n\nexact bytes, no final newline' > "$NO_NODE_SRC"
 # shellcheck disable=SC2034 # read by check() via eval below
-ANALYSIS_OUT="$(PATH="$NO_NODE_PATH" DEVLOG_PROJECT_DIR="$A" "$BASH_BIN" "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" 2>"$TMP/analysis.err")"
+ANALYSIS_OUT="$(PATH="$NO_NODE_PATH" DEVLOG_PROJECT_DIR="$NO_NODE_REPO" "$BASH_BIN" "$SCRIPT_DIR/keep-all.sh" --write-analysis "$NO_NODE_SRC" 2>"$TMP/no-node.err")"
 # shellcheck disable=SC2034 # read by check() via eval below
 ANALYSIS_STATUS=$?
-check "write-analysis without Node exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
-check "write-analysis without Node copies exact content" 'cmp -s "$SRC" "$DEST"'
-check "write-analysis without Node reports absolute path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$DEST" ]'
+check "AC-21: write-analysis without Node exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "AC-21: write-analysis without Node copies exact content" 'cmp -s "$NO_NODE_SRC" "$NO_NODE_DEST"'
+check "AC-21: write-analysis without Node reports absolute path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$NO_NODE_DEST" ] && [[ "$NO_NODE_DEST" = /* ]]'
+check "AC-21: write-analysis without Node does not report NO_NODE" '[[ "$ANALYSIS_OUT" != *NO_NODE* ]] && ! grep -q NO_NODE "$TMP/no-node.err"'
 
 # npm test uses this focused entry point; the hook suite also runs the rest.
 if [ "${1:-}" = --write-analysis-tests-only ]; then
