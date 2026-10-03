@@ -121,6 +121,27 @@ check "AC-7: empty path exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
 check "AC-7: empty path has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
 check "AC-7: empty path preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
 
+# AC-22: a live process holding the devlog lock makes --write-analysis refuse
+# after the contention timeout, leaving that process's lock untouched.
+sleep 30 &
+HOLDER_PID=$!
+mkdir "$A/.devlog/.lock"
+printf '%s\n' "$HOLDER_PID" > "$A/.devlog/.lock/pid"
+printf 'existing analysis must survive contention\n' > "$DEST"
+cp "$DEST" "$TMP/analysis-before.md"
+printf 'contended replacement\n' > "$SRC"
+DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-22: contended lock exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+check "AC-22: contended lock has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+check "AC-22: contended lock does not report ANALYSIS=" '! grep -q "ANALYSIS=" "$TMP/analysis.out"'
+check "AC-22: contended lock preserves existing analysis bytes" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+check "AC-22: contended lock leaves no tmp" 'no_analysis_tmp'
+check "AC-22: contended lock keeps the holder's lock and pid" '[ -d "$A/.devlog/.lock" ] && [ "$(cat "$A/.devlog/.lock/pid" 2>/dev/null)" = "$HOLDER_PID" ]'
+kill "$HOLDER_PID" 2>/dev/null
+wait "$HOLDER_PID" 2>/dev/null
+rm -rf "$A/.devlog/.lock"
+
 # Keep normal shell utilities available while excluding Node deterministically.
 NO_NODE_PATH="$TMP/no-node-bin"
 mkdir -p "$NO_NODE_PATH"

@@ -23,6 +23,23 @@ test('keep-all.sh analysis write failures preserve bytes, report errors and clea
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
 });
 
+test('keep-all.sh --write-analysis refuses when another live process holds the lock', () => {
+  const result = spawnSync('bash', [
+    path.join(__dirname, 'tests', 'test-keep-all.sh'),
+    '--write-analysis-tests-only',
+  ], { encoding: 'utf8' });
+  assert.ifError(result.error);
+  for (const contract of [
+    'AC-22: contended lock exits nonzero',
+    'AC-22: contended lock has a stderr diagnostic',
+    'AC-22: contended lock does not report ANALYSIS=',
+    'AC-22: contended lock preserves existing analysis bytes',
+    'AC-22: contended lock leaves no tmp',
+    "AC-22: contended lock keeps the holder's lock and pid",
+  ]) assert.ok(result.stdout.includes(`PASS: ${contract}`), `${contract}\n${result.stdout}\n${result.stderr}`);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test('keep-all.sh rejects empty, blank and missing analysis sources; scan ignores the analysis file', () => {
   const result = spawnSync('bash', [
     path.join(__dirname, 'tests', 'test-keep-all.sh'),
