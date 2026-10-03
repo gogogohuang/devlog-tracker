@@ -258,6 +258,37 @@ One run, all or nothing, under the devlog lock.
 8. stdout: `KEPT=<path> ROUNDS=<n>` per target, `DELETED=<path>` per
    removed file, `BACKUP=<dir>`.
 
+## Analysis file (`--write-analysis`)
+
+After a successful apply, Claude writes every confirmed topic's analysis
+into one file, `.devlog/keep-all.analysis.md` (overwritten each run):
+first write a temp file, then
+`keep-all.sh --write-analysis <tmp>`. Format:
+
+```
+# Keep-all analysis
+
+## <topic>
+<description>
+
+規範候選：
+- ...
+
+來源檔：<file> Round <numbers>
+```
+
+One `## <topic>` section per topic, each with description, 規範候選
+(promotable rules), source files and Rounds. `--write-analysis` is pure
+shell (no Node needed), takes the devlog lock, copies via an exclusive
+`mktemp` file and `mv`, and prints `ANALYSIS=<path>`. Error contract:
+exit 1 with a stderr message when the source is missing, empty/blank,
+the lock is held by another process, or the copy/move fails (temp file
+removed; an existing analysis file is left untouched).
+
+`promote-sources.sh` lists it as `FILE=... KIND=analysis EXISTS=1`;
+`/devlog-tracker:promote` reads it first and picks AGENTS.md/CLAUDE.md
+rules from each topic's 規範候選.
+
 ## Non-goals
 
 - No automatic trigger; user runs the command.
