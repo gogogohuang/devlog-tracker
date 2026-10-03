@@ -30,8 +30,10 @@ if [ "${1:-}" = "--write-analysis" ]; then
   SRC="${2:-}"
   [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
   DEST="$(cd "$DEVLOG_DIR" && pwd)/keep-all.analysis.md"
-  TMP_DEST="$DEST.tmp.$$"
-  cp "$SRC" "$TMP_DEST" && mv "$TMP_DEST" "$DEST" || { rm -f "$TMP_DEST"; exit 1; }
+  # mktemp creates the file exclusively (O_EXCL), so a pre-planted symlink
+  # cannot redirect the copy outside .devlog.
+  TMP_DEST="$(mktemp "$DEST.tmp.XXXXXX")" || exit 1
+  cat "$SRC" > "$TMP_DEST" && mv "$TMP_DEST" "$DEST" || { rm -f "$TMP_DEST"; exit 1; }
   echo "ANALYSIS=$DEST"
   exit 0
 fi
