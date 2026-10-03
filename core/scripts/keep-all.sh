@@ -37,9 +37,15 @@ devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
 if [ "${1:-}" = "--write-analysis" ]; then
-  if [ -n "${LOCK_CONTENDED_BY:-}" ]; then
-    echo "keep-all: devlog lock is held by process ${LOCK_CONTENDED_BY}" >&2
-    exit 1
+  # Write only when this process holds the lock or legitimately inherits it
+  # from a parent (DEVLOG_LOCK_OWNER matches the lock's pid). Anything else,
+  # including a timeout on a lock with no valid pid, is a failed acquire.
+  if [ "${LOCK_HELD:-0}" -ne 1 ]; then
+    LOCK_PID="$(cat "$DEVLOG_DIR/.lock/pid" 2>/dev/null || true)"
+    if [ -z "${DEVLOG_LOCK_OWNER:-}" ] || [ "$LOCK_PID" != "$DEVLOG_LOCK_OWNER" ]; then
+      echo "keep-all: could not acquire devlog lock (held by ${LOCK_CONTENDED_BY:-unknown process})" >&2
+      exit 1
+    fi
   fi
   DEST="$(cd "$DEVLOG_DIR" && pwd)/keep-all.analysis.md"
   # mv would move the temp file into a directory (or a link to one) and still succeed.

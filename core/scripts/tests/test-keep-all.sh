@@ -182,6 +182,28 @@ kill "$HOLDER_PID" 2>/dev/null
 wait "$HOLDER_PID" 2>/dev/null
 rm -rf "$A/.devlog/.lock"
 
+# A lock without a valid pid (missing, blank or non-numeric) cannot be reclaimed
+# as stale, so after the timeout --write-analysis must refuse rather than write.
+for pid_kind in missing blank non-numeric; do
+  mkdir "$A/.devlog/.lock"
+  case "$pid_kind" in
+    blank) printf '  \n' > "$A/.devlog/.lock/pid" ;;
+    non-numeric) printf 'abc\n' > "$A/.devlog/.lock/pid" ;;
+  esac
+  printf 'existing analysis must survive pidless lock\n' > "$DEST"
+  cp "$DEST" "$TMP/analysis-before.md"
+  printf 'pidless replacement\n' > "$SRC"
+  DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "$pid_kind-pid lock exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "$pid_kind-pid lock has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+  check "$pid_kind-pid lock does not report ANALYSIS=" '! grep -q "ANALYSIS=" "$TMP/analysis.out"'
+  check "$pid_kind-pid lock preserves existing analysis bytes" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+  check "$pid_kind-pid lock leaves no tmp" 'no_analysis_tmp'
+  check "$pid_kind-pid lock leaves the lock in place" '[ -d "$A/.devlog/.lock" ]'
+  rm -rf "$A/.devlog/.lock"
+done
+
 # Keep normal shell utilities available while excluding Node deterministically.
 NO_NODE_REPO="$TMP/no-node project"
 mkdir -p "$NO_NODE_REPO/.devlog"
