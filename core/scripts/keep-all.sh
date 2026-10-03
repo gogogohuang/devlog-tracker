@@ -34,7 +34,16 @@ if [ "${1:-}" = "--write-analysis" ]; then
   # mktemp creates the file exclusively (O_EXCL), so a pre-planted symlink
   # cannot redirect the copy outside .devlog.
   TMP_DEST="$(mktemp "$DEST.tmp.XXXXXX")" || exit 1
-  cat "$SRC" > "$TMP_DEST" && mv "$TMP_DEST" "$DEST" || { rm -f "$TMP_DEST"; exit 1; }
+  if ! cp "$SRC" "$TMP_DEST"; then
+    rm -f "$TMP_DEST"
+    echo "keep-all: failed to write analysis temp file: $TMP_DEST" >&2
+    exit 1
+  fi
+  if ! mv "$TMP_DEST" "$DEST"; then
+    rm -f "$TMP_DEST"
+    echo "keep-all: failed to move analysis into place: $DEST" >&2
+    exit 1
+  fi
   echo "ANALYSIS=$DEST"
   exit 0
 fi
