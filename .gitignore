@@ -3,3 +3,4 @@
 .devlog/
 docs/superpowers/
 node_modules/
+flow.config.json
