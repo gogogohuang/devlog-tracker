@@ -311,5 +311,13 @@ workspace_claim_state() {
   [ -n "$claimed" ] || { printf 'NO_CLAIM\n'; return 0; }
   live="$(workspace_snapshot "$dir")"
   [ -n "$live" ] || { printf 'NO_CLAIM\n'; return 0; }
-  if [ "$claimed" = "$live" ]; then printf 'MATCH\n'; else printf 'MISMATCH\n'; fi
+  if [ "$claimed" = "$live" ]; then printf 'MATCH\n'; return 0; fi
+  # Work often happens in a linked worktree while hooks still run against the
+  # main checkout; a claim that matches any worktree of this repo is not drift.
+  local wt
+  while IFS= read -r wt; do
+    [ -n "$wt" ] && [ "$wt" != "$dir" ] || continue
+    if [ "$claimed" = "$(workspace_snapshot "$wt")" ]; then printf 'MATCH\n'; return 0; fi
+  done < <(git -C "$dir" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  printf 'MISMATCH\n'
 }

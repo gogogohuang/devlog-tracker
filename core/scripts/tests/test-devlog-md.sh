@@ -505,6 +505,16 @@ assert_eq "claude claim ignores codex's later round" "MATCH" "$(workspace_claim_
 assert_eq "claude is the default platform" "MATCH" "$(workspace_claim_state "$NONGIT_DIR" "$WS_FILE")"
 assert_eq "codex claim sees its own round" "MISMATCH" "$(workspace_claim_state "$NONGIT_DIR" "$WS_FILE" codex)"
 
+# --- claim that matches a linked worktree (not the main checkout) is MATCH
+WT_MAIN="$TMP_ROOT/wt-main"; WT_LINK="$TMP_ROOT/wt-link"
+git init -q "$WT_MAIN" && git -C "$WT_MAIN" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+git -C "$WT_MAIN" worktree add -q -b feat "$WT_LINK" >/dev/null 2>&1
+# shellcheck source=../workspace-snapshot.sh
+. "$SCRIPT_DIR/workspace-snapshot.sh"
+WT_CLAIM="$(workspace_snapshot "$WT_LINK")"
+printf '## Round 1 — 2026-09-27T10:00:00+0800\n\n### Handoff\n<handoff>\n<workspace>\n%s\n</workspace>\n</handoff>\n\n### Status\nIN_PROGRESS\n' "$WT_CLAIM" > "$TMP_ROOT/wt-claim.md"
+assert_eq "claim matching a linked worktree is MATCH" "MATCH" "$(workspace_claim_state "$WT_MAIN" "$TMP_ROOT/wt-claim.md")"
+
 cat > "$TMP_ROOT/unclosed-fence-segments.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00
 
