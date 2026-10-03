@@ -10,7 +10,59 @@ FAIL=0
 check() { if eval "$2"; then echo "PASS: $1"; else echo "FAIL: $1"; FAIL=1; fi; }
 round() { printf '## Round %s — %s\n\n### Status\n%s\n\n' "$1" "$2" "$3"; }
 
-command -v node >/dev/null 2>&1 || { echo "SKIP: node not installed"; exit 0; }
+# The analysis mode is shell-only; exercise it before the Node-dependent checks.
+A="$TMP/analysis project"
+mkdir -p "$A/.devlog"
+A="$(cd "$A" && pwd -P)"
+SRC="$TMP/analysis source.md"
+DEST="$A/.devlog/keep-all.analysis.md"
+printf '# 分析\n\n- first finding\n- exact bytes, no final newline' > "$SRC"
+ANALYSIS_OUT="$(DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" 2>"$TMP/analysis.err")"
+ANALYSIS_STATUS=$?
+check "AC-1: write-analysis exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "AC-1: analysis matches source byte for byte" 'cmp -s "$SRC" "$DEST"'
+check "AC-2: stdout reports the absolute analysis path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$DEST" ]'
+
+# Seed independently so overwrite/preservation checks do not depend on AC-1.
+printf 'old analysis that must be replaced completely\nold tail\n' > "$DEST"
+printf 'new analysis\n' > "$SRC"
+ANALYSIS_OUT="$(DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" 2>"$TMP/analysis.err")"
+ANALYSIS_STATUS=$?
+check "AC-3: overwrite exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "AC-3: overwrite replaces all old content" 'cmp -s "$SRC" "$DEST"'
+
+printf 'existing analysis must survive\n' > "$DEST"
+cp "$DEST" "$TMP/analysis-before.md"
+DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$TMP/nonexistent.md" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-4: missing source exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+check "AC-4: missing source has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+check "AC-4: missing source preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+
+# Keep normal shell utilities available while excluding Node deterministically.
+NO_NODE_PATH="$TMP/no-node-bin"
+mkdir -p "$NO_NODE_PATH"
+for utility in bash cat cp mv mkdir rmdir rm date sleep mktemp git sed awk cut dirname basename tr grep head cksum; do
+  UTILITY_PATH="$(command -v "$utility")"
+  ln -s "$UTILITY_PATH" "$NO_NODE_PATH/$utility"
+done
+BASH_BIN="$(command -v bash)"
+check "no-node fixture excludes Node" '! PATH="$NO_NODE_PATH" "$BASH_BIN" -c "command -v node"'
+rm -f "$DEST"
+printf 'analysis without Node\n' > "$SRC"
+# shellcheck disable=SC2034 # read by check() via eval below
+ANALYSIS_OUT="$(PATH="$NO_NODE_PATH" DEVLOG_PROJECT_DIR="$A" "$BASH_BIN" "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" 2>"$TMP/analysis.err")"
+# shellcheck disable=SC2034 # read by check() via eval below
+ANALYSIS_STATUS=$?
+check "write-analysis without Node exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "write-analysis without Node copies exact content" 'cmp -s "$SRC" "$DEST"'
+check "write-analysis without Node reports absolute path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$DEST" ]'
+
+# npm test uses this focused entry point; the hook suite also runs the rest.
+if [ "${1:-}" = --write-analysis-tests-only ]; then
+  exit "$FAIL"
+fi
+command -v node >/dev/null 2>&1 || { echo "SKIP: Node-dependent checks"; exit "$FAIL"; }
 
 R="$TMP/repo"
 mkdir -p "$R/.devlog"
