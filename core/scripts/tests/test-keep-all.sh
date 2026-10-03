@@ -232,10 +232,6 @@ check "AC-21: write-analysis without Node copies exact content" 'cmp -s "$NO_NOD
 check "AC-21: write-analysis without Node reports absolute path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$NO_NODE_DEST" ] && [[ "$NO_NODE_DEST" = /* ]]'
 check "AC-21: write-analysis without Node does not report NO_NODE" '[[ "$ANALYSIS_OUT" != *NO_NODE* ]] && ! grep -q NO_NODE "$TMP/no-node.err"'
 
-# npm test uses this focused entry point; the hook suite also runs the rest.
-if [ "${1:-}" = --write-analysis-tests-only ]; then
-  exit "$FAIL"
-fi
 command -v node >/dev/null 2>&1 || { echo "SKIP: Node-dependent checks"; exit "$FAIL"; }
 
 R="$TMP/repo"

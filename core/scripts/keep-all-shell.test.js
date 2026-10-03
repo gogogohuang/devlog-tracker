@@ -4,11 +4,18 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-test('keep-all.sh --write-analysis works in a git repo with Node excluded from PATH', () => {
-  const result = spawnSync('bash', [
+// The shell suite waits out several lock timeouts, so every test below
+// asserts against one shared run instead of spawning it again.
+let suiteResult;
+function runKeepAllSuite() {
+  suiteResult ??= spawnSync('bash', [
     path.join(__dirname, 'tests', 'test-keep-all.sh'),
-    '--write-analysis-tests-only',
   ], { encoding: 'utf8' });
+  return suiteResult;
+}
+
+test('keep-all.sh --write-analysis works in a git repo with Node excluded from PATH', () => {
+  const result = runKeepAllSuite();
   assert.ifError(result.error);
   for (const contract of [
     'AC-21: fixture excludes Node',
@@ -22,10 +29,7 @@ test('keep-all.sh --write-analysis works in a git repo with Node excluded from P
 });
 
 test('keep-all.sh analysis write failures preserve bytes, report errors and clean tmp and lock', () => {
-  const result = spawnSync('bash', [
-    path.join(__dirname, 'tests', 'test-keep-all.sh'),
-    '--write-analysis-tests-only',
-  ], { encoding: 'utf8' });
+  const result = runKeepAllSuite();
   assert.ifError(result.error);
   for (const operation of ['cp', 'mv']) {
     for (const contract of [
@@ -41,10 +45,7 @@ test('keep-all.sh analysis write failures preserve bytes, report errors and clea
 });
 
 test('keep-all.sh --write-analysis refuses when another live process holds the lock', () => {
-  const result = spawnSync('bash', [
-    path.join(__dirname, 'tests', 'test-keep-all.sh'),
-    '--write-analysis-tests-only',
-  ], { encoding: 'utf8' });
+  const result = runKeepAllSuite();
   assert.ifError(result.error);
   for (const contract of [
     'AC-22: contended lock exits nonzero',
@@ -58,9 +59,7 @@ test('keep-all.sh --write-analysis refuses when another live process holds the l
 });
 
 test('keep-all.sh rejects empty, blank and missing analysis sources; scan ignores the analysis file', () => {
-  const result = spawnSync('bash', [
-    path.join(__dirname, 'tests', 'test-keep-all.sh'),
-  ], { encoding: 'utf8' });
+  const result = runKeepAllSuite();
   assert.ifError(result.error);
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /PASS: AC-5\/6: blank source preserves existing analysis/);
