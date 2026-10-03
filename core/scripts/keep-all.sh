@@ -21,7 +21,17 @@ fi
 
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
-[ -d "$DEVLOG_DIR" ] || { echo "NOTHING"; exit 0; }
+
+if [ "${1:-}" = "--write-analysis" ]; then
+  # Validate the source before touching .devlog, and create .devlog if it is
+  # missing: this mode must never report NOTHING without writing.
+  SRC="${2:-}"
+  [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
+  grep -q '[^[:space:]]' "$SRC" || { echo "keep-all: analysis source is empty: $SRC" >&2; exit 1; }
+  mkdir -p "$DEVLOG_DIR" || { echo "keep-all: cannot create devlog directory: $DEVLOG_DIR" >&2; exit 1; }
+else
+  [ -d "$DEVLOG_DIR" ] || { echo "NOTHING"; exit 0; }
+fi
 
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
@@ -31,9 +41,6 @@ if [ "${1:-}" = "--write-analysis" ]; then
     echo "keep-all: devlog lock is held by process ${LOCK_CONTENDED_BY}" >&2
     exit 1
   fi
-  SRC="${2:-}"
-  [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
-  grep -q '[^[:space:]]' "$SRC" || { echo "keep-all: analysis source is empty: $SRC" >&2; exit 1; }
   DEST="$(cd "$DEVLOG_DIR" && pwd)/keep-all.analysis.md"
   # mv would move the temp file into a directory (or a link to one) and still succeed.
   [ -d "$DEST" ] && { echo "keep-all: analysis destination is a directory: $DEST" >&2; exit 1; }

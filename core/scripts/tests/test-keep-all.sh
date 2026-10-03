@@ -31,6 +31,30 @@ ANALYSIS_STATUS=$?
 check "AC-3: overwrite exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
 check "AC-3: overwrite replaces all old content" 'cmp -s "$SRC" "$DEST"'
 
+# Without .devlog: write-analysis creates it, and source errors still fail loudly.
+NODIR="$TMP/no devlog project"
+mkdir -p "$NODIR"
+NODIR="$(cd "$NODIR" && pwd -P)"
+ANALYSIS_OUT="$(DEVLOG_PROJECT_DIR="$NODIR" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" 2>"$TMP/analysis.err")"
+ANALYSIS_STATUS=$?
+check "AC-1: write-analysis without .devlog exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "AC-1: write-analysis without .devlog writes the analysis" 'cmp -s "$SRC" "$NODIR/.devlog/keep-all.analysis.md"'
+check "AC-2: write-analysis without .devlog reports the path" '[ "$ANALYSIS_OUT" = "ANALYSIS=$NODIR/.devlog/keep-all.analysis.md" ]'
+printf '' > "$TMP/empty.md"
+printf '  \n\t\n' > "$TMP/blank.md"
+for bad in "$TMP/nonexistent.md" "$TMP/empty.md" "$TMP/blank.md" ""; do
+  rm -rf "$NODIR/.devlog"
+  DEVLOG_PROJECT_DIR="$NODIR" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$bad" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "AC-4/5/6/7: bad source '$bad' without .devlog exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "AC-4/5/6/7: bad source '$bad' without .devlog has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+  check "AC-4/5/6/7: bad source '$bad' without .devlog does not report NOTHING" '! grep -q NOTHING "$TMP/analysis.out"'
+done
+rm -rf "$NODIR/.devlog"
+DEVLOG_PROJECT_DIR="$NODIR" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-7: missing argument without .devlog exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ] && [ -s "$TMP/analysis.err" ]'
+
 printf 'existing analysis must survive\n' > "$DEST"
 cp "$DEST" "$TMP/analysis-before.md"
 DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$TMP/nonexistent.md" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
