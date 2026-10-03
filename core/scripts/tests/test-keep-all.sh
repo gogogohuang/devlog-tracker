@@ -57,6 +57,57 @@ for kind in empty blank; do
   check "AC-5/6: $kind source preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
 done
 
+# AC-8/9/10: inject silent failures at the filesystem command boundary.
+# cp leaves a partial tmp behind before failing, exercising cleanup as well.
+no_analysis_tmp() {
+  [ -z "$(find "$A/.devlog" -name '*.tmp*' -print)" ]
+}
+analysis_lock_reacquirable() {
+  [ ! -e "$A/.devlog/.lock" ] && [ ! -e "$A/.devlog/.lock.d" ] || return 1
+  (
+    # shellcheck source=../devlog-lock.sh
+    . "$SCRIPT_DIR/devlog-lock.sh"
+    DEVLOG_DIR="$A/.devlog"
+    devlog_lock_acquire
+    trap 'devlog_lock_release' EXIT
+    [ "$LOCK_HELD" -eq 1 ]
+  )
+}
+printf 'valid replacement analysis\n' > "$SRC"
+DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-9/10: successful write exits 0" '[ "$ANALYSIS_STATUS" -eq 0 ]'
+check "AC-9: successful write leaves no tmp" 'no_analysis_tmp'
+check "AC-10: successful write releases lock for immediate acquisition" 'analysis_lock_reacquirable'
+
+for utility in cp mv; do
+  FAIL_BIN="$TMP/fail-$utility-bin"
+  mkdir -p "$FAIL_BIN"
+  if [ "$utility" = cp ]; then
+    cat > "$FAIL_BIN/cp" <<'FAKE_CP'
+#!/usr/bin/env bash
+printf 'partial analysis copy\n' > "${@: -1}"
+exit 73
+FAKE_CP
+  else
+    cat > "$FAIL_BIN/mv" <<'FAKE_MV'
+#!/usr/bin/env bash
+exit 74
+FAKE_MV
+  fi
+  chmod +x "$FAIL_BIN/$utility"
+  printf 'existing analysis must survive\n' > "$DEST"
+  cp "$DEST" "$TMP/analysis-before.md"
+  PATH="$FAIL_BIN:$PATH" DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "AC-8: $utility failure exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "AC-8: $utility failure has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+  check "AC-8: $utility failure does not report ANALYSIS=" '! grep -q "ANALYSIS=" "$TMP/analysis.out"'
+  check "AC-8: $utility failure preserves existing analysis bytes" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+  check "AC-9: $utility failure leaves no tmp" 'no_analysis_tmp'
+  check "AC-10: $utility failure releases lock for immediate acquisition" 'analysis_lock_reacquirable'
+done
+
 # AC-7: a missing or empty-string <path> is rejected and preserves the analysis.
 printf 'existing analysis must survive\n' > "$DEST"
 DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis >"$TMP/analysis.out" 2>"$TMP/analysis.err"
@@ -120,6 +171,7 @@ check "open round not movable" 'grep -q "file=devlog.feat-live.md round=2 .* mov
 
 # AC-11 (characterization): the analysis file is never a SOURCE or ROUND.
 printf '## Round 1 — 2026-09-05T10:00:00+0800\n\n### Status\nDONE\n\nanalysis notes\n' > "$R/.devlog/keep-all.analysis.md"
+# shellcheck disable=SC2034 # read by check() via eval below
 WITH_ANALYSIS="$(bash "$SCRIPT_DIR/keep-all.sh" --scan)"
 rm -f "$R/.devlog/keep-all.analysis.md"
 check "AC-11: scan output identical with analysis file present" '[ "$WITH_ANALYSIS" = "$OUT" ]'
@@ -130,12 +182,27 @@ COUNT="$(sed -n 's/^FINGERPRINT=[^ ]* COUNT=\(.*\)/\1/p' <<<"$OUT")"
 ID_MERGED="$(sed -n 's/^ROUND id=\([0-9]*\) file=devlog.feat-merged.md .*/\1/p' <<<"$OUT")"
 ID_DELETED="$(sed -n 's/^ROUND id=\([0-9]*\) file=devlog.feat-deleted.md .*/\1/p' <<<"$OUT")"
 printf 'old-branches\told branch work\t%s,%s\n' "$ID_MERGED" "$ID_DELETED" > "$TMP/plan.tsv"
+# AC-12: run a real apply against an independent copy with analysis present.
+P="$TMP/apply with analysis"
+cp -R "$R" "$P"
+printf '## Round 99 — 2026-09-06T10:00:00+0800\n\n### Status\nDONE\n\nanalysis bytes, no final newline' > "$P/.devlog/keep-all.analysis.md"
+cp "$P/.devlog/keep-all.analysis.md" "$TMP/apply-analysis-before.md"
+P_SCAN="$(DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-all.sh" --scan)"
+P_FP="$(sed -n 's/^FINGERPRINT=\([^ ]*\) COUNT=.*/\1/p' <<<"$P_SCAN")"
+P_COUNT="$(sed -n 's/^FINGERPRINT=[^ ]* COUNT=\(.*\)/\1/p' <<<"$P_SCAN")"
+DEVLOG_PROJECT_DIR="$P" bash "$SCRIPT_DIR/keep-all.sh" --apply "$TMP/plan.tsv" --fingerprint "$P_FP" --count "$P_COUNT" >"$TMP/apply-analysis.out" 2>"$TMP/apply-analysis.err"
+# shellcheck disable=SC2034 # read by check() via eval below
+P_STATUS=$?
+check "AC-12: apply with existing analysis exits 0" '[ "$P_STATUS" -eq 0 ]'
+check "AC-12: apply does not modify or delete existing analysis" 'cmp -s "$TMP/apply-analysis-before.md" "$P/.devlog/keep-all.analysis.md"'
+
 APPLY="$(bash "$SCRIPT_DIR/keep-all.sh" --apply "$TMP/plan.tsv" --fingerprint "$FP" --count "$COUNT")"
 if [ $? -eq 0 ]; then echo "PASS: apply exits 0"; else echo "FAIL: apply exits 0"; FAIL=1; fi
 [ -f "$R/.devlog/devlog.old-branches.md" ] && grep -q "^KEPT=.*devlog.old-branches.md ROUNDS=2" <<<"$APPLY" \
   && echo "PASS: named file written" || { echo "FAIL: named file written"; FAIL=1; }
 check "emptied merged/gone branch files deleted" '[ ! -e "$R/.devlog/devlog.feat-merged.md" ] && [ ! -e "$R/.devlog/devlog.feat-deleted.md" ] && grep -q "^DELETED=.*devlog.feat-merged.md" <<<"$APPLY"'
 check "index written to the current branch file" 'grep -q "devlog.old-branches.md\`：keep-all，2 輪" "$R/.devlog/devlog.feat-live.md"'
+check "AC-12: apply does not create absent analysis" '[ ! -e "$R/.devlog/keep-all.analysis.md" ]'
 check "lock released" '[ ! -e "$R/.devlog/.lock" ] && [ ! -d "$R/.devlog/.lock.d" ]'
 
 bash "$SCRIPT_DIR/keep-all.sh" --apply "$TMP/plan.tsv" --fingerprint "$FP" --count "$COUNT" >/dev/null 2>"$TMP/err"
