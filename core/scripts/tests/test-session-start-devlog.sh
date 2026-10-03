@@ -618,6 +618,25 @@ else
 fi
 rm -f "$DEVLOG_DIR/handoff@codex.md"
 
+# --- 孤兒 vendored hook 警告 ---
+STALE_DIR="$(mktemp -d)"
+mkdir -p "$STALE_DIR/.claude" "$STALE_DIR/.devlog-tracker/core/scripts"
+: > "$STALE_DIR/.devlog-tracker/core/scripts/alive.sh"
+cat > "$STALE_DIR/.claude/settings.local.json" <<JSON
+{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"bash \\"$STALE_DIR/.devlog-tracker/core/scripts/alive.sh\\""},{"type":"command","command":"bash \\"$STALE_DIR/.devlog-tracker/core/scripts/gone.sh\\""}]}]}}
+JSON
+OUT="$(echo '{"source":"startup"}' | CLAUDE_PROJECT_DIR="$STALE_DIR" bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_contains "warns about orphan vendored hook" "gone.sh" "$OUT"
+assert_contains "warning points to init --prune" "init --prune" "$OUT"
+assert_not_contains "does not flag existing vendored script" "alive.sh" "$OUT"
+OUT="$(echo '{"source":"clear"}' | CLAUDE_PROJECT_DIR="$STALE_DIR" bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_not_contains "clear stays silent about orphans" "gone.sh" "$OUT"
+rm -f "$STALE_DIR/.devlog-tracker/core/scripts/alive.sh"
+rm -rf "$STALE_DIR/.claude"
+OUT="$(echo '{"source":"startup"}' | CLAUDE_PROJECT_DIR="$STALE_DIR" bash "$SCRIPT_DIR/session-start-devlog.sh" 2>&1)"
+assert_not_contains "no settings means no warning" "init --prune" "$OUT"
+rm -rf "$STALE_DIR"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
