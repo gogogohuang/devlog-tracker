@@ -39,6 +39,37 @@ check "AC-4: missing source exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
 check "AC-4: missing source has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
 check "AC-4: missing source preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
 
+# AC-5/AC-6: empty or whitespace-only sources are rejected and create nothing.
+for kind in empty blank; do
+  rm -f "$DEST"
+  if [ "$kind" = empty ]; then : > "$SRC"; else printf '  \n\t\n \n' > "$SRC"; fi
+  DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "AC-5/6: $kind source exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "AC-5/6: $kind source has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+  check "AC-5/6: $kind source creates no analysis" '[ ! -e "$DEST" ]'
+  check "AC-5/6: $kind source leaves no temp file" '! ls "$A/.devlog" | grep -q "keep-all.analysis.md.tmp"'
+  printf 'existing analysis must survive\n' > "$DEST"
+  DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "$SRC" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+  ANALYSIS_STATUS=$?
+  check "AC-5/6: $kind source exits nonzero with existing analysis" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+  check "AC-5/6: $kind source has a diagnostic with existing analysis" '[ -s "$TMP/analysis.err" ]'
+  check "AC-5/6: $kind source preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+done
+
+# AC-7: a missing or empty-string <path> is rejected and preserves the analysis.
+printf 'existing analysis must survive\n' > "$DEST"
+DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-7: missing path exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+check "AC-7: missing path has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+check "AC-7: missing path preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+DEVLOG_PROJECT_DIR="$A" bash "$SCRIPT_DIR/keep-all.sh" --write-analysis "" >"$TMP/analysis.out" 2>"$TMP/analysis.err"
+ANALYSIS_STATUS=$?
+check "AC-7: empty path exits nonzero" '[ "$ANALYSIS_STATUS" -ne 0 ]'
+check "AC-7: empty path has a stderr diagnostic" '[ -s "$TMP/analysis.err" ]'
+check "AC-7: empty path preserves existing analysis" 'cmp -s "$TMP/analysis-before.md" "$DEST"'
+
 # Keep normal shell utilities available while excluding Node deterministically.
 NO_NODE_PATH="$TMP/no-node-bin"
 mkdir -p "$NO_NODE_PATH"
@@ -86,6 +117,13 @@ check "devlog.md off main is a branch source" 'grep -q "^SOURCE file=devlog.md k
 check "merged branch reported" 'grep -q "file=devlog.feat-merged.md kind=branch origin=feat/merged origin_from=marker state=merged" <<<"$OUT"'
 check "deleted branch reported" 'grep -q "file=devlog.feat-deleted.md kind=branch origin=feat/deleted origin_from=marker state=gone" <<<"$OUT"'
 check "open round not movable" 'grep -q "file=devlog.feat-live.md round=2 .* movable=0" <<<"$OUT"'
+
+# AC-11 (characterization): the analysis file is never a SOURCE or ROUND.
+printf '## Round 1 — 2026-09-05T10:00:00+0800\n\n### Status\nDONE\n\nanalysis notes\n' > "$R/.devlog/keep-all.analysis.md"
+WITH_ANALYSIS="$(bash "$SCRIPT_DIR/keep-all.sh" --scan)"
+rm -f "$R/.devlog/keep-all.analysis.md"
+check "AC-11: scan output identical with analysis file present" '[ "$WITH_ANALYSIS" = "$OUT" ]'
+check "AC-11: scan never mentions the analysis file" '! grep -q "keep-all.analysis" <<<"$WITH_ANALYSIS"'
 
 FP="$(sed -n 's/^FINGERPRINT=\([^ ]*\) COUNT=.*/\1/p' <<<"$OUT")"
 COUNT="$(sed -n 's/^FINGERPRINT=[^ ]* COUNT=\(.*\)/\1/p' <<<"$OUT")"
