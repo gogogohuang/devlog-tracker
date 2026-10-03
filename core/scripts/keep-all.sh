@@ -27,6 +27,10 @@ devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
 if [ "${1:-}" = "--write-analysis" ]; then
+  if [ -n "${LOCK_CONTENDED_BY:-}" ]; then
+    echo "keep-all: devlog lock is held by process ${LOCK_CONTENDED_BY}" >&2
+    exit 1
+  fi
   SRC="${2:-}"
   [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
   grep -q '[^[:space:]]' "$SRC" || { echo "keep-all: analysis source is empty: $SRC" >&2; exit 1; }
