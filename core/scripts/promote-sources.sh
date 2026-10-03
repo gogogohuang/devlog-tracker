@@ -15,11 +15,20 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 PROJECT_DIR="$(cd "${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}" 2>/dev/null && pwd)" || { echo "NO_SOURCES"; exit 0; }
 devlog_resolve_paths "$PROJECT_DIR"
 MAIN="$DEVLOG_FILE"
-[ -f "$MAIN" ] || { echo "NO_SOURCES"; exit 0; }
 
 OUT=""
 add() { OUT="$OUT$1"$'\n'; }
 exists_flag() { if [ -f "$1" ]; then printf '1'; else printf '0'; fi; }
+
+ANALYSIS="$DEVLOG_DIR/keep-all.analysis.md"
+if [ -f "$ANALYSIS" ]; then
+  add "FILE=$ANALYSIS KIND=analysis EXISTS=1"
+fi
+
+if [ ! -f "$MAIN" ]; then
+  if [ -z "$OUT" ]; then echo "NO_SOURCES"; else printf '%s' "$OUT"; fi
+  exit 0
+fi
 
 while IFS= read -r name; do
   [ -n "$name" ] || continue
