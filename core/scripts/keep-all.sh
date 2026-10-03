@@ -29,6 +29,7 @@ trap 'devlog_lock_release' EXIT
 if [ "${1:-}" = "--write-analysis" ]; then
   SRC="${2:-}"
   [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
+  grep -q '[^[:space:]]' "$SRC" || { echo "keep-all: analysis source is empty: $SRC" >&2; exit 1; }
   DEST="$(cd "$DEVLOG_DIR" && pwd)/keep-all.analysis.md"
   # mktemp creates the file exclusively (O_EXCL), so a pre-planted symlink
   # cannot redirect the copy outside .devlog.
