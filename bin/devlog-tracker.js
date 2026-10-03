@@ -11,22 +11,31 @@ async function main(argv) {
     return 0;
   }
   if (!command || command === '--help' || command === '-h') {
-    console.log('Usage: devlog-tracker <init|status|report|timeline> [--codex] [--cursor] [--json] [--all-branches] [--out <path>]');
+    console.log('Usage: devlog-tracker <init|status|report|timeline> [--claude] [--codex] [--cursor] [--prune] [--json] [--all-branches] [--out <path>]');
     return 0;
   }
   if (command === 'init') {
     const { run } = require('../cli/init');
-    const { vendorRoot, platforms } = await run(rest, {
+    const result = await run(rest, {
       repoRoot: path.join(__dirname, '..'),
       targetDir: process.cwd(),
       version: pkg.version,
     });
-    console.log(`devlog-tracker installed to ${vendorRoot} for: ${platforms.join(', ')}`);
+    if (result.pruned !== undefined) {
+      console.log(`Removed ${result.pruned} stale devlog-tracker hook(s).`);
+      return 0;
+    }
+    console.log(`devlog-tracker installed to ${result.vendorRoot} for: ${result.platforms.join(', ')}`);
     return 0;
   }
   if (command === 'status') {
     const { status } = require('../cli/status');
     const result = status({ targetDir: process.cwd(), currentVersion: pkg.version });
+    if (result.staleHooks.length > 0) {
+      const n = result.staleHooks.reduce((sum, h) => sum + h.count, 0);
+      const files = [...new Set(result.staleHooks.map((h) => h.file))].join(', ');
+      console.log(`Warning: ${n} hook(s) in ${files} point to missing .devlog-tracker scripts. Run \`npx devlog-tracker init --prune\` to remove them (or \`init\` to reinstall).`);
+    }
     if (!result.installed) {
       console.log('devlog-tracker is not installed in this project. Run `npx devlog-tracker init`.');
     } else if (result.upToDate) {

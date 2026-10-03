@@ -22,6 +22,9 @@
 # resume / fork 這幾個 source 因為上面已經先 heal 過，這裡通常是空的、印出
 # 來是 no-op，不特別排除，寫法比較單純。讀不到就跳過，fail-open。
 #
+# 孤兒 vendored hook：設定檔裡指向已不存在的 .devlog-tracker/ 腳本時，印一段
+# 警告（plugin 與 vendored 並存、vendored 目錄被刪的常見殘骸）。clear 不印。
+#
 # 其他平台的 Session Handoff：只注入本平台的 handoff 檔；其他平台非空的
 # handoff 只印一行路徑提醒，不注入內容。
 
@@ -35,6 +38,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/detect-pending-question.sh"
 # shellcheck source=devlog-path.sh
 . "$HOOKS_DIR/devlog-path.sh"
+# shellcheck source=stale-vendored-hooks.sh
+. "$HOOKS_DIR/stale-vendored-hooks.sh"
 
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
@@ -57,6 +62,17 @@ esac
 # /clear 清空對話；不要把 devlog 或 span 提醒打回 context。
 if [ "$SOURCE" = "clear" ]; then
   exit 0
+fi
+
+STALE_HOOKS="$(devlog_stale_vendored_hooks "$PROJECT_DIR" 2>/dev/null || true)"
+if [ -n "$STALE_HOOKS" ]; then
+  echo "⚠️ 這個專案的 hook 設定指向已不存在的 .devlog-tracker 腳本（每次呼叫都會報 No such file）："
+  printf '%s\n' "$STALE_HOOKS" | while IFS="$(printf '\t')" read -r STALE_FILE STALE_SCRIPT; do
+    echo "- ${STALE_FILE}: ${STALE_SCRIPT}"
+  done
+  echo "請告訴使用者：若只用 plugin，執行 \`npx devlog-tracker init --prune\` 清掉這些孤兒 hook；"
+  echo "若要改用 vendored，執行 \`npx devlog-tracker init\` 重新安裝。"
+  echo ""
 fi
 
 if [ -f "$SPAN_FILE" ]; then

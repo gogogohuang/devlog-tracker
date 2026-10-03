@@ -7,16 +7,33 @@ const path = require('path');
 const { parseArgs, run } = require('./init');
 
 test('parseArgs accepts --claude, --codex and --cursor', () => {
-  assert.deepEqual(parseArgs(['--claude']), { platforms: ['claude'] });
-  assert.deepEqual(parseArgs(['--codex']), { platforms: ['codex'] });
-  assert.deepEqual(parseArgs(['--claude', '--codex', '--cursor']), { platforms: ['claude', 'codex', 'cursor'] });
-  assert.deepEqual(parseArgs([]), { platforms: [] });
+  assert.deepEqual(parseArgs(['--claude']), { platforms: ['claude'], prune: false });
+  assert.deepEqual(parseArgs(['--codex']), { platforms: ['codex'], prune: false });
+  assert.deepEqual(parseArgs(['--claude', '--codex', '--cursor']), { platforms: ['claude', 'codex', 'cursor'], prune: false });
+  assert.deepEqual(parseArgs([]), { platforms: [], prune: false });
+});
+
+test('parseArgs accepts --prune', () => {
+  assert.deepEqual(parseArgs(['--prune']), { platforms: [], prune: true });
+});
+
+test('run --prune removes orphan hooks without vendoring', async () => {
+  const targetDir = fs.mkdtempSync(path.join(os.tmpdir(), 'devlog-tracker-init-'));
+  fs.mkdirSync(path.join(targetDir, '.claude'));
+  const gone = path.join(targetDir, '.devlog-tracker', 'core', 'scripts', 'x.sh');
+  fs.writeFileSync(
+    path.join(targetDir, '.claude', 'settings.local.json'),
+    JSON.stringify({ hooks: { Stop: [{ hooks: [{ type: 'command', command: `bash "${gone}"` }] }] } })
+  );
+  const result = await run(['--prune'], { repoRoot: path.join(__dirname, '..'), targetDir, version: '0.0.0' });
+  assert.deepEqual(result, { pruned: 1 });
+  assert.equal(fs.existsSync(path.join(targetDir, '.devlog-tracker')), false);
 });
 
 test('parseArgs throws a clear error for unknown options', () => {
   assert.throws(
     () => parseArgs(['--foo']),
-    { message: 'Unknown option: --foo (supported: --claude, --codex, --cursor)' }
+    { message: 'Unknown option: --foo (supported: --claude, --codex, --cursor, --prune)' }
   );
   assert.throws(() => parseArgs(['--codex', '-x']), /Unknown option: -x/);
 });
