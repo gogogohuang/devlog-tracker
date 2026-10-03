@@ -8,6 +8,12 @@ set -uo pipefail
 _src="${BASH_SOURCE[0]}"
 SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 
+# Checked before sourcing anything: Claude plugin users may not have Node.
+# --write-analysis is pure shell, so it is exempt.
+if [ "${1:-}" != "--write-analysis" ]; then
+  command -v node >/dev/null 2>&1 || { echo "NO_NODE"; exit 0; }
+fi
+
 # shellcheck source=devlog-path.sh
 . "$SCRIPT_DIR/devlog-path.sh"
 # shellcheck source=json-field.sh
@@ -20,7 +26,6 @@ devlog_resolve_paths "$PROJECT_DIR"
 devlog_lock_acquire
 trap 'devlog_lock_release' EXIT
 
-# Pure shell, handled before the Node check: plugin users may not have Node.
 if [ "${1:-}" = "--write-analysis" ]; then
   SRC="${2:-}"
   [ -f "$SRC" ] || { echo "keep-all: analysis source not found: $SRC" >&2; exit 1; }
@@ -31,7 +36,6 @@ if [ "${1:-}" = "--write-analysis" ]; then
   exit 0
 fi
 
-command -v node >/dev/null 2>&1 || { echo "NO_NODE"; exit 0; }
 OPEN_ROW="$(devlog_single_open_round)" || exit 1
 OPEN="$(printf '%s' "$OPEN_ROW" | cut -f2)"
 node "$SCRIPT_DIR/keep-all.js" "$@" \
