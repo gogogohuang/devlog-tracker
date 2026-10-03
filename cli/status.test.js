@@ -13,7 +13,7 @@ function tmpdir() {
 test('reports not installed when .devlog-tracker/VERSION is missing', () => {
   const targetDir = tmpdir();
   const result = status({ targetDir, currentVersion: '0.21.0' });
-  assert.deepEqual(result, { installed: false, vendoredVersion: null, upToDate: false });
+  assert.deepEqual(result, { installed: false, vendoredVersion: null, upToDate: false, staleHooks: [] });
 });
 
 test('reports up to date when versions match', () => {
@@ -21,7 +21,7 @@ test('reports up to date when versions match', () => {
   fs.mkdirSync(path.join(targetDir, '.devlog-tracker'), { recursive: true });
   fs.writeFileSync(path.join(targetDir, '.devlog-tracker', 'VERSION'), '0.21.0\n');
   const result = status({ targetDir, currentVersion: '0.21.0' });
-  assert.deepEqual(result, { installed: true, vendoredVersion: '0.21.0', upToDate: true });
+  assert.deepEqual(result, { installed: true, vendoredVersion: '0.21.0', upToDate: true, staleHooks: [] });
 });
 
 test('reports out of date when versions differ', () => {
@@ -29,5 +29,18 @@ test('reports out of date when versions differ', () => {
   fs.mkdirSync(path.join(targetDir, '.devlog-tracker'), { recursive: true });
   fs.writeFileSync(path.join(targetDir, '.devlog-tracker', 'VERSION'), '0.20.0\n');
   const result = status({ targetDir, currentVersion: '0.21.0' });
-  assert.deepEqual(result, { installed: true, vendoredVersion: '0.20.0', upToDate: false });
+  assert.deepEqual(result, { installed: true, vendoredVersion: '0.20.0', upToDate: false, staleHooks: [] });
+});
+
+test('reports stale hooks pointing at a missing vendored script', () => {
+  const targetDir = tmpdir();
+  fs.mkdirSync(path.join(targetDir, '.claude'), { recursive: true });
+  const missing = path.join(targetDir, '.devlog-tracker', 'core', 'scripts', 'segment-watch.sh');
+  fs.writeFileSync(
+    path.join(targetDir, '.claude', 'settings.local.json'),
+    JSON.stringify({ hooks: { PreToolUse: [{ hooks: [{ type: 'command', command: `bash "${missing}"` }] }] } })
+  );
+  const result = status({ targetDir, currentVersion: '0.21.0' });
+  assert.equal(result.installed, false);
+  assert.deepEqual(result.staleHooks, [{ file: path.join('.claude', 'settings.local.json'), event: 'PreToolUse', count: 1 }]);
 });
