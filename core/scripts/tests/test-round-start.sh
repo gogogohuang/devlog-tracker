@@ -756,6 +756,48 @@ OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh"
 [ ! -f "$WS/.devlog/.workspace-mismatch" ] && echo "PASS: matching 工作區 writes no marker" || { echo "FAIL: marker on match"; FAIL=1; }
 grep -q '^## Round 2' "$WS/.devlog/.round-current.md" && echo "PASS: still opened Round 2" || { echo "FAIL: no round 2"; FAIL=1; }
 
+# --- branch label differs only: no prompt, no marker (AC-7, AC-10) -----------
+WS3="$TMP_ROOT/ws-branch"
+mkdir -p "$WS3/.devlog"
+touch "$WS3/.devlog/.enabled"
+git -C "$WS3" init -q -b other
+git -C "$WS3" config user.email test@example.com
+git -C "$WS3" config user.name test
+echo hello > "$WS3/a.txt"
+git -C "$WS3" add a.txt
+git -C "$WS3" commit -q -m init
+echo dirty > "$WS3/b.txt"
+LIVE3="$(bash "$SCRIPT_DIR/workspace-snapshot.sh" "$WS3")"
+CLAIM3="main${LIVE3#other}"
+cat > "$WS3/.devlog/devlog.md" <<EOF3
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Summary
+s
+
+### Reply
+fixture reply.
+
+### Handoff
+#### 工作區
+${CLAIM3}
+#### 現況
+going
+#### 完成條件
+done
+#### 下一步
+do x
+
+### Status
+IN_PROGRESS
+EOF3
+export CLAUDE_PROJECT_DIR="$WS3"
+OUT="$(printf '%s' '{"prompt":"keep going"}' | bash "$SCRIPT_DIR/round-start.sh" 2>/dev/null)"
+assert_not_contains "branch-only diff: no mismatch prompt" "宣稱：" "$OUT"
+assert_not_contains "branch-only diff: no 工作區 notice" "工作區（\`<workspace>\`" "$OUT"
+assert_file_absent "branch-only diff: no .workspace-mismatch" "$WS3/.devlog/.workspace-mismatch"
+export CLAUDE_PROJECT_DIR="$WS"
+
 rm -f "$WS/.devlog/.round-open" "$WS/.devlog/.round-current.md"
 # This fixture is reused below by the drift-only counter assertions (1 -> 2 ->
 # reset-at-3). Its ### Status must stay non-BLOCKED: if it were BLOCKED, the
