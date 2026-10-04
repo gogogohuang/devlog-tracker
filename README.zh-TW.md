@@ -143,6 +143,8 @@ $devlog-start           # Codex plugin 或 npx init --codex
 |---|---|
 | `/devlog-tracker:start` | 跑腳本建立 `.devlog/.enabled`（缺的 state 檔會補上，已有門檻不重置）。讀檔對進度，不自動開工。`.devlog/` 含 prompt，會建議加進 `.gitignore`，要你同意才改。 |
 | `/devlog-tracker:continue` | 讀 `.devlog/devlog.md`，核對最後一輪 Handoff「工作區」後再依下一步接著做。`/clear` 之後要接續用這個。細節見 [`docs/design/continue.md`](docs/design/continue.md)。 |
+| `/devlog-tracker:session-context-off` | 停用已確認的專案或 worktree 根目錄的 SessionStart devlog context 注入。Codex 使用 `$devlog-session-context-off`；設定會持續到執行 `session-context-on` 移除開關。 |
+| `/devlog-tracker:session-context-on` | 移除已確認的專案或 worktree 根目錄的 SessionStart context 開關，恢復預設注入。Codex 使用 `$devlog-session-context-on`。 |
 | `/devlog-tracker:migrate` | 把 `devlog.md`、分支檔、開著的那一輪與 `handoff.md` 裡舊格式 `####` 的 Handoff／Session Handoff 轉成 XML（備份成 `*.pre-migrate`）。Stop hook 擋下舊格式的 Handoff 時，會叫 agent 自己跑這個指令。 |
 | `/devlog-tracker:pause` | 暫停強制記錄，歷史檔不動，之後可再 `start`。 |
 | `/devlog-tracker:compact` | 腳本把較舊的 `DONE` 輪次搬到 `devlog.archive.md`（Checkpoint 與未完成輪留在主檔）。 |
@@ -235,7 +237,7 @@ Stop hook 會做這些事：
 
 #### 自動接續
 
-`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
+`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。使用 `/devlog-tracker:session-context-off`（Codex：`$devlog-session-context-off`）可停用已確認的專案或 worktree 根目錄的這項注入；它會寫入 `.devlog-session-context`，內容精確為三個位元組 `off`，不含尾端換行。使用 `/devlog-tracker:session-context-on`（Codex：`$devlog-session-context-on`）會移除開關並恢復預設注入。設定會持續影響所有新的 SessionStart，直到移除開關。乾淨的 SessionStart 不會搬移或修補 devlog 資料。此開關只影響 devlog-tracker 的 SessionStart context 注入；其他 hooks，包括記錄與保護 hooks，仍會執行。`/clear` 仍會清空 context 且不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
 
 #### 同輪工作區漂移偵測
 
