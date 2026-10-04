@@ -61,6 +61,32 @@ CP_LINE="$(grep -n '^## Checkpoint（Round 1-1）' "$P/.devlog/devlog.md" | cut 
 assert_line "sources: real checkpoint line" "CHECKPOINT=$P/.devlog/devlog.md:$CP_LINE" "$OUT"
 assert_eq "sources: fenced checkpoint ignored" "1" "$(printf '%s\n' "$OUT" | grep -c '^CHECKPOINT=')"
 
+# keep-all.analysis.md source (AC-13..AC-16)
+P="$(new_project)"; mkdir -p "$P/.devlog"
+printf '# analysis\n' > "$P/.devlog/keep-all.analysis.md"
+OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-sources.sh")"
+assert_line "AC-14: analysis only (no main devlog) -> analysis row" "FILE=$P/.devlog/keep-all.analysis.md KIND=analysis EXISTS=1" "$OUT"
+assert_eq "AC-14: analysis only -> not NO_SOURCES" "0" "$(printf '%s\n' "$OUT" | grep -cx 'NO_SOURCES')"
+
+P="$(new_project)"; mkdir -p "$P/.devlog"
+cat > "$P/.devlog/devlog.md" <<'EOF'
+## Round 1 — 2026-09-01T10:00:00+0800
+
+## Kept 索引
+- `devlog.k.md`：Round 1-1，kept_at 2026-09-05T00:00:00+0800，k
+EOF
+printf 'kept\n' > "$P/.devlog/devlog.k.md"
+BASE="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-sources.sh")"
+assert_eq "AC-15: no analysis -> unchanged output" "FILE=$P/.devlog/devlog.k.md KIND=kept EXISTS=1" "$BASE"
+assert_eq "AC-15: no analysis -> no KIND=analysis row" "0" "$(printf '%s\n' "$BASE" | grep -c 'KIND=analysis')"
+printf '# analysis\n' > "$P/.devlog/keep-all.analysis.md"
+OUT="$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-sources.sh")"
+assert_line "AC-13: analysis with main devlog -> analysis row" "FILE=$P/.devlog/keep-all.analysis.md KIND=analysis EXISTS=1" "$OUT"
+assert_line "AC-13: kept row still present" "FILE=$P/.devlog/devlog.k.md KIND=kept EXISTS=1" "$OUT"
+
+P="$(new_project)"; mkdir -p "$P/.devlog"
+assert_eq "AC-16: nothing at all -> NO_SOURCES" "NO_SOURCES" "$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-sources.sh")"
+
 # === promote-target.sh ==========================================================
 P="$(new_project)"
 assert_eq "target: empty project -> CLAUDE.md" "TARGET=$P/CLAUDE.md" "$(CLAUDE_PROJECT_DIR="$P" bash "$SCRIPT_DIR/promote-target.sh")"

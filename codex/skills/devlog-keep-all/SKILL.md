@@ -91,7 +91,32 @@ DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_
 `<fp>`／`<n>` 用步驟 1 的值。不要自己搬檔、刪檔或改索引——腳本是唯一的實作：驗證計畫、把所有會動到的檔備份到 `.devlog/.keep-all-backup/<時間戳>/`、組好新檔、改寫來源、刪除被整理掉的 kept 檔、清空的 archive 與搬空的分支檔、重建 `## Kept 索引`（新索引行寫在目前分支的主檔）。搬空的分支檔只在該分支不是 `active` 時才刪；目前主檔與 `devlog.md` 一律不刪。
 
 - exit 1：原樣顯示 stderr，不要自行重試或手動補做。驗證錯誤時不會寫任何檔；fingerprint 不符代表掃描後檔案被改過，回到步驟 1 重新掃描。同一工作樹有兩個以上平台的輪次開著時，腳本會以 `其他平台還有進行中的輪次（…），等它們收尾再執行。若該平台已不再使用，可先 pause 再 start 清掉它的標記。` 拒絕，請使用者等其他平台收尾再跑。
-- 成功後刪除 `.devlog/.keep-all-plan.tsv`。
+- 成功後刪除 `.devlog/.keep-all-plan.tsv`，接著寫分析檔（步驟 4.5）。
+
+## 4.5 寫分析檔
+
+apply 成功後，把本次確認的**所有主題**分析集中寫進單一檔 `.devlog/keep-all.analysis.md`（每次覆寫）。先用 Write 寫暫存檔 `<專案根目錄>/.devlog/.keep-all-analysis.tmp`，格式：
+
+```
+# Keep-all analysis
+
+## <topic>
+<一句描述>
+
+規範候選：
+- <跨任務都成立、值得進 CLAUDE.md／AGENTS.md 的規則；沒有就寫「無」>
+
+來源檔：<來源檔> Round <編號…>
+```
+
+每個主題一節 `## <topic>`，每節含描述、規範候選、來源檔與 Round。規範候選不要貼 `### User Input` 原文。然後：
+
+```bash
+DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scripts/keep-all.sh" --write-analysis "<專案根目錄絕對路徑>/.devlog/.keep-all-analysis.tmp" \
+  && rm -f "<專案根目錄絕對路徑>/.devlog/.keep-all-analysis.tmp"
+```
+
+成功印 `ANALYSIS=<路徑>`。exit 1（來源檔不存在或空白、lock 被占用、寫入或搬移失敗）時原樣顯示 stderr，不要自行重試；此時 apply 已完成，不要回滾。
 
 ## 5. 選配：摘要
 
@@ -99,7 +124,7 @@ DEVLOG_PLATFORM="<你所在的平台：claude／codex／cursor>" DEVLOG_PROJECT_
 
 ## 6. 回報
 
-依 stdout 回報：每個 `KEPT=<路徑> ROUNDS=<n>`、每個 `DELETED=<路徑>`、`BACKUP=<目錄>`（出錯時可從這裡還原），以及哪幾段套用了摘要。
+依 stdout 回報：每個 `KEPT=<路徑> ROUNDS=<n>`、每個 `DELETED=<路徑>`、`BACKUP=<目錄>`（出錯時可從這裡還原），以及 `ANALYSIS=<路徑>`、哪幾段套用了摘要。
 
 若你所在平台的 `.round-open` 檔（Claude Code 是 `.devlog/.round-open`，Codex／Cursor 是 `.devlog/.round-open@codex`／`.devlog/.round-open@cursor`）存在：在開著的那一輪補上 `### Summary` / `### Handoff` / `### Status` 再結束（Stop hook 仍會檢查）。
 

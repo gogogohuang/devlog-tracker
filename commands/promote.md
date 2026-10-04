@@ -15,6 +15,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 ```
 
 - `NO_SOURCES`：告知目前沒有可以沉澱的來源（還沒 keep 過、沒有 lessons、也沒有 Checkpoint），可以先用 `/devlog-tracker:keep` 或開 Lessons Mode；結束。
+- `FILE=<路徑> KIND=analysis EXISTS=1`：keep-all 寫的分析檔（`# Keep-all analysis`）。**優先讀取**，並從各主題的「規範候選」中挑選要寫進 `TARGET`（AGENTS.md／CLAUDE.md）的項目；候選已是沉澱過的規則，仍須去重並等使用者選。
 - `FILE=<路徑> KIND=kept|lessons EXISTS=1`：要讀的檔。`EXISTS=0` 是索引還在但檔案已被刪掉，跳過，最後提一句。
 - `CHECKPOINT=<檔案>:<行號>`：從該行的 `## Checkpoint` 標題往下讀到下一個 `## ` 標題為止，只看其中 `### 決策` 小節。
 - `TARGET=<路徑>`：規則要寫進的檔。`EXISTING=<n>` 表示這個檔已經有 n 條沉澱過的規則。
