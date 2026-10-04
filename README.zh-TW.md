@@ -235,7 +235,7 @@ Stop hook 會做這些事：
 
 #### 自動接續
 
-`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
+`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。若要停用這次注入，請在啟動 Claude Code、Codex 或 Cursor 程序前設定 `DEVLOG_SESSION_CONTEXT=off`；預設為開啟。這只控制 SessionStart context 注入，不會清除或修改 devlog 資料；其他 hooks（包含記錄 hooks）仍會執行。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
 
 #### 同輪工作區漂移偵測
 

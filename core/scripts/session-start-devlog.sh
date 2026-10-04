@@ -30,6 +30,11 @@
 
 set -uo pipefail
 
+# Allow a clean session context without resolving or modifying any devlog state.
+if [ "${DEVLOG_SESSION_CONTEXT:-}" = "off" ]; then
+  exit 0
+fi
+
 _src="${BASH_SOURCE[0]}"
 HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=json-field.sh
