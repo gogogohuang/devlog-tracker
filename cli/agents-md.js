@@ -20,7 +20,6 @@ function codexBlock() {
 | 暫停 / pause | \`$devlog-pause\`；\`commands/pause.md\` |
 | 狀態 / status | \`$devlog-status\`；\`commands/status.md\` |
 | 停用 SessionStart context / session-context-off | \`commands/session-context-off.md\` |
-| 恢復 SessionStart context / session-context-on | \`commands/session-context-on.md\` |
 | 接續上一題 / continue（換過工具或 \`/clear\` 之後） | \`commands/continue.md\` |
 | 歸檔 / compact | \`commands/compact.md\` |
 | 清空重編 / clean（不可復原，先問使用者確認） | \`commands/clean.md\` |
