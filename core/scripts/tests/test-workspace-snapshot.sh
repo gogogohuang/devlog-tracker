@@ -153,6 +153,74 @@ IN_PROGRESS
 EOF
 assert_eq "claim MISMATCH on stale hash" "MISMATCH" "$(workspace_claim_state "$REPO" "$TMP_ROOT/stale.md")"
 
+# --- branch label differs only (AC-1, AC-2, AC-6, AC-9) ----------------------
+write_claim() {
+  cat > "$2" <<EOF2
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 工作區
+$1
+
+### Status
+IN_PROGRESS
+EOF2
+}
+new_repo() {
+  mkdir -p "$1"
+  git -C "$1" init -q -b main
+  git -C "$1" config user.email test@example.com
+  git -C "$1" config user.name test
+}
+
+R1="$TMP_ROOT/label1"; new_repo "$R1"
+echo x > "$R1/a.txt"; git -C "$R1" add a.txt; git -C "$R1" commit -q -m init
+write_claim "$(workspace_snapshot "$R1")" "$TMP_ROOT/label1.md"
+git -C "$R1" checkout -q -b other
+assert_eq "AC-1: other branch, same hash, clean -> MATCH" "MATCH" "$(workspace_claim_state "$R1" "$TMP_ROOT/label1.md")"
+
+R2="$TMP_ROOT/label2"; new_repo "$R2"
+echo x > "$R2/a.txt"; git -C "$R2" add a.txt; git -C "$R2" commit -q -m init
+echo 1 > "$R2/package-lock.json"
+write_claim "$(workspace_snapshot "$R2")" "$TMP_ROOT/label2.md"
+git -C "$R2" checkout -q -b other
+assert_eq "AC-2: other branch, same uncommitted -> MATCH" "MATCH" "$(workspace_claim_state "$R2" "$TMP_ROOT/label2.md")"
+echo y > "$R2/extra.txt"
+assert_eq "AC-2: other branch, different uncommitted -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R2" "$TMP_ROOT/label2.md")"
+
+R3="$TMP_ROOT/label3"; new_repo "$R3"
+echo x > "$R3/a.txt"; git -C "$R3" add a.txt; git -C "$R3" commit -q -m init
+write_claim "$(workspace_snapshot "$R3")" "$TMP_ROOT/label3.md"
+git -C "$R3" checkout -q --detach
+assert_eq "AC-6: detached vs named branch -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R3" "$TMP_ROOT/label3.md")"
+
+R4="$TMP_ROOT/label4"; new_repo "$R4"
+write_claim "$(workspace_snapshot "$R4")" "$TMP_ROOT/label4.md"
+git -C "$R4" checkout -q -b other
+assert_eq "AC-9: unborn other branch, clean -> MATCH" "MATCH" "$(workspace_claim_state "$R4" "$TMP_ROOT/label4.md")"
+
+R5="$TMP_ROOT/label5"; new_repo "$R5"
+echo x > "$R5/a.txt"; git -C "$R5" add a.txt; git -C "$R5" commit -q -m init
+write_claim "$(workspace_snapshot "$R5")" "$TMP_ROOT/label5.md"
+git -C "$R5" checkout -q -b other
+echo y > "$R5/a.txt"; git -C "$R5" add a.txt; git -C "$R5" commit -q -m second
+assert_eq "AC-3: other branch, different hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R5" "$TMP_ROOT/label5.md")"
+
+R6="$TMP_ROOT/label6"; new_repo "$R6"
+echo x > "$R6/a.txt"; git -C "$R6" add a.txt; git -C "$R6" commit -q -m init
+echo one > "$R6/claimed.txt"
+write_claim "$(workspace_snapshot "$R6")" "$TMP_ROOT/label6.md"
+git -C "$R6" checkout -q -b other
+rm "$R6/claimed.txt"
+echo two > "$R6/live.txt"
+assert_eq "AC-4: other branch, same hash, different uncommitted files -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R6" "$TMP_ROOT/label6.md")"
+
+R7="$TMP_ROOT/label7"; new_repo "$R7"
+echo x > "$R7/a.txt"; git -C "$R7" add a.txt; git -C "$R7" commit -q -m init
+write_claim "$(workspace_snapshot "$R7")" "$TMP_ROOT/label7.md"
+echo y > "$R7/a.txt"; git -C "$R7" add a.txt; git -C "$R7" commit -q -m second
+assert_eq "AC-5: same branch, different hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R7" "$TMP_ROOT/label7.md")"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
