@@ -103,6 +103,14 @@ Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s)
 
 Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
 
+To remove stale hooks after vendored scripts have gone missing, run:
+
+```bash
+npx devlog-tracker init --prune
+```
+
+This removes only devlog-tracker-marked hooks that point to a missing vendored script. Valid hooks and your own hooks are preserved; this command does not reinstall or copy package files.
+
 Claude Code, Codex, and Cursor can run in the same worktree at the same time. They share one `devlog.md`, but each platform keeps its own open round (`.devlog/.round-current.md` for Claude Code, `.round-current@codex.md`／`.round-current@cursor.md` for the others) and its own Session Handoff; round numbers stay unique across platforms, and Codex／Cursor round headings end with ` · codex`／` · cursor`. `clean`, `keep`, and `keep-all` refuse to run while two or more platforms have a round open. Several windows of the *same* platform in one worktree are not supported — they share one slot. Upgrade every platform's install to the same devlog-tracker version together: an older version on one platform still writes the shared, un-suffixed files and breaks the per-platform split. See [`docs/design/multi-platform-concurrency.md`](docs/design/multi-platform-concurrency.md).
 
 `.devlog-tracker/` contains the installed program. `.devlog/` contains your project's tracking data and is created only when you run the start command. Therefore, seeing `.devlog-tracker/` immediately after `npx init` is expected; `init` alone does not start recording.
