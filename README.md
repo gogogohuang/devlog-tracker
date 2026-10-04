@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/devlog-tracker.svg)](https://www.npmjs.com/package/devlog-tracker)
 
-**Version** 1.3.0
+**Version** 1.4.0
 
 Maintains a `.devlog/devlog.md` in your project, turning each conversation round's requests, decisions, and outcomes into a permanent record. A conversation disappears the moment you `/clear` or switch sessions; this file fills that gap so work can pause and resume. Nothing is touched until you explicitly run `/devlog-tracker:start` — installing the plugin alone doesn't create or modify any files.
 
