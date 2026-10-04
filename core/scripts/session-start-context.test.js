@@ -14,8 +14,9 @@ const ENTRIES = {
 };
 const MARK = 'ctx-switch-marker-7781';
 
-function makeProject() {
+function makeProject(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'devlog-ctx-'));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
   const d = path.join(dir, '.devlog');
   fs.mkdirSync(d);
   fs.writeFileSync(path.join(d, 'devlog.md'), `# Project\n\n## Round 1 — 2026-09-09T12:00:00+08:00\n\n### Summary\n${MARK}\n\n### Handoff\n#### 現況\n${MARK}\n\n### Status\nDONE\n\n## Round 2 — 2026-09-09T13:00:00+08:00\n\n### User Input\n\`\`\`text\nopen\n\`\`\`\n`);
@@ -25,15 +26,14 @@ function makeProject() {
   return dir;
 }
 
-function snapshot(dir) {
-  const d = path.join(dir, '.devlog');
-  return fs.readdirSync(d).sort().map((n) => [n, fs.readFileSync(path.join(d, n)).toString('base64')]);
-}
-
-function run(kind, dir, value, source = 'startup') {
-  const env = { ...process.env, CLAUDE_PROJECT_DIR: dir, DEVLOG_PROJECT_DIR: dir };
-  delete env.DEVLOG_SESSION_CONTEXT;
-  if (value !== undefined) env.DEVLOG_SESSION_CONTEXT = value;
+function run(kind, dir, source = 'startup') {
+  const env = { ...process.env };
+  for (const name of ['DEVLOG_SESSION_CONTEXT', 'DEVLOG_PLATFORM', 'DEVLOG_PROJECT_DIR', 'CLAUDE_PROJECT_DIR']) {
+    delete env[name];
+  }
+  env.DEVLOG_PROJECT_DIR = dir;
+  env.CLAUDE_PROJECT_DIR = dir;
+  env.DEVLOG_PLATFORM = kind;
   return spawnSync('bash', [ENTRIES[kind]], {
     cwd: dir, env, encoding: 'utf8',
     input: JSON.stringify({ source, cwd: dir, workspace_roots: [dir] }),
@@ -41,35 +41,24 @@ function run(kind, dir, value, source = 'startup') {
 }
 
 for (const kind of Object.keys(ENTRIES)) {
-  test(`${kind}: DEVLOG_SESSION_CONTEXT=off injects nothing and leaves .devlog untouched (AC-1)`, () => {
-    const dir = makeProject();
-    const before = snapshot(dir);
-    const r = run(kind, dir, 'off');
+  test(`${kind}: injects the default summary without a file switch (AC-1)`, (t) => {
+    const dir = makeProject(t);
+    const r = run(kind, dir);
     assert.ifError(r.error);
     assert.equal(r.status, 0, r.stderr);
-    assert.ok(!r.stdout.includes(MARK), r.stdout);
-    for (const s of ['Round 1', '尚未收尾', 'span']) {
-      assert.ok(!r.stdout.includes(s), `${s} in ${r.stdout}`);
-    }
-    if (kind === 'claude') assert.equal(r.stdout, '');
-    else if (r.stdout.trim()) assert.ok(!JSON.parse(r.stdout).additional_context, r.stdout);
-    assert.deepEqual(snapshot(dir), before);
-  });
-
-  for (const value of [undefined, '', 'on', 'OFF']) {
-    test(`${kind}: DEVLOG_SESSION_CONTEXT=${JSON.stringify(value)} keeps default injection (AC-2)`, () => {
-      const dir = makeProject();
-      const r = run(kind, dir, value);
-      assert.ifError(r.error);
-      assert.equal(r.status, 0, r.stderr);
+    if (kind === 'cursor') {
+      const payload = JSON.parse(r.stdout);
+      assert.equal(payload.additional_context.includes(MARK), true, r.stdout);
+    } else {
       assert.ok(r.stdout.includes(MARK), r.stdout);
-    });
-  }
+    }
+  });
 }
 
-test('claude: source=clear stays empty without the switch (AC-3)', () => {
-  const dir = makeProject();
-  const r = run('claude', dir, undefined, 'clear');
+test('claude: source=clear stays empty without the switch (AC-5)', (t) => {
+  const dir = makeProject(t);
+  const r = run('claude', dir, 'clear');
+  assert.ifError(r.error);
   assert.equal(r.status, 0, r.stderr);
   assert.equal(r.stdout, '');
 });
