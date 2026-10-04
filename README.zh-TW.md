@@ -235,7 +235,7 @@ Stop hook 會做這些事：
 
 #### 自動接續
 
-`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。若要停用這次注入，請在啟動 Claude Code、Codex 或 Cursor 程序前設定 `DEVLOG_SESSION_CONTEXT=off`；預設為開啟。這只控制 SessionStart context 注入，不會清除或修改 devlog 資料；其他 hooks（包含記錄 hooks）仍會執行。`/clear` 是真的清空，不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
+`SessionStart` hook 在開新 session、resume、`/compact`、`/fork` 時，若目前分支的 `.devlog/handoff.md`（或 `handoff.<branch>.md`）非空會先注入這份 Session Handoff 快照，再注入最後一個 Checkpoint（若有，含其中的 `### 待解問題` 供接手抓卡點）、`## Kept 索引`（若有，不是具名檔內容）加上最近兩輪的 Summary / Handoff / Status，不是整份檔。`IN_PROGRESS`／`BLOCKED` 收尾時 Stop 會覆寫 handoff 檔，`DONE` 會刪掉它。若要停用這項注入，請在實際專案或 worktree 根目錄執行 `printf 'off' > .devlog-session-context`；檔案內容必須精確為三個位元組 `off`，不含尾端換行。檔案不存在或內容不同都維持預設啟用。此開關會持續影響所有新的 SessionStart，直到執行 `rm .devlog-session-context` 移除它。乾淨的 SessionStart 不會搬移或修補 devlog 資料。此開關只影響 devlog-tracker 的 SessionStart context 注入；其他 hooks，包括記錄與保護 hooks，仍會執行。`/clear` 仍會清空 context 且不注入；要接續請 `/devlog-tracker:continue`（先核對「工作區」再做下一步）。細節見 [`docs/design/continue.md`](docs/design/continue.md)、[`docs/design/session-handoff-file.md`](docs/design/session-handoff-file.md)。
 
 #### 同輪工作區漂移偵測
 
