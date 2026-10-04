@@ -109,6 +109,18 @@ test('write failure is not reported as success', (t) => {
   assert.ok(fs.statSync(path.join(proj, '.devlog-session-context')).isDirectory());
 });
 
+test('command doc passes DEVLOG_PROJECT_DIR and the Codex skill is generated in sync', () => {
+  const doc = fs.readFileSync(path.join(REPO, 'commands', 'session-context-off.md'), 'utf8');
+  assert.match(doc, /DEVLOG_PROJECT_DIR=/);
+  assert.match(doc, /session-context-off\.sh/);
+  assert.ok(fs.existsSync(path.join(REPO, 'codex', 'skills', 'devlog-session-context-off', 'SKILL.md')));
+  const r = spawnSync(process.execPath, [path.join(REPO, 'scripts', 'sync-codex-plugin.js'), '--check'], {
+    cwd: REPO,
+    encoding: 'utf8',
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
 for (const kind of Object.keys(ENTRIES)) {
   test(`${kind}: SessionStart emits no context after the off command (AC-2)`, (t) => {
     const proj = tmp(t);
