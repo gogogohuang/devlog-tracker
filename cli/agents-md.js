@@ -31,6 +31,7 @@ function codexBlock() {
 | 產生 PR 描述 / pr | \`commands/pr.md\` |
 | 長任務定期記錄 / span | \`commands/span.md\` |
 | 調整沉默門檻 / checkpoint、segment-watch | \`commands/checkpoint.md\`、\`commands/segment-watch.md\` |
+| 停用／恢復 SessionStart context / session-context-off、session-context-on | \`commands/session-context-off.md\`、\`commands/session-context-on.md\` |
 | 開發歷程教訓 / lessons、lessons-on、lessons-off、lessons-drift | \`commands/lessons.md\`、\`commands/lessons-on.md\`、\`commands/lessons-off.md\`、\`commands/lessons-drift.md\` |
 
 寫 devlog 的格式與規則見 \`.devlog-tracker/skills/devlog-tracker/SKILL.md\`。每輪結束前必須把當輪寫進 \`.devlog/\`；已 \`start\` 的專案，Stop hook 會擋沒寫完的輪次。
