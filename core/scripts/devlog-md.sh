@@ -290,6 +290,23 @@ devlog_reopen_round() {
   return 0
 }
 
+_workspace_claim_matches_branch_label() {
+  local claimed="$1" live="$2" claimed_first live_first claimed_rest live_rest
+  claimed_first="${claimed%%$'\n'*}"
+  live_first="${live%%$'\n'*}"
+  case "$claimed_first" in *' @ '*) ;; *) return 1 ;; esac
+  case "$live_first" in *' @ '*) ;; *) return 1 ;; esac
+  case "$claimed_first:$live_first" in
+    'HEAD detached @ '*|*':HEAD detached @ '*) return 1 ;;
+  esac
+  claimed_rest=""
+  live_rest=""
+  case "$claimed" in *$'\n'*) claimed_rest="${claimed#*$'\n'}" ;; esac
+  case "$live" in *$'\n'*) live_rest="${live#*$'\n'}" ;; esac
+  [ "${claimed_first#* @ }" = "${live_first#* @ }" ] \
+    && [ "$claimed_rest" = "$live_rest" ]
+}
+
 workspace_claim_state() {
   local dir="$1" file="$2" platform="${3:-claude}" start end status claimed live
   if ! type workspace_snapshot >/dev/null 2>&1; then
@@ -319,5 +336,6 @@ workspace_claim_state() {
     [ -n "$wt" ] && [ "$wt" != "$dir" ] || continue
     if [ "$claimed" = "$(workspace_snapshot "$wt")" ]; then printf 'MATCH\n'; return 0; fi
   done < <(git -C "$dir" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  if _workspace_claim_matches_branch_label "$claimed" "$live"; then printf 'MATCH\n'; return 0; fi
   printf 'MISMATCH\n'
 }
