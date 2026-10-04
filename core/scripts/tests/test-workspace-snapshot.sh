@@ -199,6 +199,28 @@ write_claim "$(workspace_snapshot "$R4")" "$TMP_ROOT/label4.md"
 git -C "$R4" checkout -q -b other
 assert_eq "AC-9: unborn other branch, clean -> MATCH" "MATCH" "$(workspace_claim_state "$R4" "$TMP_ROOT/label4.md")"
 
+R5="$TMP_ROOT/label5"; new_repo "$R5"
+echo x > "$R5/a.txt"; git -C "$R5" add a.txt; git -C "$R5" commit -q -m init
+write_claim "$(workspace_snapshot "$R5")" "$TMP_ROOT/label5.md"
+git -C "$R5" checkout -q -b other
+echo y > "$R5/a.txt"; git -C "$R5" add a.txt; git -C "$R5" commit -q -m second
+assert_eq "AC-3: other branch, different hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R5" "$TMP_ROOT/label5.md")"
+
+R6="$TMP_ROOT/label6"; new_repo "$R6"
+echo x > "$R6/a.txt"; git -C "$R6" add a.txt; git -C "$R6" commit -q -m init
+echo one > "$R6/claimed.txt"
+write_claim "$(workspace_snapshot "$R6")" "$TMP_ROOT/label6.md"
+git -C "$R6" checkout -q -b other
+rm "$R6/claimed.txt"
+echo two > "$R6/live.txt"
+assert_eq "AC-4: other branch, same hash, different uncommitted files -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R6" "$TMP_ROOT/label6.md")"
+
+R7="$TMP_ROOT/label7"; new_repo "$R7"
+echo x > "$R7/a.txt"; git -C "$R7" add a.txt; git -C "$R7" commit -q -m init
+write_claim "$(workspace_snapshot "$R7")" "$TMP_ROOT/label7.md"
+echo y > "$R7/a.txt"; git -C "$R7" add a.txt; git -C "$R7" commit -q -m second
+assert_eq "AC-5: same branch, different hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R7" "$TMP_ROOT/label7.md")"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
