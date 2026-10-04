@@ -30,8 +30,14 @@
 
 set -uo pipefail
 
-# Allow a clean session context without resolving or modifying any devlog state.
-if [ "${DEVLOG_SESSION_CONTEXT:-}" = "off" ]; then
+PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
+
+# 專案根目錄的 .devlog-session-context 內容恰為三位元組 off 時，乾淨 context：
+# 在解析路徑、claim legacy、搬移分支、heal 之前退出，不讀也不改任何 devlog 狀態。
+_ctx_file="$PROJECT_DIR/.devlog-session-context"
+if [ -f "$_ctx_file" ] \
+  && [ "$(wc -c < "$_ctx_file" 2>/dev/null | tr -d ' ')" = "3" ] \
+  && [ "$(head -c 3 "$_ctx_file" 2>/dev/null)" = "off" ]; then
   exit 0
 fi
 
@@ -46,7 +52,6 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 # shellcheck source=stale-vendored-hooks.sh
 . "$HOOKS_DIR/stale-vendored-hooks.sh"
 
-PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 devlog_resolve_paths "$PROJECT_DIR"
 
 INPUT="$(cat 2>/dev/null || true)"
