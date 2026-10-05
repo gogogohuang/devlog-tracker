@@ -13,7 +13,7 @@ mkdir -p "$PROJECT"
 
 cd "$PROJECT" || exit 1
 NODE_BIN="$(command -v node)"
-"$NODE_BIN" "$REPO_ROOT/bin/devlog-tracker.js" init --claude --codex --cursor >/dev/null 2>"$TMP/stderr" \
+"$NODE_BIN" "$REPO_ROOT/bin/devlog-tracker.js" init --claude --codex >/dev/null 2>"$TMP/stderr" \
   || { echo "FAIL: init exited non-zero"; cat "$TMP/stderr"; FAIL=1; }
 
 [ -f "$PROJECT/.devlog-tracker/VERSION" ] && echo "PASS: vendored VERSION exists" || { echo "FAIL: no VERSION"; FAIL=1; }
@@ -24,7 +24,6 @@ NODE_BIN="$(command -v node)"
   && echo "PASS: CLAUDE.md fallback block written" || { echo "FAIL: no devlog-tracker block in CLAUDE.md"; FAIL=1; }
 [ -f "$PROJECT/.codex/hooks.json" ] && echo "PASS: .codex/hooks.json written" || { echo "FAIL: no .codex/hooks.json"; FAIL=1; }
 [ -f "$PROJECT/.agents/skills/devlog-start/SKILL.md" ] && echo "PASS: Codex start skill written" || { echo "FAIL: no Codex start skill"; FAIL=1; }
-[ -f "$PROJECT/.cursor/hooks.json" ] && echo "PASS: .cursor/hooks.json written" || { echo "FAIL: no .cursor/hooks.json"; FAIL=1; }
 
 # Controller addition 1a: Check vendored core scripts exist
 [ -f "$PROJECT/.devlog-tracker/core/scripts/enforce-devlog.sh" ] && echo "PASS: vendored core/scripts/enforce-devlog.sh exists" || { echo "FAIL: no core/scripts/enforce-devlog.sh"; FAIL=1; }
@@ -48,7 +47,7 @@ fi
 # re-running must not duplicate entries
 COUNT_BEFORE_CODEX=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$PROJECT/.codex/hooks.json')).hooks.Stop.length)")
 COUNT_BEFORE_CLAUDE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$PROJECT/.claude/settings.local.json')).hooks.Stop.length)")
-"$NODE_BIN" "$REPO_ROOT/bin/devlog-tracker.js" init --claude --codex --cursor >/dev/null 2>"$TMP/stderr" \
+"$NODE_BIN" "$REPO_ROOT/bin/devlog-tracker.js" init --claude --codex >/dev/null 2>"$TMP/stderr" \
   || { echo "FAIL: second init exited non-zero"; cat "$TMP/stderr"; FAIL=1; }
 COUNT_AFTER_CODEX=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$PROJECT/.codex/hooks.json')).hooks.Stop.length)")
 COUNT_AFTER_CLAUDE=$(node -e "console.log(JSON.parse(require('fs').readFileSync('$PROJECT/.claude/settings.local.json')).hooks.Stop.length)")

@@ -11,7 +11,7 @@ async function main(argv) {
     return 0;
   }
   if (!command || command === '--help' || command === '-h') {
-    console.log('Usage: devlog-tracker <init|status|report|timeline> [--claude] [--codex] [--cursor] [--prune] [--json] [--all-branches] [--out <path>]');
+    console.log('Usage: devlog-tracker <init|status|report|timeline> [--claude] [--codex] [--prune] [--json] [--all-branches] [--out <path>]');
     return 0;
   }
   if (command === 'init') {

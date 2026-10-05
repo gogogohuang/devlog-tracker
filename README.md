@@ -87,21 +87,17 @@ With Lessons Mode enabled, Codex's `SubagentStart` hook gives subagents the reco
 
 ### Cursor
 
-```bash
-npx devlog-tracker init --cursor
-```
+Cursor support is temporarily disabled: `init --cursor` is no longer accepted and `cursor/` is not installed or published. The adapter code stays in the repo (`cursor/`, `cli/platforms/cursor.js`) so it can be re-enabled later.
 
-Merges the `hooks` from `cursor/hooks.json` into the project's `.cursor/hooks.json`. Cursor has no slash-command surface, so once hooks are installed, follow the steps in `commands/*.md` to run the corresponding scripts manually. Cursor's cloud agent doesn't run `sessionStart`, so it won't auto-inject a handoff summary; other configured hooks still run on whichever events Cursor supports.
-
-### All three platforms
+### Both platforms
 
 ```bash
 npx devlog-tracker init
 ```
 
-Without `--claude`/`--codex`/`--cursor`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs all three platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
+Without `--claude`/`--codex`, it interactively asks which platform(s) to install; in an environment without a TTY (e.g. CI) and no flags given, `init` skips the prompt and installs both platforms directly. You can also combine flags, e.g. `npx devlog-tracker init --claude --codex`.
 
-Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `cursor/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
+Copies `core/scripts/`, `claude/hooks.json`, `codex/hooks/`, `skills/`, and `commands/` into the project's `.devlog-tracker/`. Re-running `npx devlog-tracker init` upgrades to the package's current version; `npx devlog-tracker status` checks whether the installed version is behind. `npx devlog-tracker report [--json] [--all-branches]` and `npx devlog-tracker timeline [--all-branches] [--out <path>]` run the same scripts as `/devlog-tracker:report` and `/devlog-tracker:timeline`, using the vendored copy when there is one.
 
 To remove stale hooks after vendored scripts have gone missing, run:
 
@@ -288,7 +284,7 @@ When enabled, a development-lesson entry is only considered when a `BLOCKED` sta
 ## Tests
 
 ```
-bash core/scripts/run-tests.sh   # hook self-checks, including the Cursor and Codex adapters
+bash core/scripts/run-tests.sh   # hook self-checks, including the Codex adapter
 npm test                          # CLI, timeline renderer and scripts (Node)
 ```
 

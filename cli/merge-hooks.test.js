@@ -160,7 +160,7 @@ test('vendorRoot containing a double quote or backslash still yields valid JSON'
 
 test('real templates quote the vendor path so project paths with spaces work', () => {
   const vendorRoot = '/tmp/my project/.devlog-tracker';
-  for (const name of ['cursor', 'codex']) {
+  for (const name of ['codex']) {
     const dir = tmpdir();
     const targetPath = path.join(dir, 'hooks.json');
     mergeHooksTemplate({

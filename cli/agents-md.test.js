@@ -81,7 +81,7 @@ test('block mentions every command doc and Codex skill naming convention', () =>
   assert.ok(text.includes('$devlog-start'));
 });
 
-test('init --codex writes AGENTS.md and project skills; --cursor alone does not', async () => {
+test('init --codex writes AGENTS.md and project skills', async () => {
   const repoRoot = path.join(__dirname, '..');
   const withCodex = tmp();
   await run(['--codex'], { repoRoot, targetDir: withCodex, version: '0.0.0' });
@@ -111,10 +111,6 @@ test('init --codex writes AGENTS.md and project skills; --cursor alone does not'
   await run(['--codex'], { repoRoot, targetDir: upgraded, version: '0.0.0' });
   assert.ok(!fs.existsSync(path.join(legacy, 'devlog-start.md')));
   assert.ok(fs.existsSync(path.join(legacy, 'mine.md')));
-
-  const cursorOnly = tmp();
-  await run(['--cursor'], { repoRoot, targetDir: cursorOnly, version: '0.0.0' });
-  assert.ok(!fs.existsSync(path.join(cursorOnly, 'AGENTS.md')));
 });
 
 test('upsertMarkdown writes to a custom file name with a custom block', () => {

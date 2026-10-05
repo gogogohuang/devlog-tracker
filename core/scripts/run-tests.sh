@@ -10,10 +10,6 @@ for t in "$DIR"/tests/test-*.sh; do
     FAIL=1
   fi
 done
-echo "=== test-adapters.sh ==="
-if ! bash "$DIR/../../cursor/hooks/test-adapters.sh"; then
-  FAIL=1
-fi
 echo "=== codex/test-adapters.sh ==="
 if ! bash "$DIR/../../codex/hooks/test-adapters.sh"; then
   FAIL=1

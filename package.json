@@ -1,7 +1,7 @@
 {
   "name": "devlog-tracker",
   "version": "1.4.1",
-  "description": "npx installer for devlog-tracker's Claude Code, Cursor and Codex adapters.",
+  "description": "npx installer for devlog-tracker's Claude Code and Codex adapters.",
   "bin": {
     "devlog-tracker": "bin/devlog-tracker.js"
   },
@@ -11,11 +11,9 @@
     "core/scripts",
     "claude/hooks.json",
     "codex/hooks",
-    "cursor/hooks",
     "skills",
     "commands",
-    "codex/hooks.json",
-    "cursor/hooks.json"
+    "codex/hooks.json"
   ],
   "engines": {
     "node": ">=18"
