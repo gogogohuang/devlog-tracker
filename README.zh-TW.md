@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/devlog-tracker.svg)](https://www.npmjs.com/package/devlog-tracker)
 
-**版本** 1.4.1
+**版本** 1.5.0
 
 在專案中維護一份 `.devlog/devlog.md`，把每一輪對話的請求、決策與結果寫成永久紀錄。對話一 `/clear` 或換 session 就沒了；這份檔案取代那個缺口，讓工作可以中斷再接。沒下過 `/devlog-tracker:start` 時，裝著也不會動任何檔案。
 
