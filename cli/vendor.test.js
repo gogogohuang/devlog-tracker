@@ -17,8 +17,6 @@ function makeFakeRepo(dir) {
   fs.writeFileSync(path.join(dir, 'claude', 'hooks.json'), '{"hooks":{}}\n');
   fs.mkdirSync(path.join(dir, 'codex', 'hooks'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'codex', 'hooks', 'on-stop.sh'), '#!/usr/bin/env bash\necho codex\n');
-  fs.mkdirSync(path.join(dir, 'cursor', 'hooks'), { recursive: true });
-  fs.writeFileSync(path.join(dir, 'cursor', 'hooks', 'on-stop.sh'), '#!/usr/bin/env bash\necho cursor\n');
   fs.mkdirSync(path.join(dir, 'skills', 'devlog-tracker'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'skills', 'devlog-tracker', 'SKILL.md'), '# skill\n');
   fs.mkdirSync(path.join(dir, 'commands'), { recursive: true });
@@ -36,7 +34,6 @@ test('vendor copies the expected directories and stamps VERSION + env.sh', () =>
   assert.ok(fs.existsSync(path.join(vendorRoot, 'core', 'scripts', 'enforce-devlog.sh')));
   assert.ok(fs.existsSync(path.join(vendorRoot, 'claude', 'hooks.json')));
   assert.ok(fs.existsSync(path.join(vendorRoot, 'codex', 'hooks', 'on-stop.sh')));
-  assert.ok(fs.existsSync(path.join(vendorRoot, 'cursor', 'hooks', 'on-stop.sh')));
   assert.ok(fs.existsSync(path.join(vendorRoot, 'skills', 'devlog-tracker', 'SKILL.md')));
   assert.ok(fs.existsSync(path.join(vendorRoot, 'commands', 'start.md')));
   assert.equal(fs.readFileSync(path.join(vendorRoot, 'VERSION'), 'utf8'), '0.21.0\n');
@@ -46,7 +43,7 @@ test('vendor copies the expected directories and stamps VERSION + env.sh', () =>
   );
 });
 
-test('vendor preserves the ../../core/scripts relative layout codex/cursor wrappers rely on', () => {
+test('vendor preserves the ../../core/scripts relative layout codex wrappers rely on', () => {
   const repoRoot = tmpdir();
   const targetDir = tmpdir();
   makeFakeRepo(repoRoot);

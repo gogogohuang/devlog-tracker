@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const VENDOR_ENTRIES = ['core/scripts', 'claude/hooks.json', 'codex/hooks', 'cursor/hooks', 'skills', 'commands'];
+const VENDOR_ENTRIES = ['core/scripts', 'claude/hooks.json', 'codex/hooks', 'skills', 'commands'];
 
 // 0.25.x及更早版本 vendor 到 .devlog-tracker/hooks/scripts/；升級後改放
 // core/scripts/，這裡清掉舊目錄避免孤兒檔案殘留。

@@ -87,21 +87,17 @@ Lessons Mode 開啟時，Codex 的 `SubagentStart` hook 會把記錄指引與專
 
 ### Cursor
 
-```bash
-npx devlog-tracker init --cursor
-```
+Cursor 支援暫時停用：`init --cursor` 不再接受，`cursor/` 也不會被安裝或發佈。轉接層程式碼仍留在 repo（`cursor/`、`cli/platforms/cursor.js`），之後可重新啟用。
 
-會把 `cursor/hooks.json` 的 `hooks` 合併進專案 `.cursor/hooks.json`。Cursor 沒有 slash 指令面，hooks 裝好後照 commands/*.md 的步驟手動執行對應腳本。Cursor cloud agent 不執行 `sessionStart`，因此不會自動注入接手摘要；其他已設定的 hook 仍依 Cursor 支援的事件執行。
-
-### 三平台共通
+### 兩個平台共通
 
 ```bash
 npx devlog-tracker init
 ```
 
-沒帶 `--claude`／`--codex`／`--cursor` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝全部三個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
+沒帶 `--claude`／`--codex` 時會互動式問要裝哪個平台；在沒有 TTY 的環境（例如 CI）且沒帶旗標時，`init` 不會詢問，直接安裝兩個平台。也可以組合指定，例如 `npx devlog-tracker init --claude --codex`。
 
-會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`cursor/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
+會把 `core/scripts/`、`claude/hooks.json`、`codex/hooks/`、`skills/`、`commands/` 複製進專案的 `.devlog-tracker/`。重新執行 `npx devlog-tracker init` 可以升級到套件目前的版本；`npx devlog-tracker status` 可以查目前裝的版本是否落後。`npx devlog-tracker report [--json] [--all-branches]` 和 `npx devlog-tracker timeline [--all-branches] [--out <路徑>]` 跑的是跟 `/devlog-tracker:report`、`/devlog-tracker:timeline` 同一支腳本，有 vendored 版本就用它。
 
 若 vendored script 已不存在而留下舊 hook，可執行以下命令清理：
 
@@ -288,7 +284,7 @@ Claude 用純文字結尾提出問題、下一則訊息才拿到答案時，不�
 ## 測試
 
 ```
-bash core/scripts/run-tests.sh   # hook 自檢，含 Cursor 與 Codex 轉接層
+bash core/scripts/run-tests.sh   # hook 自檢，含 Codex 轉接層
 npm test                          # CLI、timeline renderer 與 scripts 的 node 測試
 ```
 

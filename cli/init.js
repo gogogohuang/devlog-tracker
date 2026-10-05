@@ -4,9 +4,8 @@ const { vendor } = require('./vendor');
 const { pruneStaleHooks } = require('./stale-hooks');
 const claude = require('./platforms/claude');
 const codex = require('./platforms/codex');
-const cursor = require('./platforms/cursor');
 
-const PLATFORMS = { claude, codex, cursor };
+const PLATFORMS = { claude, codex };
 
 function parseArgs(argv) {
   const platforms = [];
@@ -14,10 +13,9 @@ function parseArgs(argv) {
   for (const arg of argv) {
     if (arg === '--claude') platforms.push('claude');
     else if (arg === '--codex') platforms.push('codex');
-    else if (arg === '--cursor') platforms.push('cursor');
     else if (arg === '--prune') prune = true;
     else if (arg.startsWith('-')) {
-      throw new Error(`Unknown option: ${arg} (supported: --claude, --codex, --cursor, --prune)`);
+      throw new Error(`Unknown option: ${arg} (supported: --claude, --codex, --prune)`);
     }
   }
   return { platforms, prune };
@@ -27,7 +25,7 @@ function promptPlatforms() {
   if (!process.stdin.isTTY) return Promise.resolve(Object.keys(PLATFORMS));
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
-    rl.question('要裝哪個平台？(claude/codex/cursor，逗號分隔，留空=全部): ', (answer) => {
+    rl.question('要裝哪個平台？(claude/codex，逗號分隔，留空=全部): ', (answer) => {
       rl.close();
       const trimmed = answer.trim();
       if (!trimmed) return resolve(Object.keys(PLATFORMS));
