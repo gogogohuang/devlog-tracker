@@ -8,8 +8,11 @@
 因為沒有 Round/Status 歷史可判斷「BLOCKED→解開」這個訊號。`/devlog-tracker:lessons-off` 只刪
 `.lessons-enabled`，不動任何已寫的 `devlog.lessons.*.md` 或索引。
 
-**兩種自我判斷訊號**（hook 判斷不到，完全仰賴你自己在 Round 收尾前想起來）：這一輪的
-`### Status` 從 `BLOCKED` 變成別的值，或你自行判斷這輪明顯繞了一圈才找到對的做法。
+**三種自我判斷訊號**（hook 判斷不到，完全仰賴你自己在 Round 收尾前想起來）：這一輪的
+`### Status` 從 `BLOCKED` 變成別的值，你自行判斷這輪明顯繞了一圈才找到對的做法，或使用者糾正了你的做法、
+否決或中斷你、要求重做。第三種的 `--text` 開頭寫 `[糾正]`，內容是你原本怎麼做、使用者要求怎樣、
+下次怎麼避免；`/devlog-tracker:promote` 會把 `[糾正]` 條目當最優先的規則候選，所以不要省略這個標記。
+純需求變更、新功能要求不算糾正。
 
 **兩種機制性訊號**（`round-start.sh` 在下一輪開始時累積計數，`.devlog/.lessons-advisory-state`
 的 `count`/`threshold`，預設門檻 3、`/devlog-tracker:lessons-drift <次數>` 可調，兩種共用同一個
@@ -18,7 +21,7 @@
 下一輪開始時 hook 會**額外**機械印一句提示——這個不經過門檻計數，偵測到就印一次（因為它本身
 就是一次性事件，不是可以累積的次數）。
 
-以上四種**完全不 hook 強制寫入本身**——寫不寫都不影響這一輪能不能收尾，跟「Handoff 的
+以上五種**完全不 hook 強制寫入本身**——寫不寫都不影響這一輪能不能收尾，跟「Handoff 的
 `<decisions>`（舊格式 `#### 決策`）沒有就整個標籤省略」同一種精神，不要自己加壓力覺得每輪都要交一份。
 
 **寫法**：跑（`PLUGIN_ROOT` 同其他指令）：
@@ -54,7 +57,7 @@ Lessons Mode 開著時，Claude Code 與 Codex 的 `SubagentStart` hook 會在 s
   worktree isolation 下也照那條絕對路徑指令跑，不會寫錯地方。
 
 Claude Code 上，前景 sub agent 回來時（`PostToolUse`），或背景 sub agent／Workflow 的 task-notification
-  到達時（`round-start.sh`），你會看到一句 `[Lessons Mode 提示]`，提醒你檢查上面四種訊號；
+  到達時（`round-start.sh`），你會看到一句 `[Lessons Mode 提示]`，提醒你檢查上面的訊號；
   背景任務 `status` 是 `failed`／`killed` 時還會算進共用計數器。
 
 看到提示後：sub agent 已說明記過的主題不要重複記；多個 agent 卡在同一種問題時，由你彙整成

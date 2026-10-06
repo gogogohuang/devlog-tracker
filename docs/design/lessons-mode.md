@@ -56,6 +56,13 @@ BLOCKED→解開」below).
    took a real wrong turn before landing on the right approach, and that
    future-Claude would benefit from knowing to skip the wrong turn.
 
+3. **Self-judged user correction.** The user told Claude its approach was
+   wrong, overrode or interrupted it, or asked for a redo. The entry's text
+   starts with `[糾正]` and says what Claude did, what the user wanted, and
+   how to avoid it next time. `/devlog-tracker:promote` treats `[糾正]`
+   entries as top-priority rule candidates (same as keep-all's `## 糾正 AI`).
+   Plain requirement changes do not count. Still never enforced.
+
 Writing an entry is **never required** to close a Round (unlike
 `#### 工作區`/`#### 檔案`, which are machine-verified when applicable).
 Skipping it is not an error and produces no warning.

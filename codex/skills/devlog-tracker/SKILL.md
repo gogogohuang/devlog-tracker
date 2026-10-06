@@ -481,8 +481,9 @@ Handoff。核對用 `commands/continue.md` 步驟 5.1–5.2（不要跟著做 5.
 
 跟 Checkpoint／Span 不同，管的是「開發**過程**踩過的坑」，不是進度或架構——架構
 決策的 SSOT 永遠是 `docs/design/*.md`。預設關閉，隸屬主開關（沒下過
-`/devlog-tracker:start` 會被拒絕）。開著時有兩種自我判斷訊號考慮記一筆：這輪
-`Status` 從 `BLOCKED` 解開、你自行判斷這輪明顯繞了一圈——這兩種完全仰賴你自己
+`/devlog-tracker:start` 會被拒絕）。開著時有三種自我判斷訊號考慮記一筆：這輪
+`Status` 從 `BLOCKED` 解開、你自行判斷這輪明顯繞了一圈、使用者糾正了你的做法（`--text`
+開頭寫 `[糾正]`，promote 會優先採用）——這三種完全仰賴你自己
 想起來，hook 不強制、不追蹤。另外有兩種機制性訊號，由 hook 累積計數、達門檻只印
 一句顧問式建議（預設 3 次，`/devlog-tracker:lessons-drift <次數>` 可調，兩種共用
 同一個門檻）：工作區漂移（宣稱跟實際不符）累積達門檻、或 Status 是 `BLOCKED` 的
