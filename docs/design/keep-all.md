@@ -268,6 +268,12 @@ first write a temp file, then
 ```
 # Keep-all analysis
 
+## 糾正 AI
+- #<id> <file> Round <n> (topic: <topic>)
+  - AI 做錯／不當：...
+  - 使用者糾正：...
+  - 應遵守的規則：...
+
 ## <topic>
 <description>
 
@@ -277,7 +283,13 @@ first write a temp file, then
 來源檔：<file> Round <numbers>
 ```
 
-One `## <topic>` section per topic, each with description, 規範候選
+`## 糾正 AI` always comes first (just 「無」 when there are none): every
+place the user corrected the AI (told it a behavior was wrong, interrupted
+or overrode it) is marked while Claude reads the sources, shown as a count
+in the confirmation list, and written as AI behavior / user correction /
+rule to follow. Repeated corrections of the same mistake are merged, since
+those are the rules most worth putting in the prompt. It is prompt-only —
+the script treats the file as opaque text. One `## <topic>` section per topic, each with description, 規範候選
 (promotable rules), source files and Rounds. `--write-analysis` is pure
 shell (no Node needed), takes the devlog lock, copies via an exclusive
 `mktemp` file and `mv`, and prints `ANALYSIS=<path>`. Error contract:
@@ -286,8 +298,10 @@ the lock is held by another process, or the copy/move fails (temp file
 removed; an existing analysis file is left untouched).
 
 `promote-sources.sh` lists it as `FILE=... KIND=analysis EXISTS=1`;
-`/devlog-tracker:promote` reads it first and picks AGENTS.md/CLAUDE.md
-rules from each topic's 規範候選.
+`/devlog-tracker:promote` reads it first, treats each 糾正 AI entry as
+the top-priority candidate (written as a direct instruction to the AI,
+repeated corrections first, overturned ones skipped), then picks
+AGENTS.md/CLAUDE.md rules from each topic's 規範候選.
 
 ## Non-goals
 

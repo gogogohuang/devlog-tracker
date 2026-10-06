@@ -15,7 +15,7 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 ```
 
 - `NO_SOURCES`：告知目前沒有可以沉澱的來源（還沒 keep 過、沒有 lessons、也沒有 Checkpoint），可以先用 `/devlog-tracker:keep` 或開 Lessons Mode；結束。
-- `FILE=<路徑> KIND=analysis EXISTS=1`：keep-all 寫的分析檔（`# Keep-all analysis`）。**優先讀取**，並從各主題的「規範候選」中挑選要寫進 `TARGET`（AGENTS.md／CLAUDE.md）的項目；候選已是沉澱過的規則，仍須去重並等使用者選。
+- `FILE=<路徑> KIND=analysis EXISTS=1`：keep-all 寫的分析檔（`# Keep-all analysis`）。**優先讀取**。先看最前面的 `## 糾正 AI` 節：每一筆都是使用者糾正過 AI 的實例，它的「應遵守的規則」是最優先的候選（標為 `[糾正]`；多次被糾正的排最前面，已標「已被推翻」的跳過）。接著再從各主題的「規範候選」中挑選要寫進 `TARGET`（AGENTS.md／CLAUDE.md）的項目；候選已是沉澱過的規則，仍須去重並等使用者選。
 - `FILE=<路徑> KIND=kept|lessons EXISTS=1`：要讀的檔。`EXISTS=0` 是索引還在但檔案已被刪掉，跳過，最後提一句。
 - `CHECKPOINT=<檔案>:<行號>`：從該行的 `## Checkpoint` 標題往下讀到下一個 `## ` 標題為止，只看其中 `### 決策` 小節。
 - `TARGET=<路徑>`：規則要寫進的檔。`EXISTING=<n>` 表示這個檔已經有 n 條沉澱過的規則。
@@ -30,6 +30,10 @@ DEVLOG_PROJECT_DIR="<專案根目錄絕對路徑>" bash "${PLUGIN_ROOT}/core/scr
 - 不要：單次任務細節、已經被後續內容推翻或取代的決定、`TARGET` 檔裡已經寫了（不論在不在規範區塊裡）意思相同的規則。
 
 **不要把 `### User Input` 原文寫成規則候選**——kept 檔保留完整 Round，內容是單次任務的原文，不是沉澱過的規範。
+
+`KIND=lessons` 檔裡開頭為 `[糾正]` 的條目也一律當 `[糾正]` 候選，優先度同上（與分析檔重複的合併成一條）。
+
+`[糾正]` 候選要寫成對 AI 的直接指示（「不要…」「一律…」），並說明原因是使用者曾糾正過，讓 CLAUDE.md／AGENTS.md 的規則實際改掉 AI 的行為；如果 `TARGET` 已有意思相近的規則卻仍被糾正，建議改寫成更明確的版本，而不是略過。
 
 每條候選寫成一行、可以直接放進 CLAUDE.md 的條列句，必要時附一句原因，結尾標出處：`（來源：<檔名>「<標題>」）`。找不到夠格的就說沒有，不硬湊。
 
