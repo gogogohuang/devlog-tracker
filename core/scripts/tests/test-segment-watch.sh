@@ -321,6 +321,21 @@ printf '{"last_change_epoch": %s, "last_seen_cksum": "stale-sum", "max_silent_se
 printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
 assert_exit "missing identity + hash change -> allowed" 0 $?
 
+# --- Scenario 18: no .round-current.md (round-start opened no round) --------
+# round-start.sh records "MISSING" when it opens no round (management command,
+# span tick, notification fold). Nothing to append a 段落 to, so an expired
+# clock must not block: the Stop hook's checkpoint message asks for a write to
+# devlog.md, which the valve would otherwise deny while demanding edits to a
+# file that does not exist.
+rm -f "$DEVLOG_DIR/.round-current.md"
+write_state "$EXPIRED" "MISSING" 900
+printf '%s' "$BASH_PAYLOAD" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "no round file + expired + Bash -> allowed" 0 $?
+EDIT_DEVLOG='{"tool_name":"Edit","tool_input":{"file_path":".devlog/devlog.md"},"session_id":"aaa"}'
+write_state "$EXPIRED" "MISSING" 900
+printf '%s' "$EDIT_DEVLOG" | bash "$SCRIPT_DIR/segment-watch.sh" >/dev/null 2>&1
+assert_exit "no round file + expired + Edit devlog.md -> allowed" 0 $?
+
 # --- workspace mismatch marker blocks non-devlog tools ----------------------
 cat > "$DEVLOG_DIR/.round-current.md" <<'EOF'
 ## Round 1 — 2026-09-11T00:00:00+08:00

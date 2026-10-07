@@ -187,8 +187,13 @@ if [ -f "$ROUND_CURRENT" ]; then
     ID_SZ="${ID#* }"
   fi
 else
-  CURRENT="MISSING"
-  ID_MT=""; ID_SZ=""
+  # No round file means round-start opened no round (management command, span
+  # tick, notification fold) or the round was already merged. There is no
+  # 段落 to append, so the valve has nothing to ask for; blocking here would
+  # demand edits to a file that does not exist and deny the devlog.md write the
+  # Stop hook's checkpoint message requests. Keep the clock fresh and let go.
+  persist_seen "$NOW" "MISSING" "" ""
+  exit 0
 fi
 [ -n "$CURRENT" ] || exit 0
 
