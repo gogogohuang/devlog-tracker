@@ -221,6 +221,25 @@ write_claim "$(workspace_snapshot "$R7")" "$TMP_ROOT/label7.md"
 echo y > "$R7/a.txt"; git -C "$R7" add a.txt; git -C "$R7" commit -q -m second
 assert_eq "AC-5: same branch, different hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R7" "$TMP_ROOT/label7.md")"
 
+# --- hand-written prose claim, same facts (semantic compare) -------------------
+R8="$TMP_ROOT/prose8"; new_repo "$R8"
+mkdir -p "$R8/docs/specs"; echo x > "$R8/docs/specs/01.md"; git -C "$R8" add .; git -C "$R8" commit -q -m init
+echo s > "$R8/docs/specs/14-open-pr.md"
+H8="$(git -C "$R8" rev-parse --short HEAD)"
+write_claim "main @ ${H8}，工作樹有未追蹤的 docs/specs/14-open-pr.md" "$TMP_ROOT/prose8.md"
+assert_eq "prose: same hash, same dirty file -> MATCH" "MATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8.md")"
+write_claim "main @ ${H8}，工作樹乾淨" "$TMP_ROOT/prose8b.md"
+assert_eq "prose: claims clean but live dirty -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8b.md")"
+write_claim "main @ ${H8}，工作樹有未追蹤的 docs/specs/14-open-pr.md 與 other.ts" "$TMP_ROOT/prose8c.md"
+assert_eq "prose: claims extra file -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8c.md")"
+write_claim "main @ deadbee，工作樹有未追蹤的 docs/specs/14-open-pr.md" "$TMP_ROOT/prose8d.md"
+assert_eq "prose: wrong hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8d.md")"
+write_claim "main @ ${H8}，工作樹有未追蹤的 docs/specs/14-open-pr.md" "$TMP_ROOT/prose8e.md"
+echo y > "$R8/another.txt"
+assert_eq "prose: live has unclaimed dirty file -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8e.md")"
+rm "$R8/another.txt"; git -C "$R8" checkout -q --detach
+assert_eq "prose: detached live vs named claim -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8.md")"
+
 if [ "$FAIL" -eq 0 ]; then
   echo "All checks passed."
   exit 0
