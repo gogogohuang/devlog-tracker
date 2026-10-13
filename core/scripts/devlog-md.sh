@@ -307,6 +307,46 @@ _workspace_claim_matches_branch_label() {
     && [ "$claimed_rest" = "$live_rest" ]
 }
 
+# Fallback for a hand-written <workspace> that states the same facts as the
+# live snapshot in different words (e.g. "main @ abc1234，工作樹有未追蹤的
+# a/b.md" vs the canonical two-line form). Compares facts, not text: same
+# commit hash, same dirty-path set, and a detached HEAD only matches a
+# detached HEAD. Branch labels are ignored, as in the label matcher above.
+_workspace_claim_matches_facts() {
+  local claimed="$1" live="$2" claimed_first live_first claimed_label live_label
+  local claimed_hash live_hash claimed_rest live_files="" live_rest="" f tok
+  claimed_first="${claimed%%$'\n'*}"
+  live_first="${live%%$'\n'*}"
+  case "$claimed_first" in *' @ '*) ;; *) return 1 ;; esac
+  case "$live_first" in *' @ '*) ;; *) return 1 ;; esac
+  claimed_label="${claimed_first%% @ *}"
+  live_label="${live_first%% @ *}"
+  [ "$claimed_label" = "HEAD detached" ] && [ "$live_label" != "HEAD detached" ] && return 1
+  [ "$live_label" = "HEAD detached" ] && [ "$claimed_label" != "HEAD detached" ] && return 1
+  claimed_hash="$(printf '%s' "${claimed_first#* @ }" | grep -oE '^[0-9a-f]{7,40}' || true)"
+  live_hash="$(printf '%s' "${live_first#* @ }" | grep -oE '^[0-9a-f]{7,40}' || true)"
+  [ -n "$claimed_hash" ] && [ "$claimed_hash" = "$live_hash" ] || return 1
+  claimed_rest="${claimed#"$claimed_first"}"
+  claimed_rest="${claimed_rest}${claimed_first#*"$claimed_hash"}"
+  case "$live" in *$'\n'*) live_rest="${live#*$'\n'}" ;; esac
+  live_files="${live_rest#未提交：}"
+  if [ -z "$live_rest" ]; then
+    case "$claimed_rest" in *未提交*|*未追蹤*|*未暫存*) return 1 ;; esac
+  else
+    case "$claimed_rest" in *乾淨*) return 1 ;; esac
+    while IFS= read -r f; do
+      [ -n "$f" ] || continue
+      case "$claimed_rest" in *"$f"*) ;; *) return 1 ;; esac
+    done < <(printf '%s\n' "$live_files" | sed 's/, /\n/g')
+  fi
+  # Any path-like token the claim names must be a live dirty path.
+  while IFS= read -r tok; do
+    [ -n "$tok" ] || continue
+    case ", $live_files, " in *", $tok, "*) ;; *) return 1 ;; esac
+  done < <(printf '%s\n' "$claimed_rest" | grep -oE '[A-Za-z0-9_./@-]*[./][A-Za-z0-9_./@-]*' | sed 's/[.,]*$//' | grep -v '^$' || true)
+  return 0
+}
+
 workspace_claim_state() {
   local dir="$1" file="$2" platform="${3:-claude}" start end status claimed live
   if ! type workspace_snapshot >/dev/null 2>&1; then
@@ -337,5 +377,6 @@ workspace_claim_state() {
     if [ "$claimed" = "$(workspace_snapshot "$wt")" ]; then printf 'MATCH\n'; return 0; fi
   done < <(git -C "$dir" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
   if _workspace_claim_matches_branch_label "$claimed" "$live"; then printf 'MATCH\n'; return 0; fi
+  if _workspace_claim_matches_facts "$claimed" "$live"; then printf 'MATCH\n'; return 0; fi
   printf 'MISMATCH\n'
 }
