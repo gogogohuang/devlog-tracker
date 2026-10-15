@@ -237,6 +237,31 @@ assert_eq "prose: wrong hash -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$
 write_claim "main @ ${H8}，工作樹有未追蹤的 docs/specs/14-open-pr.md" "$TMP_ROOT/prose8e.md"
 echo y > "$R8/another.txt"
 assert_eq "prose: live has unclaimed dirty file -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8e.md")"
+write_claim_scoped() {
+  cat > "$3" <<EOF2
+## Round 1 — 2026-09-11T00:00:00+08:00
+
+### Handoff
+#### 檔案
+$2
+
+#### 工作區
+$1
+
+### Status
+IN_PROGRESS
+EOF2
+}
+# scope rule: dirty files listed in the previous Handoff's 檔案 are not drift
+write_claim_scoped "main @ ${H8}，有未 commit 的修改" "尚未 commit：
+新增：docs/specs/14-open-pr.md, another.txt" "$TMP_ROOT/scope1.md"
+assert_eq "scope: all dirty files listed in 檔案 -> MATCH" "MATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/scope1.md")"
+write_claim_scoped "main @ ${H8}，有未 commit 的修改" "新增：docs/specs/14-open-pr.md" "$TMP_ROOT/scope2.md"
+assert_eq "scope: dirty file outside 檔案 -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/scope2.md")"
+write_claim_scoped "main @ deadbee，有未 commit 的修改" "新增：docs/specs/14-open-pr.md, another.txt" "$TMP_ROOT/scope3.md"
+assert_eq "scope: files all listed but hash differs -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/scope3.md")"
+write_claim_scoped "main @ ${H8}，有未 commit 的修改" "新增：docs/" "$TMP_ROOT/scope4.md"
+assert_eq "scope: directory prefix covers file but not another.txt -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/scope4.md")"
 rm "$R8/another.txt"; git -C "$R8" checkout -q --detach
 assert_eq "prose: detached live vs named claim -> MISMATCH" "MISMATCH" "$(workspace_claim_state "$R8" "$TMP_ROOT/prose8.md")"
 

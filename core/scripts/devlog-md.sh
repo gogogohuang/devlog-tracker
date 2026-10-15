@@ -347,8 +347,49 @@ _workspace_claim_matches_facts() {
   return 0
 }
 
+devlog_round_files_body() {
+  local blob body
+  blob="$(awk -v start="$2" -v end="$3" 'NR >= start && NR <= end' "$1")"
+  body="$(handoff_section_of "$blob" Handoff)"
+  handoff_field "$body" files | sed -e '/^[[:space:]]*$/d'
+}
+
+# Scope rule: a live dirty path is "drift" only when the previous Handoff's
+# <files> did not list it. Same commit hash, and every live dirty path is
+# named in <files> (exact path, or a directory prefix either way) -> the
+# working tree is just that round's own unfinished work, not drift. Claim
+# wording in <workspace> is ignored. Different hash is still a mismatch.
+_workspace_dirty_within_files_scope() {
+  local files="$1" live="$2" claimed="$3" live_first claimed_first live_hash claimed_hash live_rest live_files f t ok
+  [ -n "$files" ] || return 1
+  live_first="${live%%$'\n'*}"
+  claimed_first="${claimed%%$'\n'*}"
+  case "$live_first" in *' @ '*) ;; *) return 1 ;; esac
+  case "$claimed_first" in *' @ '*) ;; *) return 1 ;; esac
+  live_hash="$(printf '%s' "${live_first#* @ }" | grep -oE '^[0-9a-f]{7,40}' || true)"
+  claimed_hash="$(printf '%s' "${claimed_first#* @ }" | grep -oE '^[0-9a-f]{7,40}' || true)"
+  [ -n "$live_hash" ] && [ "$live_hash" = "$claimed_hash" ] || return 1
+  case "$live" in *$'\n'*) live_rest="${live#*$'\n'}" ;; *) return 1 ;; esac
+  live_files="${live_rest#未提交：}"
+  [ -n "$live_files" ] || return 1
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    ok=0
+    while IFS= read -r t; do
+      [ -n "$t" ] || continue
+      case "$t" in
+        "$f") ok=1; break ;;
+        "$f"*) case "$f" in */) ok=1; break ;; esac ;;
+      esac
+      case "$t" in */) case "$f" in "$t"*) ok=1; break ;; esac ;; esac
+    done < <(printf '%s\n' "$files" | sed -e 's/[,，、：:]/ /g' | tr -s '[:space:]' '\n')
+    [ "$ok" -eq 1 ] || return 1
+  done < <(printf '%s\n' "$live_files" | sed 's/, /\n/g')
+  return 0
+}
+
 workspace_claim_state() {
-  local dir="$1" file="$2" platform="${3:-claude}" start end status claimed live
+  local dir="$1" file="$2" platform="${3:-claude}" start end status claimed live files_scope
   if ! type workspace_snapshot >/dev/null 2>&1; then
     # shellcheck source=workspace-snapshot.sh
     . "$_DEVLOG_MD_DIR/workspace-snapshot.sh"
@@ -365,6 +406,7 @@ workspace_claim_state() {
     *) printf 'NO_CLAIM\n'; return 0 ;;
   esac
   claimed="$(devlog_round_workspace_body "$file" "$start" "$end")"
+  files_scope="$(devlog_round_files_body "$file" "$start" "$end")"
   [ -n "$claimed" ] || { printf 'NO_CLAIM\n'; return 0; }
   live="$(workspace_snapshot "$dir")"
   [ -n "$live" ] || { printf 'NO_CLAIM\n'; return 0; }
@@ -378,5 +420,6 @@ workspace_claim_state() {
   done < <(git -C "$dir" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
   if _workspace_claim_matches_branch_label "$claimed" "$live"; then printf 'MATCH\n'; return 0; fi
   if _workspace_claim_matches_facts "$claimed" "$live"; then printf 'MATCH\n'; return 0; fi
+  if _workspace_dirty_within_files_scope "$files_scope" "$live" "$claimed"; then printf 'MATCH\n'; return 0; fi
   printf 'MISMATCH\n'
 }
