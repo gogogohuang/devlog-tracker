@@ -90,7 +90,9 @@ files_snapshot() {
 # Executed directly (not sourced): print this session's changes when a valid
 # session baseline exists, else the whole dirty listing (D5, D7).
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
-  # shellcheck source=session-baseline.sh
+  # session-baseline.sh sources this file back; /dev/null keeps shellcheck
+  # -x from following that cycle forever.
+  # shellcheck source=/dev/null
   . "$(dirname "${BASH_SOURCE[0]}")/session-baseline.sh"
   _fs_dir="${1:-.}"
   if ! _fs_out="$(session_changes "$_fs_dir" 2>/dev/null)"; then
