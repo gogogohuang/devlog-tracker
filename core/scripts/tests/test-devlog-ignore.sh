@@ -66,7 +66,7 @@ devlog_ignored "$TMP" 'gen/' && echo "PASS: dir entry ignored" || { echo "FAIL: 
 rm -f "$TMP/.devlogignore"
 OUT="$(printf 'a\nb\n' | devlog_ignore_filter "$TMP")"; rc=$?
 [ "$OUT" = "$(printf 'a\nb')" ] && [ $rc -eq 0 ] && echo "PASS: no file passthrough" || { echo "FAIL: no file"; FAIL=1; }
-printf '\377\376(((\n[\n\\\n**\n' > "$TMP/.devlogignore"
+printf '\377\376(((\n[\n\\\n' > "$TMP/.devlogignore"
 OUT="$(printf 'a\n' | devlog_ignore_filter "$TMP")"; rc=$?
 [ "$OUT" = "a" ] && [ $rc -eq 0 ] && echo "PASS: garbage file fail-open" || { echo "FAIL: garbage: $OUT rc=$rc"; FAIL=1; }
 mkdir "$TMP/d2"; mkdir "$TMP/d2/.devlogignore"
