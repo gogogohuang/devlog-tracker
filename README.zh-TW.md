@@ -165,11 +165,33 @@ $devlog-start           # Codex plugin 或 npx init --codex
 | `/devlog-tracker:status` | 查看強制記錄開關、Span、Checkpoint、Segment Watch、Lessons Mode 工作區漂移計數與最後一輪 Status。 |
 | `/devlog-tracker:span` | 開啟或關閉自動續接長任務使用的 Span Mode（不要手寫 `.span-open` JSON）。 |
 | `/devlog-tracker:segment-watch <時間長度>` | 調整 Segment Watch 的沉默門檻（預設 10 分鐘）。專案還沒 `/devlog-tracker:start` 時回報 `NOT_STARTED`，不會建立任何檔案。 |
+| `/devlog-tracker:ignore [list\|add <pattern>\|remove <pattern>\|check <path>]` | 管理專案根目錄的 `.devlogignore`（見[忽略路徑](#忽略路徑devlogignore)）。`add` 不加重複行，`remove` 只刪完全相同的行。不需要先 `start`。 |
 | `/devlog-tracker:checkpoint <輪數>` | 調整 Checkpoint Mode 的沉默門檻（預設 20 輪）。專案還沒 start 時回報 `NOT_STARTED`。 |
 | `/devlog-tracker:lessons-on` | 開啟預設關閉的 Lessons Mode（隸屬主開關，沒 `start` 過會拒絕）。細節見 [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md)。 |
 | `/devlog-tracker:lessons-off` | 關閉 Lessons Mode，不動任何已寫的 `devlog.lessons.*.md` 或索引。 |
 | `/devlog-tracker:lessons [<topic>]` | 沒給 topic：印 `## Lessons 索引`。給 topic：印該主題檔全文。純讀取，不核對工作區、不等確認。 |
 | `/devlog-tracker:lessons-drift <次數>` | 調整 Lessons Mode「工作區漂移重複發生」機制性提醒的門檻（預設 3 次）。隸屬 Lessons Mode，沒開會回報 `LESSONS_NOT_ENABLED`。 |
+
+## 忽略路徑（`.devlogignore`）
+
+在專案根目錄（跟 `.devlog/` 同層，可以進版控）放一個 `.devlogignore`，語法是 gitignore 的子集，一行一個 pattern：
+
+```
+# 註解與空行會略過
+*.lock
+dist/
+/build
+src/gen/**
+!keep.lock
+```
+
+- 不含 `/` 的（`name`、`*.lock`）比對任一層名稱；開頭 `/` 或中間有 `/` 的錨定在專案根目錄；結尾 `/` 只比對目錄。
+- `*`、`?` 不跨 `/`，`**` 可跨目錄。`!pat` 是否定，最後一個命中的行決定結果。
+- 不支援 `[...]` 與 `\` 跳脫（照字面比對，不報錯）。
+- 被 ignore 的路徑不計入 `<files>` 與 `<workspace>` 的核對。檔案不存在或讀不到就不多略過任何東西（fail-open）。
+- 用 `/devlog-tracker:ignore`（`list`、`add`、`remove`、`check`）管理，或直接手改。
+
+**Session 基準。** session 開始時 hook 會記下當時已經 dirty 的檔案。`<files>` 的「尚未 commit」核對只算**本 session** 的改動（用 `bash <plugin>/core/scripts/files-snapshot.sh` 可印出）；`<workspace>` 仍是整個工作區狀態扣掉 ignore 的路徑，所以 `/devlog-tracker:continue` 可跨 session 核對。基準有任何問題就退回舊行為（fail-open）。細節見 [`docs/design/devlog-ignore-session-baseline.md`](docs/design/devlog-ignore-session-baseline.md)。
 
 ## 善用記下來的內容
 

@@ -302,6 +302,10 @@ Round 編號：讀取檔案中最後一個 `## Round <N>`，本輪用 N+1；檔�
   刪除+新增，不是第四類。`.devlog/` 路徑不算進比對。看不懂的行（沒有照這個格式寫）會被擋下來，
   不是 fail-open——這是 Claude 該產生的格式，不是可有可無的宣告。細節見
   `docs/design/files-verify.md`（`core/scripts/files-snapshot.sh`）。
+  `尚未 commit` 區塊只列**本 session** 的改動：session 開始前就已存在、之後沒動過的 dirty 檔不算；
+  `bash <plugin>/core/scripts/files-snapshot.sh` 會印出這份清單。`.devlogignore` 列出的路徑在
+  `<files>` 與 `<workspace>` 都不計（`/devlog-tracker:ignore` 管理；見
+  `docs/design/devlog-ignore-session-baseline.md`）。
 - Handoff 只寫已發生的事；未來式只允許出現在「下一步」與「完成條件」。
 - `Status` 只寫 `DONE`、`IN_PROGRESS`、`BLOCKED`、`INTERRUPTED` 其中一個，不要在下面再附「接下來要做什麼」
   （那句搬進 Handoff 的「下一步」）。`IN_PROGRESS` = 還能做；`BLOCKED` = 缺外部輸入；
@@ -330,7 +334,7 @@ Stop hook 會檢查最後一個 Round 是否同時有 `### Summary`、`### Reply
 ### devlog-tracker 自己的管理指令不記錄
 
 這一輪如果是使用者直接呼叫 devlog-tracker 自己的純管理指令——`/devlog-tracker:checkpoint`、
-`clean`、`compact`、`keep`、`keep-all`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
+`clean`、`compact`、`ignore`、`keep`、`keep-all`、`lessons`、`lessons-drift`、`lessons-off`、`lessons-on`、
 `overview`、`pause`、`report`、`search`、`segment-watch`、`span`、`start`、`status`、`timeline`——`round-start.sh`
 會整輪直接放行，不開 Round、不動任何計數器，等於這個 tick 沒發生過；不用、也不會被
 Stop hook 要求補寫 Summary／Reply／Handoff。這些指令本身就是在操作 devlog 系統，不是開發
