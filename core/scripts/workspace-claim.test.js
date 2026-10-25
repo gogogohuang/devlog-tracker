@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-for (const name of ['test-workspace-snapshot.sh', 'test-round-start.sh']) {
+for (const name of ['test-workspace-snapshot.sh', 'test-round-start.sh', 'test-devlog-ignore.sh', 'test-devlog-ignore-hooks.sh', 'test-session-baseline.sh']) {
   test(`${name} passes (workspace claim ignores branch label)`, () => {
     const result = spawnSync('bash', [path.join(__dirname, 'tests', name)], { encoding: 'utf8' });
     assert.ifError(result.error);

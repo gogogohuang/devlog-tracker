@@ -22,28 +22,22 @@
 # git status's `C`) is categorized conservatively as 修改 — see
 # docs/design/files-verify.md's Known Limitations.
 #
+# Paths matched by $dir/.devlogignore are dropped in both modes
+# (devlog-ignore.sh); no ignore file means output is unchanged.
+#
 # Known limitation: a changed path containing a space is not exactly
 # reversible from the comma-joined output below — same limitation
 # workspace-snapshot.sh's 未提交 list already has.
-files_snapshot() {
-  local dir="${1:-.}" hash="${2:-}"
-  if ! git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    return 0
-  fi
+# shellcheck source=devlog-ignore.sh
+. "$(dirname "${BASH_SOURCE[0]}")/devlog-ignore.sh"
 
-  local raw
-  if [ -n "$hash" ]; then
-    git -C "$dir" rev-parse --verify -q "${hash}^{commit}" >/dev/null 2>&1 || return 0
-    raw="$(git -C "$dir" diff-tree --no-commit-id --name-status -r --root "$hash" 2>/dev/null || true)"
-  else
-    raw="$(git -C "$dir" status --short --no-renames 2>/dev/null || true)"
-  fi
-  [ -n "$raw" ] || return 0
-
-  local added='' modified='' deleted='' line code path
+# stdin: raw status (kind=status) or diff-tree (kind=tab) lines, already
+# ignore-filtered; stdout: the 新增/修改/刪除 category lines.
+_files_categorize() {
+  local kind="$1" added='' modified='' deleted='' line code path
   while IFS= read -r line; do
     [ -n "$line" ] || continue
-    if [ -n "$hash" ]; then
+    if [ "$kind" = tab ]; then
       # diff-tree --name-status: "<code>\t<path>" (single-letter code)
       code="${line%%$'\t'*}"
       path="${line#*$'\t'}"
@@ -61,10 +55,47 @@ files_snapshot() {
       *D*) deleted="${deleted:+$deleted, }$path" ;;
       *) modified="${modified:+$modified, }$path" ;;
     esac
-  done <<< "$raw"
+  done
 
   [ -n "$added" ] && printf '新增：%s\n' "$added"
   [ -n "$modified" ] && printf '修改：%s\n' "$modified"
   [ -n "$deleted" ] && printf '刪除：%s\n' "$deleted"
   return 0
 }
+
+files_snapshot() {
+  local dir="${1:-.}" hash="${2:-}"
+  if ! git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local raw
+  if [ -n "$hash" ]; then
+    git -C "$dir" rev-parse --verify -q "${hash}^{commit}" >/dev/null 2>&1 || return 0
+    raw="$(git -C "$dir" diff-tree --no-commit-id --name-status -r --root "$hash" 2>/dev/null || true)"
+  else
+    raw="$(git -C "$dir" status --short --no-renames 2>/dev/null || true)"
+  fi
+  [ -n "$raw" ] || return 0
+  if [ -n "$hash" ]; then
+    raw="$(printf '%s\n' "$raw" | devlog_ignore_filter "$dir" tab)"
+  else
+    raw="$(printf '%s\n' "$raw" | devlog_ignore_filter "$dir" status)"
+  fi
+
+  printf '%s\n' "$raw" | _files_categorize "$([ -n "$hash" ] && echo tab || echo status)"
+  return 0
+}
+
+# Executed directly (not sourced): print this session's changes when a valid
+# session baseline exists, else the whole dirty listing (D5, D7).
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  # shellcheck source=session-baseline.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/session-baseline.sh"
+  _fs_dir="${1:-.}"
+  if ! _fs_out="$(session_changes "$_fs_dir" 2>/dev/null)"; then
+    _fs_out="$(files_snapshot "$_fs_dir")"
+  fi
+  [ -z "$_fs_out" ] || printf '%s\n' "$_fs_out"
+  exit 0
+fi

@@ -165,11 +165,33 @@ The table below uses the Claude plugin's `/devlog-tracker:*` namespace; `npx ini
 | `/devlog-tracker:status` | Shows whether enforced recording is on, Span, Checkpoint, Segment Watch, the Lessons Mode workspace-drift count, and the last round's Status. |
 | `/devlog-tracker:span` | Turns Span Mode on/off, used for auto-continuing long-running tasks (don't hand-edit the `.span-open` JSON). |
 | `/devlog-tracker:segment-watch <duration>` | Adjusts Segment Watch's silence threshold (default 10 minutes). Reports `NOT_STARTED` and creates no files if the project hasn't run `/devlog-tracker:start`. |
+| `/devlog-tracker:ignore [list\|add <pattern>\|remove <pattern>\|check <path>]` | Manages the project-root `.devlogignore` (see [Ignoring paths](#ignoring-paths-devlogignore)). `add` skips duplicates, `remove` deletes exact-match lines only. Doesn't need `start`. |
 | `/devlog-tracker:checkpoint <rounds>` | Adjusts Checkpoint Mode's silence threshold (default 20 rounds). Reports `NOT_STARTED` if the project hasn't started. |
 | `/devlog-tracker:lessons-on` | Turns on Lessons Mode, which is off by default (subordinate to the main switch; refuses if `start` hasn't run). See [`docs/design/lessons-mode.md`](docs/design/lessons-mode.md). |
 | `/devlog-tracker:lessons-off` | Turns off Lessons Mode; doesn't touch any already-written `devlog.lessons.*.md` files or the index. |
 | `/devlog-tracker:lessons [<topic>]` | No topic given: prints the `## Lessons index`. Topic given: prints that topic file's full content. Read-only — no workspace check, no confirmation. |
 | `/devlog-tracker:lessons-drift <count>` | Adjusts the threshold for Lessons Mode's "recurring workspace drift" mechanical reminder (default 3). Subordinate to Lessons Mode; reports `LESSONS_NOT_ENABLED` if it's off. |
+
+## Ignoring paths (`.devlogignore`)
+
+Put a `.devlogignore` at the project root (next to `.devlog/`, so it can be committed). It uses a subset of gitignore syntax, one pattern per line:
+
+```
+# comments and blank lines are skipped
+*.lock
+dist/
+/build
+src/gen/**
+!keep.lock
+```
+
+- `name` / `*.lock` (no `/`) matches any path segment; a leading `/` or a `/` in the middle anchors to the project root; a trailing `/` matches directories only.
+- `*` and `?` don't cross `/`; `**` does. `!pat` negates, and the last matching line wins.
+- Not supported: `[...]` and `\` escapes (taken literally, no error).
+- Ignored paths are excluded from `<files>` and `<workspace>` checks. A missing or unreadable file means nothing extra is ignored (fail-open).
+- Manage it with `/devlog-tracker:ignore` (`list`, `add`, `remove`, `check`) or edit it by hand.
+
+**Session baseline.** At session start the hooks record which files were already dirty. For the `<files>` 尚未 commit check, only this session's changes count (print them with `bash <plugin>/core/scripts/files-snapshot.sh`); `<workspace>` still describes the whole workspace state minus ignored paths, so `/devlog-tracker:continue` works across sessions. Any baseline problem falls back to the old behaviour (fail-open). Details: [`docs/design/devlog-ignore-session-baseline.md`](docs/design/devlog-ignore-session-baseline.md).
 
 ## Using what's recorded
 

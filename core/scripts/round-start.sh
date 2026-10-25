@@ -26,6 +26,8 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/devlog-path.sh"
 # shellcheck source=lessons-advisory-state.sh
 . "$HOOKS_DIR/lessons-advisory-state.sh"
+# shellcheck source=session-baseline.sh
+. "$HOOKS_DIR/session-baseline.sh"
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 [ -f "$PROJECT_DIR/.devlog/.enabled" ] || exit 0
 devlog_resolve_paths "$PROJECT_DIR"
@@ -99,10 +101,14 @@ if [ -z "$CMD_NAME" ]; then
   esac
 fi
 case "$CMD_NAME" in
-  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:migrate|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
+  devlog-tracker:checkpoint|devlog-tracker:clean|devlog-tracker:compact|devlog-tracker:ignore|devlog-tracker:keep|devlog-tracker:keep-all|devlog-tracker:lessons|devlog-tracker:lessons-drift|devlog-tracker:lessons-off|devlog-tracker:lessons-on|devlog-tracker:migrate|devlog-tracker:overview|devlog-tracker:pause|devlog-tracker:report|devlog-tracker:search|devlog-tracker:segment-watch|devlog-tracker:span|devlog-tracker:start|devlog-tracker:status|devlog-tracker:timeline)
     exit 0
     ;;
 esac
+
+# Session baseline (D6): lazy create / adopt empty id / rebuild on id change.
+# fail-open: never affects the hook's exit status.
+session_baseline_ensure "$PROJECT_DIR" "$SESSION_ID" >/dev/null 2>&1 || true
 
 # 背景 task-notification（例如子 agent 完成通知）不是使用者真的打字：不留原始
 # XML，換成精簡摘要；也不當成新話題開新 Round，改折進最後一個 Round 當段落。

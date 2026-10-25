@@ -16,15 +16,22 @@
 # reversible from `git status --short`'s last-field extraction below — same
 # limitation the hand-written 工作區 convention already has.
 #
+# Paths matched by $dir/.devlogignore are left out too (devlog-ignore.sh); a
+# tree whose only changes are ignored reports as clean.
+#
 # Paths under .devlog/ are left out (same rule as files-snapshot.sh): the
 # devlog is rewritten every round, so counting it would make the snapshot
 # dirty by its own write. A tree whose only changes are under .devlog/
 # reports as clean.
 
+# shellcheck source=devlog-ignore.sh
+. "$(dirname "${BASH_SOURCE[0]}")/devlog-ignore.sh"
+
 # `git status --short` minus .devlog/ entries. Lines are "<XY> <path>".
 _ws_status_short() {
   git -C "$1" status --short 2>/dev/null \
     | awk '{ p = substr($0, 4) } p == ".devlog" || p ~ /^\.devlog\// { next } { print }' \
+    | devlog_ignore_filter "$1" status \
     || true
 }
 

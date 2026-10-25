@@ -32,6 +32,16 @@ set -uo pipefail
 
 PROJECT_DIR="${DEVLOG_PROJECT_DIR:-${CLAUDE_PROJECT_DIR:-.}}"
 
+_src="${BASH_SOURCE[0]}"
+HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
+# shellcheck source=json-field.sh
+. "$HOOKS_DIR/json-field.sh"
+# shellcheck source=session-baseline.sh
+. "$HOOKS_DIR/session-baseline.sh"
+
+INPUT="$(cat 2>/dev/null || true)"
+SOURCE="$(json_str_field "$INPUT" source)"
+
 # 專案根目錄的 .devlog-session-context 內容恰為三位元組 off 時，乾淨 context：
 # 在解析路徑、claim legacy、搬移分支、heal 之前退出，不讀也不改任何 devlog 狀態。
 _ctx_file="$PROJECT_DIR/.devlog-session-context"
@@ -41,10 +51,11 @@ if [ -f "$_ctx_file" ] \
   exit 0
 fi
 
-_src="${BASH_SOURCE[0]}"
-HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
-# shellcheck source=json-field.sh
-. "$HOOKS_DIR/json-field.sh"
+# Session baseline (docs/design/devlog-ignore-session-baseline.md D6): after the
+# context=off gate, which must leave all .devlog state untouched. Silent, fail-open.
+session_baseline_on_session_start "$PROJECT_DIR" "$SOURCE" \
+  "$(json_str_field "$INPUT" session_id)" >/dev/null 2>&1 || true
+
 # shellcheck source=detect-pending-question.sh
 . "$HOOKS_DIR/detect-pending-question.sh"
 # shellcheck source=devlog-path.sh
@@ -53,9 +64,6 @@ HOOKS_DIR="$(cd "${_src%/*}" && pwd)"
 . "$HOOKS_DIR/stale-vendored-hooks.sh"
 
 devlog_resolve_paths "$PROJECT_DIR"
-
-INPUT="$(cat 2>/dev/null || true)"
-SOURCE="$(json_str_field "$INPUT" source)"
 
 case "$SOURCE" in
   startup|resume|clear|fork)

@@ -29,6 +29,8 @@ SCRIPT_DIR="$(cd "${_src%/*}" && pwd)"
 . "$SCRIPT_DIR/workspace-snapshot.sh"
 # shellcheck source=files-snapshot.sh
 . "$SCRIPT_DIR/files-snapshot.sh"
+# shellcheck source=session-baseline.sh
+. "$SCRIPT_DIR/session-baseline.sh"
 # shellcheck source=devlog-md.sh
 . "$SCRIPT_DIR/devlog-md.sh"
 # shellcheck source=handoff-file.sh
@@ -463,7 +465,7 @@ commit ${h}：
 ${expected}"
         else
           FILES_ERR="$FILES_ERR
-這個 commit 在 .devlog/ 以外沒有變更，\`<files>\`（檔案）裡不該有這個 commit 區塊（或整個 \`<files>\` 省略，如果沒有其他 commit／尚未 commit 內容要報）。"
+這個 commit 在 .devlog/ 與 .devlogignore 排除的檔案以外沒有變更，\`<files>\`（檔案）裡不該有這個 commit 區塊（或整個 \`<files>\` 省略，如果沒有其他 commit／尚未 commit 內容要報）。"
         fi
       fi
     }
@@ -524,13 +526,30 @@ ${FILES_GRAMMAR}"
     fi
 
     if [ -z "$FILES_ERR" ] && [ -n "$UNCOMMITTED_CLAIM_PATHS" ]; then
-      ACTUAL_DIRTY="$(files_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+      # With a valid session baseline (D4/D5) the comparison set is this
+      # session's changes; no/invalid baseline or any failure -> whole dirty
+      # tree, exactly the pre-baseline behaviour (D7).
+      USE_BASELINE=0
+      if ACTUAL_DIRTY="$(session_changes "$PROJECT_DIR" 2>/dev/null)"; then
+        USE_BASELINE=1
+      else
+        ACTUAL_DIRTY="$(files_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+      fi
       ACTUAL_JOINED="$(printf '%s\n' "$ACTUAL_DIRTY" | sed -E 's/^(新增|修改|刪除)：//' | awk 'BEGIN{ORS=""} NF{print (out?", ":"") $0; out=1}')"
       IFS=',' read -ra _CLAIMED_ARR <<< "$UNCOMMITTED_CLAIM_PATHS"
       for _p in "${_CLAIMED_ARR[@]}"; do
         _p="$(printf '%s' "$_p" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
         [ -n "$_p" ] || continue
         if ! path_in_list "$_p" "$ACTUAL_JOINED"; then
+          if [ "$USE_BASELINE" -eq 1 ]; then
+            _ALL_DIRTY="$(files_snapshot "$PROJECT_DIR" 2>/dev/null || true)"
+            _ALL_JOINED="$(printf '%s\n' "$_ALL_DIRTY" | sed -E 's/^(新增|修改|刪除)：//' | awk 'BEGIN{ORS=""} NF{print (out?", ":"") $0; out=1}')"
+            if path_in_list "$_p" "$_ALL_JOINED"; then
+              FILES_ERR="\`<files>\`（檔案）的「尚未 commit」宣稱了 ${_p}，但它在本 session 開始前就已存在且未變動，不算本 session 的改動。請從「尚未 commit」移除它。本 session 實際的未提交變更是：
+${ACTUAL_DIRTY:-（沒有）}"
+              break
+            fi
+          fi
           FILES_ERR="\`<files>\`（檔案）的「尚未 commit」宣稱了 ${_p}，但它目前不在實際變更的檔案裡。目前實際的未提交變更是：
 ${ACTUAL_DIRTY:-（沒有，工作樹乾淨）}"
           break

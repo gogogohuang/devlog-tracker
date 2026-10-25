@@ -10,6 +10,7 @@ rm -f "$DEVLOG_DIR/.enabled" \
   "$DEVLOG_DIR"/.span-open "$DEVLOG_DIR"/.span-open@* \
   "$DEVLOG_DIR"/.round-open "$DEVLOG_DIR"/.round-open@* \
   "$DEVLOG_DIR"/.interrupted "$DEVLOG_DIR"/.interrupted@* \
-  "$DEVLOG_DIR"/.awaiting-reply "$DEVLOG_DIR"/.awaiting-reply@*
+  "$DEVLOG_DIR"/.awaiting-reply "$DEVLOG_DIR"/.awaiting-reply@* \
+  "$DEVLOG_DIR"/.session-baseline "$DEVLOG_DIR"/.session-baseline@*
 echo "PAUSED"
 exit 0
